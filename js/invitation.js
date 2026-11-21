@@ -68,17 +68,32 @@ function playAudioElementWithFallback(audioEl, candidates, onAllFail, rawUrl = "
     let idx = 0;
     let blobTried = false;
     let settled = false;
+    let stallTimer = null;
 
     audioEl.dataset.wantPlay = "1";
 
+    const clearStallTimer = () => {
+        if (stallTimer) {
+            clearTimeout(stallTimer);
+            stallTimer = null;
+        }
+    };
+
     const markPlayingSuccess = () => {
         settled = true;
+        clearStallTimer();
+    };
+
+    const finishWithError = () => {
+        if (settled || audioEl.dataset.wantPlay !== "1") return;
+        clearStallTimer();
+        if (onAllFail) onAllFail();
     };
 
     const tryBlobFallback = async () => {
         if (settled || audioEl.dataset.wantPlay !== "1") return;
         if (blobTried || typeof fetchAudioAsBlobUrl !== "function") {
-            if (onAllFail) onAllFail();
+            finishWithError();
             return;
         }
         blobTried = true;
@@ -90,12 +105,13 @@ function playAudioElementWithFallback(audioEl, candidates, onAllFail, rawUrl = "
             const p = audioEl.play();
             if (p && typeof p.catch === "function") {
                 p.catch((err) => {
+                    if (settled || audioEl.dataset.wantPlay !== "1") return;
                     if (err && err.name === "NotAllowedError") return;
-                    if (onAllFail) onAllFail();
+                    finishWithError();
                 });
             }
-        } else if (onAllFail) {
-            onAllFail();
+        } else {
+            finishWithError();
         }
     };
 
@@ -105,13 +121,35 @@ function playAudioElementWithFallback(audioEl, candidates, onAllFail, rawUrl = "
             tryBlobFallback();
             return;
         }
-        audioEl.src = candidates[idx];
-        try { audioEl.load(); } catch {}
+        const targetSrc = candidates[idx];
+        if (audioEl.src !== targetSrc) {
+            audioEl.src = targetSrc;
+            try { audioEl.load(); } catch {}
+        }
+
+        clearStallTimer();
+        stallTimer = setTimeout(() => {
+            if (settled || audioEl.dataset.wantPlay !== "1") return;
+            if (!audioEl.paused && audioEl.currentTime >= 0 && audioEl.readyState >= 2) {
+                markPlayingSuccess();
+                return;
+            }
+            if (idx + 1 < candidates.length) {
+                idx++;
+                tryCurrent();
+            } else {
+                tryBlobFallback();
+            }
+        }, 2200);
+
         const p = audioEl.play();
         if (p && typeof p.catch === "function") {
             p.catch((err) => {
                 if (settled || audioEl.dataset.wantPlay !== "1") return;
-                if (err && err.name === "NotAllowedError") return;
+                if (err && err.name === "NotAllowedError") {
+                    clearStallTimer();
+                    return;
+                }
                 if (idx + 1 < candidates.length) {
                     idx++;
                     tryCurrent();
@@ -126,6 +164,20 @@ function playAudioElementWithFallback(audioEl, candidates, onAllFail, rawUrl = "
     audioEl.onplaying = (ev) => {
         markPlayingSuccess();
         if (typeof prevOnPlaying === "function") prevOnPlaying(ev);
+    };
+
+    const prevOnCanPlay = audioEl.oncanplay;
+    audioEl.oncanplay = (ev) => {
+        if (!settled && audioEl.dataset.wantPlay === "1" && audioEl.paused) {
+            audioEl.play().catch(() => {});
+        }
+        if (typeof prevOnCanPlay === "function") prevOnCanPlay(ev);
+    };
+
+    const prevOnPause = audioEl.onpause;
+    audioEl.onpause = (ev) => {
+        if (audioEl.dataset.wantPlay !== "1") clearStallTimer();
+        if (typeof prevOnPause === "function") prevOnPause(ev);
     };
 
     audioEl.onerror = () => {
@@ -149,6 +201,7 @@ function stopPreviewAudio() {
         previewAudio.dataset.wantPlay = "0";
         previewAudio.onerror = null;
         previewAudio.onplaying = null;
+        previewAudio.oncanplay = null;
         try { previewAudio.pause(); } catch {}
         previewAudio = null;
     }
