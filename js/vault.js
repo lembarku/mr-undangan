@@ -5,6 +5,7 @@ const vaultCache = {};
 let activeVaultOwner = "";
 let activeSecretAlbumId = "";
 let pendingPinAlbum = null;
+let pendingDriveAlbum = null;
 let afTempCoverUrl = "";
 let lightboxPhotos = [];
 let lightboxIndex = 0;
@@ -38,7 +39,7 @@ async function loadUserVault(username, force = false) {
     return vaultCache[uname] || { albums: [], usedBytes: 0, isPro: false, limitBytes: 2 * 1024 * 1024 * 1024 };
 }
 
-// Revisi 12: Sampul album bersih tanpa tombol edit di luar (pengaturan ada di pojok kanan atas di dalam album)
+// Sampul album bersih tanpa tombol edit di luar (pengaturan ada di dalam album / menu Drive)
 async function renderProfileAlbumHighlights(containerId, countLblId, username) {
     const box = document.getElementById(containerId); if (!box) return;
     const uname = String(username || "").toLowerCase();
@@ -89,7 +90,7 @@ function buildAddHighlightTileHtml() {
 
 function openAddAlbumChoiceModal() {
     document.getElementById("modal-add-album-choice").classList.remove("hide");
-    pushBackGuard();
+    if (typeof pushBackGuard === "function") pushBackGuard();
 }
 
 function openAlbumFormModal(type, editAlb = null) {
@@ -97,7 +98,7 @@ function openAlbumFormModal(type, editAlb = null) {
     const isSecret = type === "secret";
     const curU = getCurrentUserObj();
     const isMaster = curU && curU.role === "master";
-    const hasExistingPin = !!(editAlb && editAlb.pinEnabled && editAlb.pin && !isMaster);
+    const hasExistingPin = !!(isSecret && editAlb && editAlb.pinEnabled && editAlb.pin && !isMaster);
 
     afTempCoverUrl = editAlb ? (editAlb.cover || "") : "";
     document.getElementById("af-title-head").innerText = editAlb
@@ -113,7 +114,7 @@ function openAlbumFormModal(type, editAlb = null) {
     document.getElementById("af-drive-url").required = !isSecret;
     document.getElementById("af-pin-wrap").classList.toggle("hide", !isSecret);
 
-    // Revisi 12: Jika album sudah ber-PIN, wajib masukkan sandi/PIN lama saat membuka pengaturan album
+    // Jika album rahasia sudah ber-PIN, wajib masukkan sandi/PIN lama saat membuka pengaturan album
     const oldPinWrap = document.getElementById("af-old-pin-wrap");
     const oldPinInp = document.getElementById("af-old-pin-val");
     if (oldPinWrap && oldPinInp) {
@@ -122,23 +123,24 @@ function openAlbumFormModal(type, editAlb = null) {
         oldPinInp.required = hasExistingPin;
     }
 
-    const pinOn = !!(editAlb && editAlb.pinEnabled);
+    const pinOn = !!(isSecret && editAlb && editAlb.pinEnabled);
     document.getElementById("af-pin-toggle").checked = pinOn;
     document.getElementById("af-pin-input-box").classList.toggle("hide", !pinOn);
-    document.getElementById("af-pin-val").value = (editAlb && editAlb.pin) ? editAlb.pin : "";
+    document.getElementById("af-pin-val").value = (pinOn && editAlb && editAlb.pin) ? editAlb.pin : "";
 
     const delBtn = document.getElementById("btn-af-delete");
     if (delBtn) delBtn.classList.toggle("hide", !editAlb);
 
     document.getElementById("modal-album-form").classList.remove("hide");
-    pushBackGuard();
+    if (typeof pushBackGuard === "function") pushBackGuard();
 }
 
 function openEditAlbumById(uname, albId) {
-    const v = vaultCache[uname]; if (!v) return;
+    const v = vaultCache[String(uname || "").toLowerCase()]; if (!v) return;
     const alb = (v.albums || []).find(a => String(a.id) === String(albId));
     if (!alb) return;
-    activeVaultOwner = uname;
+    activeVaultOwner = String(uname || "").toLowerCase();
+    activeSecretAlbumId = alb.id;
     openAlbumFormModal(alb.type || "drive", alb);
 }
 
@@ -167,15 +169,15 @@ async function submitVaultAlbumForm(e) {
     const oldPin = (document.getElementById("af-old-pin-val")?.value || "").trim();
 
     if (!title) return showToast("Nama album wajib diisi.", "error");
-    if (type === "drive" && !driveUrl) return showToast("Masukkan link folder Google Drive.", "error");
+    if (type === "drive" && !/^https?:\/\//i.test(driveUrl)) return showToast("Masukkan link folder Google Drive yang valid (diawali https://).", "error");
     if (pinEnabled && !/^\d{4}$/.test(pin)) return showToast("PIN baru wajib terdiri dari 4 angka.", "error");
 
-    const owner = activeVaultOwner || currentSessionUser;
-    const v = vaultCache[owner.toLowerCase()];
+    const owner = (activeVaultOwner || currentSessionUser || "").toLowerCase();
+    const v = vaultCache[owner];
     const curU = getCurrentUserObj();
     const isMaster = curU && curU.role === "master";
 
-    if (id && v && !isMaster) {
+    if (id && v && !isMaster && type === "secret") {
         const existing = (v.albums || []).find(a => String(a.id) === String(id));
         if (existing && existing.pinEnabled && existing.pin && oldPin !== String(existing.pin)) {
             return showToast("Sandi/PIN lama salah! Masukkan 4 angka PIN lama terlebih dahulu.", "error");
@@ -192,10 +194,10 @@ async function submitVaultAlbumForm(e) {
     setBtnLoading("btn-af-save", false);
 
     if (res && res.ok && res.vault) {
-        vaultCache[owner.toLowerCase()] = Object.assign(vaultCache[owner.toLowerCase()] || {}, res.vault);
+        vaultCache[owner] = Object.assign(vaultCache[owner] || {}, res.vault);
         document.getElementById("modal-album-form").classList.add("hide");
         refreshCurrentHighlightsUI();
-        if (!document.getElementById("modal-secret-album").classList.contains("hide") && activeSecretAlbumId === id) {
+        if (type === "secret" && !document.getElementById("modal-secret-album").classList.contains("hide") && String(activeSecretAlbumId) === String(id)) {
             openSecretAlbumViewer(owner, id);
         }
         showToast("Pengaturan album tersimpan!");
@@ -208,27 +210,65 @@ function refreshCurrentHighlightsUI() {
 }
 
 function handleHighlightClick(uname, albId) {
-    const v = vaultCache[uname]; if (!v) return;
+    const ownerKey = String(uname || "").toLowerCase();
+    const v = vaultCache[ownerKey]; if (!v) return;
     const alb = (v.albums || []).find(a => String(a.id) === String(albId));
     if (!alb) return;
+
+    const curU = getCurrentUserObj();
+    const isOwner = curU && String(curU.username || "").toLowerCase() === ownerKey;
+    const isMaster = curU && curU.role === "master";
+
+    // Album Google Drive: tampilkan popup aksi agar bisa dibuka ATAU diedit/dihapus
     if (alb.type === "drive") {
-        if (alb.driveUrl) window.open(alb.driveUrl, "_blank");
+        const modal = document.getElementById("modal-drive-album-actions");
+        if (modal && (isOwner || isMaster)) {
+            pendingDriveAlbum = { uname: ownerKey, alb };
+            const covEl = document.getElementById("da-modal-cover");
+            const titEl = document.getElementById("da-modal-title");
+            const editBtn = document.getElementById("da-modal-edit-btn");
+            if (covEl) covEl.src = alb.cover || "./logo.png";
+            if (titEl) titEl.innerText = alb.title || "Album Google Drive";
+            if (editBtn) editBtn.classList.toggle("hide", !(isOwner || isMaster));
+            modal.classList.remove("hide");
+            if (typeof pushBackGuard === "function") pushBackGuard();
+            return;
+        }
+        if (alb.driveUrl) window.open(alb.driveUrl, "_blank", "noopener,noreferrer");
         else showToast("Link Google Drive belum diisi.", "info");
         return;
     }
-    const curU = getCurrentUserObj();
-    const isMaster = curU && curU.role === "master";
+
     if (alb.pinEnabled && alb.pin && !isMaster) {
-        pendingPinAlbum = { uname, alb };
+        pendingPinAlbum = { uname: ownerKey, alb };
         document.getElementById("pg-album-name").innerText = alb.title;
         const pinInp = document.getElementById("pg-pin-input");
         if (pinInp) pinInp.value = "";
         document.getElementById("modal-pin-gate").classList.remove("hide");
         setTimeout(() => pinInp?.focus(), 100);
-        pushBackGuard();
+        if (typeof pushBackGuard === "function") pushBackGuard();
         return;
     }
-    openSecretAlbumViewer(uname, alb.id);
+    openSecretAlbumViewer(ownerKey, alb.id);
+}
+
+function openSelectedDriveAlbumUrl() {
+    const modal = document.getElementById("modal-drive-album-actions");
+    if (modal) modal.classList.add("hide");
+    if (!pendingDriveAlbum || !pendingDriveAlbum.alb) return;
+    const url = String(pendingDriveAlbum.alb.driveUrl || "").trim();
+    if (/^https?:\/\//i.test(url)) {
+        window.open(url, "_blank", "noopener,noreferrer");
+    } else {
+        showToast("Link Google Drive belum diisi atau tidak valid.", "info");
+    }
+}
+
+function editSelectedDriveAlbum() {
+    const modal = document.getElementById("modal-drive-album-actions");
+    if (modal) modal.classList.add("hide");
+    if (!pendingDriveAlbum || !pendingDriveAlbum.alb) return;
+    openEditAlbumById(pendingDriveAlbum.uname, pendingDriveAlbum.alb.id);
 }
 
 function verifySecretAlbumPin() {
@@ -270,7 +310,7 @@ function switchVaultInnerTab(tab) {
     document.getElementById("sa-tab-notes").className = `px-3.5 py-1.5 rounded-full text-xs font-bold ${!isPhotos ? "gold-pill-btn" : "app-btn-sec"}`;
 }
 
-// Revisi 11 & 12: Buka layar penuh ala Galeri iPhone + tanggal upload + catatan kecil rahasia
+// Buka layar penuh ala Galeri iPhone + tanggal upload + catatan kecil rahasia
 function openSecretAlbumViewer(uname, albId) {
     const v = vaultCache[uname.toLowerCase()]; if (!v) return;
     const alb = (v.albums || []).find(a => String(a.id) === String(albId));
@@ -323,7 +363,7 @@ function openSecretAlbumViewer(uname, albId) {
     renderSecretVaultNotesList(notes, lightboxCanDelete);
     switchVaultInnerTab(activeVaultInnerTab || "photos");
     document.getElementById("modal-secret-album").classList.remove("hide");
-    pushBackGuard();
+    if (typeof pushBackGuard === "function") pushBackGuard();
 }
 
 function renderSecretVaultNotesList(notes, canEdit) {
@@ -413,7 +453,7 @@ function openSecretPhotoLightbox(idx) {
 
     renderSecretPhotoLightbox();
     lb.classList.remove("hide");
-    pushBackGuard();
+    if (typeof pushBackGuard === "function") pushBackGuard();
 }
 
 function renderSecretPhotoLightbox() {
@@ -459,16 +499,28 @@ function editActiveSecretAlbum() {
 }
 
 async function deleteActiveSecretAlbumFromSettings() {
-    if (!(await showConfirm("Hapus Album", "Hapus album beserta seluruh foto dan catatan di dalamnya?", "fa-solid fa-trash", "Ya, Hapus"))) return;
+    const targetAlbId = (document.getElementById("af-id")?.value || "").trim() || activeSecretAlbumId;
+    const albType = (document.getElementById("af-type")?.value || "secret");
+    if (!targetAlbId) return;
+
+    const msg = albType === "drive"
+        ? "Hapus tautan Album Google Drive ini dari profil Anda? (File asli di Google Drive tidak ikut terhapus)"
+        : "Hapus album beserta seluruh foto dan catatan di dalamnya?";
+
+    if (!(await showConfirm("Hapus Album", msg, "fa-solid fa-trash", "Ya, Hapus"))) return;
     showLoading("Menghapus album...");
-    const res = await apiAction({ action: "delete_vault_album", username: activeVaultOwner, albumId: activeSecretAlbumId });
+    const owner = (activeVaultOwner || currentSessionUser || "").toLowerCase();
+    const res = await apiAction({ action: "delete_vault_album", username: owner, albumId: targetAlbId });
     hideLoading();
     if (res && res.ok && res.vault) {
-        vaultCache[activeVaultOwner] = Object.assign(vaultCache[activeVaultOwner] || {}, res.vault);
+        vaultCache[owner] = Object.assign(vaultCache[owner] || {}, res.vault);
         document.getElementById("modal-album-form").classList.add("hide");
-        document.getElementById("modal-secret-album").classList.add("hide");
+        document.getElementById("modal-drive-album-actions")?.classList.add("hide");
+        if (albType === "secret") document.getElementById("modal-secret-album").classList.add("hide");
         refreshCurrentHighlightsUI();
         showToast("Album berhasil dihapus.", "info");
+    } else {
+        showToast((res && res.message) || "Gagal menghapus album.", "error");
     }
 }
 
