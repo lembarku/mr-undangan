@@ -193,14 +193,23 @@ function logoutSession() {
     showToast("Anda telah keluar.", "info");
 }
 
-// ================= 3. NAVIGASI & TOMBOL BACK HP (BUG 14) =================
+// ================= 3. NAVIGASI & TOMBOL BACK HP (SINGLE-GUARD ANTI-MENUMPUK) =================
 let lastBackPressTs = 0, historyGuardReady = false;
 function initBackNavigationGuard() {
     if (historyGuardReady) return;
     historyGuardReady = true;
-    try { history.replaceState({ mrBase: true }, ""); history.pushState({ mrActive: true }, ""); } catch {}
+    try {
+        history.replaceState({ mrBase: true }, "");
+        history.pushState({ mrActive: true }, "");
+    } catch {}
 }
-function pushBackGuard() { try { history.pushState({ mrActive: true, ts: Date.now() }, ""); } catch {} }
+function pushBackGuard() {
+    try {
+        // Hanya pasang 1 lapis penjaga agar tutup modal pakai tombol X tidak menumpuk history HP
+        if (history.state && history.state.mrActive) return;
+        history.pushState({ mrActive: true }, "");
+    } catch {}
+}
 
 window.addEventListener("popstate", () => {
     const isVis = (id) => { const el = document.getElementById(id); return el && !el.classList.contains("hide"); };
@@ -209,6 +218,7 @@ window.addEventListener("popstate", () => {
     if (isVis("ios-vault-lightbox")) { closeSecretPhotoLightbox(); pushBackGuard(); return; }
     if (isVis("modal-image-cropper")) { closeImageCropper(); pushBackGuard(); return; }
     if (isVis("modal-audio-cropper")) { closeAudioCropper(); pushBackGuard(); return; }
+    if (isVis("modal-proof-viewer")) { document.getElementById("modal-proof-viewer").classList.add("hide"); pushBackGuard(); return; }
     if (isVis("modal-theme-builder")) { closeThemeBuilderModal(); pushBackGuard(); return; }
     if (isVis("app-confirm-modal")) { document.getElementById("app-confirm-cancel")?.click(); pushBackGuard(); return; }
     if (isVis("modal-install-welcome")) { dismissWelcomeInstall(); pushBackGuard(); return; }
@@ -216,6 +226,7 @@ window.addEventListener("popstate", () => {
     if (isVis("modal-chat-contacts")) { document.getElementById("modal-chat-contacts").classList.add("hide"); pushBackGuard(); return; }
     if (isVis("modal-sempurnakan")) { document.getElementById("modal-sempurnakan").classList.add("hide"); pushBackGuard(); return; }
     if (isVis("modal-portfolio-preview")) { document.getElementById("modal-portfolio-preview").classList.add("hide"); pushBackGuard(); return; }
+    if (isVis("modal-drive-album-actions")) { document.getElementById("modal-drive-album-actions").classList.add("hide"); pushBackGuard(); return; }
     if (isVis("modal-pin-gate")) { document.getElementById("modal-pin-gate").classList.add("hide"); pushBackGuard(); return; }
     if (isVis("modal-album-form")) { document.getElementById("modal-album-form").classList.add("hide"); pushBackGuard(); return; }
     if (isVis("modal-add-album-choice")) { document.getElementById("modal-add-album-choice").classList.add("hide"); pushBackGuard(); return; }
@@ -228,10 +239,13 @@ window.addEventListener("popstate", () => {
     if (isVis("modal-view-user-profile")) { document.getElementById("modal-view-user-profile").classList.add("hide"); pushBackGuard(); return; }
     if (isVis("modal-master-user")) { document.getElementById("modal-master-user").classList.add("hide"); pushBackGuard(); return; }
     if (isVis("modal-share-sosmed")) { cancelSocialShareModal(); pushBackGuard(); return; }
+
     if (clientPortalState.active) {
         const now = Date.now();
-        if (now - lastBackPressTs < 2400) history.back();
-        else { lastBackPressTs = now; showToast("Tekan kembali sekali lagi untuk keluar.", "info"); pushBackGuard(); }
+        if (now - lastBackPressTs < 2400) { history.back(); return; }
+        lastBackPressTs = now;
+        showToast("Tekan kembali sekali lagi untuk keluar.", "info");
+        pushBackGuard();
         return;
     }
 
@@ -248,8 +262,10 @@ window.addEventListener("popstate", () => {
     }
 
     const now = Date.now();
-    if (now - lastBackPressTs < 2400) history.back();
-    else { lastBackPressTs = now; showToast("Tekan kembali sekali lagi untuk keluar aplikasi.", "info"); pushBackGuard(); }
+    if (now - lastBackPressTs < 2400) { history.back(); return; }
+    lastBackPressTs = now;
+    showToast("Tekan kembali sekali lagi untuk keluar aplikasi.", "info");
+    pushBackGuard();
 });
 
 function handleHeaderBrandClick() {
@@ -323,7 +339,6 @@ function renderHeaderActions() {
     const subEl = document.getElementById("header-brand-sub");
     const footLoginBtn = document.getElementById("footer-login-cta");
 
-    // Bug 17: Kop nama cabang Powered by Mr Undangan saat berada di Portal Client
     if (clientPortalState.active) {
         if (mainEl) mainEl.innerText = clientPortalState.brandName || "Mitra Cabang";
         if (subEl) subEl.innerText = "Powered by Mr Undangan";
@@ -353,7 +368,7 @@ function renderHeaderActions() {
     updateChatBadges();
 }
 
-// ================= 4. MENU TITIK 3 POPUP PENUH (BUG 3 & REVISI 4) =================
+// ================= 4. MENU TITIK 3 POPUP PENUH =================
 function toggleSlideMenu(show) {
     const el = document.getElementById("drawer-main"); if (!el) return;
     if (show) {
@@ -534,7 +549,7 @@ async function changeUserCredentials() {
     toggleSlideMenu(false); refreshActiveViewSmart(); showToast("Username & password diperbarui!");
 }
 
-// ================= 5. BERANDA (BANNER + INFINITE LOOP + CV + 6 SERTIFIKAT BERKELAS) =================
+// ================= 5. BERANDA (BANNER + ETALASE RINGAN + CV + 6 SERTIFIKAT BERKELAS) =================
 function renderLandingPage() {
     renderPromoBannerSlider();
     renderInfiniteInvShelf();
@@ -563,12 +578,16 @@ function renderPromoBannerSlider() {
         </div>
     `).join("");
 
-    dots.innerHTML = slides.map((_, i) => `<button onclick="event.stopPropagation();promoBannerIdx=${i};updatePromoBannerPos();" class="h-1.5 rounded-full transition-all ${i === promoBannerIdx ? "w-6 bg-amber-400" : "w-2 bg-white/45"}"></button>`).join("");
+    dots.innerHTML = slides.map((_, i) => `<button type="button" data-pb-dot="${i}" onclick="event.stopPropagation();promoBannerIdx=${i};updatePromoBannerPos();" class="h-1.5 rounded-full transition-all ${i === promoBannerIdx ? "w-6 bg-amber-400" : "w-2 bg-white/45"}"></button>`).join("");
     updatePromoBannerPos();
 }
 function updatePromoBannerPos() {
     const tr = document.getElementById("promo-banner-track");
     if (tr) tr.style.transform = `translateX(-${promoBannerIdx * 100}%)`;
+    document.querySelectorAll("#promo-banner-dots [data-pb-dot]").forEach((btn) => {
+        const active = Number(btn.dataset.pbDot) === promoBannerIdx;
+        btn.className = `h-1.5 rounded-full transition-all ${active ? "w-6 bg-amber-400" : "w-2 bg-white/45"}`;
+    });
 }
 function handlePromoBannerClick(idx) {
     const s = ((db.promoBanners && db.promoBanners.length) ? db.promoBanners : getLocalFallbackDB().promoBanners)[idx];
@@ -582,52 +601,33 @@ function renderInvCategoryPills() {
     const cats = Object.keys(THEME_CATALOG);
     const box = document.getElementById("landing-inv-cat-tabs"); if (!box) return;
     box.innerHTML = cats.map(c =>
-        `<button type="button" onclick="scrollInvShelfToCat('${esc(c)}')" class="px-3 py-1.5 rounded-full text-[11px] font-bold whitespace-nowrap transition ${activeInvShelfCat === c ? "gold-pill-btn shadow" : "app-card border app-muted"}">${c}</button>`
+        `<button type="button" onclick="scrollInvShelfToCat('${esc(c)}')" class="px-3 py-1.5 rounded-full text-[11px] font-bold whitespace-nowrap transition ${activeInvShelfCat === c ? "gold-pill-btn shadow" : "app-card border app-muted"}">${escHtml(c)}</button>`
     ).join("");
 }
 
+// Etalase Undangan Ringan (1x render tanpa menggandakan kartu 3x lipat)
 function renderInfiniteInvShelf() {
     const shelf = document.getElementById("landing-inv-shelf"); if (!shelf) return;
     const cats = Object.keys(THEME_CATALOG);
     const flat = [];
     cats.forEach(cat => getMergedThemes(cat, false).forEach(t => flat.push(t)));
 
-    const buildCopyHtml = (copyIdx) => flat.map(t => {
+    shelf.innerHTML = flat.map(t => {
         const targetId = (db.themeOverrides && db.themeOverrides[`${t.cat}::${t.name}`]?.targetInvId) || "";
-        return `<div data-inv-cat="${esc(t.cat)}" data-copy="${copyIdx}" onclick="openBannerOrCardTarget('${esc(t.cat)}','${esc(t.name)}','${esc(targetId)}')" class="h-shelf-card group rounded-2xl overflow-hidden border gold-border bg-black shadow-md cursor-pointer flex flex-col">
+        return `<div data-inv-cat="${esc(t.cat)}" onclick="openBannerOrCardTarget('${esc(t.cat)}','${esc(t.name)}','${esc(targetId)}')" class="h-shelf-card group rounded-2xl overflow-hidden border gold-border bg-black shadow-md cursor-pointer flex flex-col">
             ${buildMiniCoverCardHtml(t.cat, t, true)}
             ${buildPriceStripHtml(t, true)}
         </div>`;
     }).join("");
-
-    shelf.innerHTML = buildCopyHtml(0) + buildCopyHtml(1) + buildCopyHtml(2);
     renderInvCategoryPills();
 
-    requestAnimationFrame(() => {
-        const setW = shelf.scrollWidth / 3;
-        if (setW > 100) {
-            shelf.style.scrollBehavior = "auto";
-            shelf.scrollLeft = setW;
-        }
-    });
-
-    if (!shelf.dataset.loopBound) {
-        shelf.dataset.loopBound = "1";
+    if (!shelf.dataset.catScrollBound) {
+        shelf.dataset.catScrollBound = "1";
         let raf = null;
         shelf.addEventListener("scroll", () => {
-            if (raf) return;
+            if (raf || invShelfLock) return;
             raf = requestAnimationFrame(() => {
                 raf = null;
-                const setW = shelf.scrollWidth / 3;
-                if (setW > 100 && !invShelfLock) {
-                    if (shelf.scrollLeft >= setW * 2) {
-                        shelf.style.scrollBehavior = "auto";
-                        shelf.scrollLeft -= setW;
-                    } else if (shelf.scrollLeft <= setW * 0.15) {
-                        shelf.style.scrollBehavior = "auto";
-                        shelf.scrollLeft += setW;
-                    }
-                }
                 if (invShelfLock) return;
                 const shelfLeft = shelf.getBoundingClientRect().left + 28;
                 const cards = shelf.children;
@@ -651,8 +651,7 @@ function scrollInvShelfToCat(cat) {
     activeInvShelfCat = cat;
     renderInvCategoryPills();
     const shelf = document.getElementById("landing-inv-shelf"); if (!shelf) return;
-    const target = shelf.querySelector(`[data-copy="1"][data-inv-cat="${CSS.escape(cat)}"]`)
-        || shelf.querySelector(`[data-inv-cat="${CSS.escape(cat)}"]`);
+    const target = shelf.querySelector(`[data-inv-cat="${CSS.escape(cat)}"]`);
     if (target) {
         invShelfLock = true;
         shelf.scrollTo({ left: Math.max(0, target.offsetLeft - 6), behavior: "smooth" });
@@ -714,7 +713,7 @@ function scrollPfShelfToCat(cat) {
     }
 }
 
-// Revisi 16: 6 Desain Sertifikat & Piagam Profesional Berkelas (Mengacu 6 Gaya Contoh, Bebas Nama/Perusahaan/Institusi)
+// 6 Desain Sertifikat & Piagam Profesional Berkelas
 function renderCertificateShowcaseShelf() {
     const shelf = document.getElementById("landing-cert-shelf"); if (!shelf) return;
     shelf.innerHTML = CERT_SHOWCASE.map(c => {
@@ -795,16 +794,22 @@ function renderTestimonials() {
 }
 function slideTestimonial(d) { const n = (db.testimonials || []).length; if (!n) return; testiIdx = (testiIdx + d + n) % n; renderTestimonials(); }
 
+// Hemat baterai: jeda auto-slide saat tab diminimalkan atau overlay layar penuh sedang dibuka
 setInterval(() => {
-    if (currentViewName === "landing") {
-        const s = (db.promoBanners && db.promoBanners.length) ? db.promoBanners : [1];
+    if (document.hidden || currentViewName !== "landing") return;
+    const guestOpen = !document.getElementById("guest-invitation-overlay")?.classList.contains("hide");
+    const chatOpen = !document.getElementById("full-chat-overlay")?.classList.contains("hide");
+    if (guestOpen || chatOpen) return;
+
+    const s = (db.promoBanners && db.promoBanners.length) ? db.promoBanners : [1];
+    if (s.length > 1) {
         promoBannerIdx = (promoBannerIdx + 1) % s.length;
         updatePromoBannerPos();
-        if ((db.testimonials || []).length > 1) slideTestimonial(1);
     }
+    if ((db.testimonials || []).length > 1) slideTestimonial(1);
 }, 4500);
 
-// ================= 6. BUAT BERKASMU & PROFIL USER / CABANG (BUG 9) =================
+// ================= 6. BUAT BERKASMU & PROFIL USER / CABANG =================
 function openCreateChoiceModal(isCabang = false) {
     const u = getCurrentUserObj();
     if (!u) {
@@ -822,7 +827,6 @@ function chooseCreateDoc(kind) {
     else if (kind === "lamaran") startCreatePortfolio(createChoiceIsCabang, "lamaran");
 }
 
-// Bug 9: Sampul berkas yang sudah dibuat user menampilkan hasil buatan user sendiri (foto & judul asli buatan user)
 function buildFilmPosterDocCardHtml(doc, isCabang = false) {
     const isPf = doc._kind === "pf";
     const isAktif = doc.status === "Aktif";
@@ -1017,7 +1021,13 @@ function refreshActiveViewSmart() {
     }
     if (!document.getElementById("guest-invitation-overlay").classList.contains("hide") && activeGuestInv && activeGuestInv.id !== "demo") {
         const fresh = db.invitations.find(i => String(i.id) === String(activeGuestInv.id));
-        if (fresh) { activeGuestInv = fresh; renderGuestWishes(); }
+        if (fresh) {
+            activeGuestInv = fresh;
+            // Jangan hapus ketikan tamu saat sedang mengetik ucapan atau balasan
+            if (!isUserTypingIn("guest-invitation-overlay")) {
+                renderGuestWishes();
+            }
+        }
     }
 }
 
@@ -1036,7 +1046,6 @@ async function bootMrUndanganApp() {
         initBackNavigationGuard();
         const p = new URLSearchParams(window.location.search);
 
-        // Bug 17: Portal Client Cabang (mendukung ?client=ID&key=KEY maupun ?client=ID)
         if (p.has("client")) {
             hideHelloSplash();
             showLoading("Membuka Portal Tamu Mandiri...");
@@ -1061,7 +1070,6 @@ async function bootMrUndanganApp() {
             return;
         }
 
-        // Bug 19: Link undangan yang dibagikan ke tamu langsung mengambil data undangan asli milik user
         if (p.has("inv") || p.has("to")) {
             hideHelloSplash();
             showEnvelopeLoader("Membuka Undangan...");
