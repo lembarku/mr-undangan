@@ -65,6 +65,15 @@ function playAudioElementWithFallback(audioEl, candidates, onAllFail, rawUrl = "
         if (onAllFail) onAllFail();
         return;
     }
+
+    const cleanRaw = String(rawUrl || "").trim();
+    const cachedBlob = (typeof _audioBlobCache !== "undefined" && _audioBlobCache && cleanRaw)
+        ? _audioBlobCache.get(cleanRaw)
+        : "";
+    const orderedCandidates = cachedBlob && !candidates.includes(cachedBlob)
+        ? [cachedBlob, ...candidates]
+        : candidates;
+
     let idx = 0;
     let blobTried = false;
     let settled = false;
@@ -97,7 +106,7 @@ function playAudioElementWithFallback(audioEl, candidates, onAllFail, rawUrl = "
             return;
         }
         blobTried = true;
-        const blobUrl = await fetchAudioAsBlobUrl(rawUrl, candidates);
+        const blobUrl = await fetchAudioAsBlobUrl(rawUrl, orderedCandidates);
         if (settled || audioEl.dataset.wantPlay !== "1") return;
         if (blobUrl) {
             audioEl.src = blobUrl;
@@ -117,30 +126,33 @@ function playAudioElementWithFallback(audioEl, candidates, onAllFail, rawUrl = "
 
     const tryCurrent = () => {
         if (settled || audioEl.dataset.wantPlay !== "1") return;
-        if (idx >= candidates.length) {
+        if (idx >= orderedCandidates.length) {
             tryBlobFallback();
             return;
         }
-        const targetSrc = candidates[idx];
+        const targetSrc = orderedCandidates[idx];
         if (audioEl.src !== targetSrc) {
             audioEl.src = targetSrc;
             try { audioEl.load(); } catch {}
         }
 
         clearStallTimer();
-        stallTimer = setTimeout(() => {
-            if (settled || audioEl.dataset.wantPlay !== "1") return;
-            if (!audioEl.paused && audioEl.currentTime >= 0 && audioEl.readyState >= 2) {
-                markPlayingSuccess();
-                return;
-            }
-            if (idx + 1 < candidates.length) {
-                idx++;
-                tryCurrent();
-            } else {
-                tryBlobFallback();
-            }
-        }, 2200);
+        const isBlobOrData = targetSrc.startsWith("blob:") || targetSrc.startsWith("data:");
+        if (!isBlobOrData) {
+            stallTimer = setTimeout(() => {
+                if (settled || audioEl.dataset.wantPlay !== "1") return;
+                if (!audioEl.paused && audioEl.currentTime >= 0 && audioEl.readyState >= 2) {
+                    markPlayingSuccess();
+                    return;
+                }
+                if (idx + 1 < orderedCandidates.length) {
+                    idx++;
+                    tryCurrent();
+                } else {
+                    tryBlobFallback();
+                }
+            }, 950);
+        }
 
         const p = audioEl.play();
         if (p && typeof p.catch === "function") {
@@ -150,7 +162,7 @@ function playAudioElementWithFallback(audioEl, candidates, onAllFail, rawUrl = "
                     clearStallTimer();
                     return;
                 }
-                if (idx + 1 < candidates.length) {
+                if (idx + 1 < orderedCandidates.length) {
                     idx++;
                     tryCurrent();
                 } else {
@@ -182,7 +194,7 @@ function playAudioElementWithFallback(audioEl, candidates, onAllFail, rawUrl = "
 
     audioEl.onerror = () => {
         if (settled || audioEl.dataset.wantPlay !== "1") return;
-        if (idx + 1 < candidates.length) {
+        if (idx + 1 < orderedCandidates.length) {
             idx++;
             tryCurrent();
         } else {
@@ -1017,6 +1029,13 @@ function setupGuestInvitationAudio(audioUrl) {
     document.body.appendChild(el);
     guestAudio = el;
     try { el.load(); } catch {}
+
+    if (typeof fetchAudioAsBlobUrl === "function" && guestAudioRawUrl) {
+        const alreadyCached = (typeof _audioBlobCache !== "undefined" && _audioBlobCache && _audioBlobCache.has(guestAudioRawUrl));
+        if (!alreadyCached) {
+            fetchAudioAsBlobUrl(guestAudioRawUrl, guestAudioCandidates).catch(() => {});
+        }
+    }
 }
 
 function openGuestViewWithObject(inv, guestName, isDirectLink = false) {
