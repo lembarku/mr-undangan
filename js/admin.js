@@ -180,7 +180,7 @@ function buildMasterAnalyticsHtml() {
     </div>`;
 }
 
-// ================= 2. HALAMAN ROLE ADMINISTRASI (BUG 21: FULL ORDERAN & CHAT USER) =================
+// ================= 2. HALAMAN ROLE ADMINISTRASI =================
 function isCabangOwnedDoc(item) {
     if (!item) return false;
     if (item.brandName && String(item.brandName).trim()) return true;
@@ -227,7 +227,7 @@ function buildUnifiedOrdersListHtml(isStaffMode = false) {
     return filterBar + `<div class="space-y-3">` + list.map(item => {
         const isPf = item._kind === "pf";
         const hasRev = !!item.pendingRevision;
-        const typeTag = isPf ? (item.docType === "lamaran" ? "SURAT LAMARAN" : "CV") : `UNDANGAN • ${item.category}`;
+        const typeTag = isPf ? (item.docType === "lamaran" ? "SURAT LAMARAN" : "CV") : `UNDANGAN • ${escHtml(item.category)}`;
         const priceInfo = item.totalPay ? `${fmtRp(item.totalPay)} (kode unik)` : (item.price ? fmtRp(item.price) : "");
 
         return `<div class="app-card-soft border rounded-2xl p-4 flex flex-col md:flex-row md:items-center justify-between gap-3">
@@ -259,14 +259,37 @@ function buildUnifiedOrdersListHtml(isStaffMode = false) {
     }).join("") + `</div>`;
 }
 
+// Penampil Bukti Pembayaran Aman (Tanpa document.write & bebas blokir popup HP)
 function viewOrderProof(kind, id) {
     const item = kind === "pf"
         ? (db.portfolios || []).find(p => String(p.id) === String(id))
         : (db.invitations || []).find(i => String(i.id) === String(id));
-    if (!item || !item.paymentProof) return;
-    const w = window.open("");
-    w.document.write(`<body style="background:#0a0a0a;display:flex;justify-content:center;align-items:center;height:100vh;margin:0;"><img src="${item.paymentProof}" style="max-width:92%;max-height:92%;border:3px solid #d4af37;border-radius:16px;"></body>`);
+    if (!item || !item.paymentProof) return showToast("Bukti pembayaran belum tersedia.", "info");
+
+    const rawUrl = String(item.paymentProof || "").trim();
+    const isSafeUrl = /^(https?:\/\/|data:image\/)/i.test(rawUrl);
+    if (!isSafeUrl) return showToast("Format bukti pembayaran tidak valid.", "error");
+
+    const modal = document.getElementById("modal-proof-viewer");
+    const imgEl = document.getElementById("proof-viewer-img");
+    const titleEl = document.getElementById("proof-viewer-title");
+    const openLink = document.getElementById("proof-viewer-open-link");
+
+    if (modal && imgEl) {
+        if (titleEl) titleEl.innerText = `Bukti — ${item.title || "Pesanan"} (@${item.owner || "-"})`;
+        imgEl.src = rawUrl;
+        if (openLink) {
+            openLink.href = rawUrl;
+            openLink.classList.toggle("hide", rawUrl.startsWith("data:"));
+        }
+        modal.classList.remove("hide");
+        if (typeof pushBackGuard === "function") pushBackGuard();
+        return;
+    }
+
+    if (!rawUrl.startsWith("data:")) window.open(rawUrl, "_blank", "noopener,noreferrer");
 }
+
 function previewPendingRevision(id) {
     const inv = db.invitations.find(i => String(i.id) === String(id));
     if (inv && inv.pendingRevision) openGuestViewWithObject(Object.assign({}, inv, inv.pendingRevision), "Review Revisi");
@@ -308,6 +331,57 @@ function refreshAfterAdminOrderAction(msg) {
 }
 
 // ================= 3. WORKSPACE MASTER: TEMA, HARGA CV, AKUN, BANNER & MEDIA =================
+function renderMasterThemesGridOnly() {
+    const grid = document.getElementById("master-themes-grid");
+    const countEl = document.getElementById("master-themes-count");
+    if (!grid) return;
+
+    let list = getMergedThemes(masterThemeCatFilter, true);
+    if (masterThemeSearch.trim()) {
+        const q = masterThemeSearch.trim().toLowerCase();
+        list = list.filter(t => String(t.name || "").toLowerCase().includes(q));
+    }
+
+    if (countEl) countEl.innerText = String(list.length);
+
+    if (!list.length) {
+        grid.innerHTML = `<p class="text-xs app-muted text-center py-8 sm:col-span-2 lg:col-span-3 app-card-soft rounded-2xl border border-dashed">Tidak ada tema yang cocok dengan pencarian "${escHtml(masterThemeSearch)}".</p>`;
+        return;
+    }
+
+    grid.innerHTML = list.map(t => {
+        const cov = getThemeCoverPair(t.cat, t), pr = getThemePricing(t);
+        return `<div class="app-card-soft border rounded-2xl overflow-hidden flex flex-col justify-between ${t.isHidden ? "opacity-55 border-dashed" : ""}">
+            <div class="flex gap-3 p-3">
+                <img src="${cov.src}" ${imgFbAttr(cov.fb)} loading="lazy" class="w-16 h-24 rounded-xl object-cover border gold-border shrink-0 bg-black">
+                <div class="flex-1 min-w-0 space-y-1">
+                    <div class="flex items-center gap-1 flex-wrap">
+                        ${t.isCustom ? `<span class="text-[9px] px-1.5 py-0.5 rounded-full bg-pink-500/20 text-pink-500 font-bold">KUSTOM</span>` : ""}
+                        ${t.badge ? `<span class="text-[9px] px-1.5 py-0.5 rounded-full bg-amber-400 text-black font-extrabold">${escHtml(t.badge)}</span>` : ""}
+                        ${t.isHidden ? `<span class="text-[9px] px-1.5 py-0.5 rounded-full bg-red-500/20 text-red-500 font-bold">DISEMBUNYIKAN</span>` : ""}
+                    </div>
+                    <h4 class="font-bold text-xs truncate">${escHtml(t.name)}</h4>
+                    <p class="text-[11px] font-extrabold app-accent">${pr.hasDisc ? `<span class="line-through app-muted font-normal mr-1">${fmtRp(pr.origPrice)}</span>` : ""}${fmtRp(pr.price)}</p>
+                    <p class="text-[10px] app-muted truncate">${(t.demoData && t.demoData.title) ? `Contoh: ${escHtml(t.demoData.title)}` : "Contoh bawaan"}</p>
+                </div>
+            </div>
+            <div class="grid grid-cols-5 gap-1 p-2 border-t gold-border text-[10px] font-bold">
+                <button onclick="openThemeLivePreview('${esc(t.cat)}','${esc(t.name)}')" class="py-1.5 rounded-lg app-btn-sec" title="Preview"><i class="fa-regular fa-eye"></i></button>
+                <button onclick="openThemeBuilderModal('${esc(t.cat)}','${esc(t.name)}',false)" class="py-1.5 rounded-lg gold-pill-btn col-span-2"><i class="fa-solid fa-pen mr-1"></i>Edit</button>
+                <button onclick="openThemeBuilderModal('${esc(t.cat)}','${esc(t.name)}',true)" class="py-1.5 rounded-lg bg-blue-500/15 text-blue-600" title="Duplikat"><i class="fa-regular fa-copy"></i></button>
+                <button onclick="copyThemeDemoLink('${esc(t.cat)}','${esc(t.name)}')" class="py-1.5 rounded-lg bg-emerald-500/15 text-emerald-600" title="Salin Link Demo"><i class="fa-solid fa-link"></i></button>
+            </div>
+            <div class="px-2 pb-2">
+                ${t.isCustom
+                    ? `<button onclick="deleteCustomTheme('${esc(t.id)}','${esc(t.name)}')" class="w-full py-1.5 rounded-lg bg-red-600/15 text-red-500 text-[10px] font-bold"><i class="fa-solid fa-trash mr-1"></i>Hapus Permanen</button>`
+                    : t.isHidden
+                        ? `<button onclick="toggleHideBuiltInTheme('${esc(t.key)}',false)" class="w-full py-1.5 rounded-lg bg-emerald-600/15 text-emerald-600 text-[10px] font-bold">Pulihkan Tema</button>`
+                        : `<button onclick="toggleHideBuiltInTheme('${esc(t.key)}',true)" class="w-full py-1.5 rounded-lg bg-red-600/10 text-red-500 text-[10px] font-bold">Sembunyikan</button>`}
+            </div>
+        </div>`;
+    }).join("");
+}
+
 function renderMasterWorkspaceContent() {
     const box = document.getElementById("master-workspace-body"); if (!box) return;
 
@@ -334,7 +408,7 @@ function renderMasterWorkspaceContent() {
                 <div class="grid sm:grid-cols-2 lg:grid-cols-3 gap-3">${allPf.map(p => `
                     <div class="app-card-soft border rounded-2xl p-3.5 space-y-2.5">
                         <div class="flex items-center justify-between gap-2">
-                            <div><span class="text-[9px] px-2 py-0.5 rounded-full app-accent-bg app-accent font-extrabold uppercase">${p._dt === "lamaran" ? "Lamaran" : "CV"}</span><h4 class="font-bold text-xs mt-1">${p.name}</h4></div>
+                            <div><span class="text-[9px] px-2 py-0.5 rounded-full app-accent-bg app-accent font-extrabold uppercase">${p._dt === "lamaran" ? "Lamaran" : "CV"}</span><h4 class="font-bold text-xs mt-1">${escHtml(p.name)}</h4></div>
                             <button type="button" onclick="openPortfolioDemoPreview('${p._dt}','${p.id}')" class="px-2.5 py-1 rounded-lg app-btn-sec text-[10px] font-bold"><i class="fa-regular fa-eye"></i></button>
                         </div>
                         <div class="grid grid-cols-2 gap-2">
@@ -348,52 +422,18 @@ function renderMasterWorkspaceContent() {
             return;
         }
 
-        let list = getMergedThemes(masterThemeCatFilter, true);
-        if (masterThemeSearch.trim()) {
-            const q = masterThemeSearch.trim().toLowerCase();
-            list = list.filter(t => t.name.toLowerCase().includes(q));
-        }
         box.innerHTML = `<div class="space-y-4">
             <div class="flex flex-wrap items-center justify-between gap-2.5">
                 <div class="flex flex-wrap gap-1.5">${cats.map(c => `<button type="button" onclick="masterThemeCatFilter='${c}';renderMasterWorkspaceContent();" class="px-3 py-1.5 rounded-xl text-[11px] font-bold ${masterThemeCatFilter===c?"gold-pill-btn":"app-btn-sec"}">${c}</button>`).join("")}</div>
                 <button type="button" onclick="openThemeBuilderModal(null,null,false)" class="gold-pill-btn px-4 py-2 rounded-xl text-xs shadow"><i class="fa-solid fa-plus mr-1"></i>Buat Tema Baru</button>
             </div>
             <div class="flex flex-col sm:flex-row gap-2 items-center justify-between">
-                <input type="text" value="${esc(masterThemeSearch)}" oninput="masterThemeSearch=this.value;renderMasterWorkspaceContent();" placeholder="Cari nama tema..." class="app-input !py-2 sm:max-w-xs">
-                <span class="text-[11px] app-muted"><strong>${list.length}</strong> tema di ${masterThemeCatFilter} • Klik <strong>Edit</strong> untuk ganti foto template, nama contoh &amp; harga.</span>
+                <input type="text" id="master-theme-search-inp" value="${esc(masterThemeSearch)}" oninput="masterThemeSearch=this.value;renderMasterThemesGridOnly();" placeholder="Cari nama tema..." class="app-input !py-2 sm:max-w-xs">
+                <span class="text-[11px] app-muted"><strong id="master-themes-count">0</strong> tema di ${escHtml(masterThemeCatFilter)} • Klik <strong>Edit</strong> untuk ganti foto template, nama contoh &amp; harga.</span>
             </div>
-            <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3.5">${list.map(t => {
-                const cov = getThemeCoverPair(t.cat, t), pr = getThemePricing(t);
-                return `<div class="app-card-soft border rounded-2xl overflow-hidden flex flex-col justify-between ${t.isHidden ? "opacity-55 border-dashed" : ""}">
-                    <div class="flex gap-3 p-3">
-                        <img src="${cov.src}" ${imgFbAttr(cov.fb)} loading="lazy" class="w-16 h-24 rounded-xl object-cover border gold-border shrink-0 bg-black">
-                        <div class="flex-1 min-w-0 space-y-1">
-                            <div class="flex items-center gap-1 flex-wrap">
-                                ${t.isCustom ? `<span class="text-[9px] px-1.5 py-0.5 rounded-full bg-pink-500/20 text-pink-500 font-bold">KUSTOM</span>` : ""}
-                                ${t.badge ? `<span class="text-[9px] px-1.5 py-0.5 rounded-full bg-amber-400 text-black font-extrabold">${t.badge}</span>` : ""}
-                                ${t.isHidden ? `<span class="text-[9px] px-1.5 py-0.5 rounded-full bg-red-500/20 text-red-500 font-bold">DISEMBUNYIKAN</span>` : ""}
-                            </div>
-                            <h4 class="font-bold text-xs truncate">${escHtml(t.name)}</h4>
-                            <p class="text-[11px] font-extrabold app-accent">${pr.hasDisc ? `<span class="line-through app-muted font-normal mr-1">${fmtRp(pr.origPrice)}</span>` : ""}${fmtRp(pr.price)}</p>
-                            <p class="text-[10px] app-muted truncate">${(t.demoData && t.demoData.title) ? `Contoh: ${escHtml(t.demoData.title)}` : "Contoh bawaan"}</p>
-                        </div>
-                    </div>
-                    <div class="grid grid-cols-5 gap-1 p-2 border-t gold-border text-[10px] font-bold">
-                        <button onclick="openThemeLivePreview('${esc(t.cat)}','${esc(t.name)}')" class="py-1.5 rounded-lg app-btn-sec" title="Preview"><i class="fa-regular fa-eye"></i></button>
-                        <button onclick="openThemeBuilderModal('${esc(t.cat)}','${esc(t.name)}',false)" class="py-1.5 rounded-lg gold-pill-btn col-span-2"><i class="fa-solid fa-pen mr-1"></i>Edit</button>
-                        <button onclick="openThemeBuilderModal('${esc(t.cat)}','${esc(t.name)}',true)" class="py-1.5 rounded-lg bg-blue-500/15 text-blue-600" title="Duplikat"><i class="fa-regular fa-copy"></i></button>
-                        <button onclick="copyThemeDemoLink('${esc(t.cat)}','${esc(t.name)}')" class="py-1.5 rounded-lg bg-emerald-500/15 text-emerald-600" title="Salin Link Demo"><i class="fa-solid fa-link"></i></button>
-                    </div>
-                    <div class="px-2 pb-2">
-                        ${t.isCustom
-                            ? `<button onclick="deleteCustomTheme('${esc(t.id)}','${esc(t.name)}')" class="w-full py-1.5 rounded-lg bg-red-600/15 text-red-500 text-[10px] font-bold"><i class="fa-solid fa-trash mr-1"></i>Hapus Permanen</button>`
-                            : t.isHidden
-                                ? `<button onclick="toggleHideBuiltInTheme('${esc(t.key)}',false)" class="w-full py-1.5 rounded-lg bg-emerald-600/15 text-emerald-600 text-[10px] font-bold">Pulihkan Tema</button>`
-                                : `<button onclick="toggleHideBuiltInTheme('${esc(t.key)}',true)" class="w-full py-1.5 rounded-lg bg-red-600/10 text-red-500 text-[10px] font-bold">Sembunyikan</button>`}
-                    </div>
-                </div>`;
-            }).join("")}</div>
+            <div id="master-themes-grid" class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3.5"></div>
         </div>`;
+        renderMasterThemesGridOnly();
         return;
     }
 
@@ -416,7 +456,7 @@ function renderMasterWorkspaceContent() {
                         <div class="flex items-center gap-1.5">
                             <strong class="text-xs truncate cursor-pointer hover:underline" onclick="viewUserProfileModal('${esc(u.username)}')">${escHtml(u.name)}</strong>
                             ${u.isPro ? '<i class="fa-solid fa-circle-check text-blue-500 text-xs" title="Akun Pro"></i>' : ""}
-                            <span class="text-[9px] px-2 py-0.5 rounded-full font-bold uppercase ${roleCol}">${u.role}</span>
+                            <span class="text-[9px] px-2 py-0.5 rounded-full font-bold uppercase ${roleCol}">${escHtml(u.role)}</span>
                         </div>
                         <p class="text-[11px] app-accent">@${escHtml(u.username)} • <span class="${u.status==="Aktif"?"text-emerald-600":"text-amber-600"}">${escHtml(u.status)}</span></p>
                         ${u.role === "cabang" && u.brandName ? `<p class="text-[10px] text-blue-600 font-semibold truncate"><i class="fa-solid fa-tag mr-1"></i>${escHtml(u.brandName)}</p>` : ""}
@@ -528,7 +568,7 @@ async function viewUserProfileModal(username) {
                 <img src="${u.avatar || DEFAULT_AVATAR}" class="w-20 h-20 rounded-full object-cover border-4 border-[var(--app-card)] bg-zinc-800 shadow-lg">
                 <div class="pb-1 min-w-0 flex-1">
                     <h4 class="font-bold text-base truncate flex items-center gap-1.5">${escHtml(u.name)} ${u.isPro ? '<i class="fa-solid fa-circle-check text-blue-500 text-sm"></i>' : ""}</h4>
-                    <p class="text-xs app-accent font-semibold">@${escHtml(u.username)} • ${u.role.toUpperCase()} (${escHtml(u.status)})</p>
+                    <p class="text-xs app-accent font-semibold">@${escHtml(u.username)} • ${escHtml(u.role.toUpperCase())} (${escHtml(u.status)})</p>
                 </div>
             </div>
 
@@ -638,7 +678,7 @@ async function topUpCabangRealTime(uname, amt, btn, reopenModal = false) {
     showToast(`+${amt} kuota ditambahkan!`);
 }
 
-// ================= 5. EDIT BANNER PROMOSI 12 : 4.4 & HARGA CV (BUG 2) =================
+// ================= 5. EDIT BANNER PROMOSI 12 : 4.4 & HARGA CV =================
 function pickCroppedPromoBanner(inp) {
     const file = inp.files[0]; if (!file) return; inp.value = "";
     openImageCropper(file, 12 / 4.4, "Crop Banner Promosi (12 : 4.4)", 1200, 440, async (dataUrl) => {
@@ -717,7 +757,7 @@ async function saveCvThemePrice(themeId, btn) {
     showToast("Harga desain CV / Lamaran diperbarui permanen!");
 }
 
-// ================= 6. VISUAL THEME BUILDER 3 TAB (BUG 2 & BUG 6) =================
+// ================= 6. VISUAL THEME BUILDER 3 TAB =================
 function copyThemeDemoLink(cat, themeName) {
     navigator.clipboard.writeText(`${getCleanBaseUrl()}?demo=${encodeURIComponent(cat)}&theme=${encodeURIComponent(themeName)}`);
     showToast(`Link Demo "${themeName}" disalin!`);
@@ -777,7 +817,7 @@ function openThemeBuilderModal(cat = null, themeName = null, isDuplicate = false
 
     tbPhotosDraft = { cover: dp.cover || (tObj && tObj.customCover) || (tObj && tObj.isCustom && tObj.img ? tObj.img : ""), pria: dp.pria || "", wanita: dp.wanita || "", couple: dp.couple || "", g1: dp.g1 || "", g2: dp.g2 || "", g3: dp.g3 || "" };
 
-    document.getElementById("tb-modal-title").innerHTML = isDuplicate ? `Duplikat Tema: ${themeName}` : isEdit ? `Edit Tema: ${themeName}` : `Buat Tema Baru`;
+    document.getElementById("tb-modal-title").innerText = isDuplicate ? `Duplikat Tema: ${themeName}` : isEdit ? `Edit Tema: ${themeName}` : "Buat Tema Baru";
     document.getElementById("tb-id").value = (!isDuplicate && tObj && tObj.isCustom) ? tObj.id : "";
     document.getElementById("tb-orig-key").value = (!isDuplicate && tObj && !tObj.isCustom) ? tObj.key : "";
     document.getElementById("tb-cat").value = activeCat;
@@ -895,7 +935,7 @@ async function toggleHideBuiltInTheme(key, hideIt) {
     hideLoading(); renderMasterWorkspaceContent(); showToast(hideIt ? "Tema disembunyikan." : "Tema dipulihkan!");
 }
 
-// ================= 7. REKENING, QRIS DANA, MUSIK & TESTIMONI (BUG 2) =================
+// ================= 7. REKENING, QRIS DANA, MUSIK & TESTIMONI =================
 function addMasterBankRow(bk = "BCA", no = "", holder = "") {
     const box = document.getElementById("ms-banks-container"); if (!box) return;
     const div = document.createElement("div"); div.className = "app-card-soft border rounded-xl p-2.5 space-y-2 ms-bank-row";
