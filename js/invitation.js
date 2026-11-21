@@ -77,32 +77,13 @@ function playAudioElementWithFallback(audioEl, candidates, onAllFail, rawUrl = "
     let idx = 0;
     let blobTried = false;
     let settled = false;
-    let stallTimer = null;
 
     audioEl.dataset.wantPlay = "1";
 
-    const clearStallTimer = () => {
-        if (stallTimer) {
-            clearTimeout(stallTimer);
-            stallTimer = null;
-        }
-    };
-
-    const markPlayingSuccess = () => {
-        settled = true;
-        clearStallTimer();
-    };
-
-    const finishWithError = () => {
-        if (settled || audioEl.dataset.wantPlay !== "1") return;
-        clearStallTimer();
-        if (onAllFail) onAllFail();
-    };
-
-    const tryBlobFallback = async () => {
+    const tryBlobOnce = async () => {
         if (settled || audioEl.dataset.wantPlay !== "1") return;
         if (blobTried || typeof fetchAudioAsBlobUrl !== "function") {
-            finishWithError();
+            if (onAllFail) onAllFail();
             return;
         }
         blobTried = true;
@@ -116,18 +97,19 @@ function playAudioElementWithFallback(audioEl, candidates, onAllFail, rawUrl = "
                 p.catch((err) => {
                     if (settled || audioEl.dataset.wantPlay !== "1") return;
                     if (err && err.name === "NotAllowedError") return;
-                    finishWithError();
+                    if (onAllFail) onAllFail();
                 });
             }
-        } else {
-            finishWithError();
+        } else if (onAllFail) {
+            onAllFail();
         }
     };
 
-    const tryCurrent = () => {
+    const startCandidate = (targetIdx) => {
         if (settled || audioEl.dataset.wantPlay !== "1") return;
+        idx = targetIdx;
         if (idx >= orderedCandidates.length) {
-            tryBlobFallback();
+            tryBlobOnce();
             return;
         }
         const targetSrc = orderedCandidates[idx];
@@ -135,38 +117,15 @@ function playAudioElementWithFallback(audioEl, candidates, onAllFail, rawUrl = "
             audioEl.src = targetSrc;
             try { audioEl.load(); } catch {}
         }
-
-        clearStallTimer();
-        const isBlobOrData = targetSrc.startsWith("blob:") || targetSrc.startsWith("data:");
-        if (!isBlobOrData) {
-            stallTimer = setTimeout(() => {
-                if (settled || audioEl.dataset.wantPlay !== "1") return;
-                if (!audioEl.paused && audioEl.currentTime >= 0 && audioEl.readyState >= 2) {
-                    markPlayingSuccess();
-                    return;
-                }
-                if (idx + 1 < orderedCandidates.length) {
-                    idx++;
-                    tryCurrent();
-                } else {
-                    tryBlobFallback();
-                }
-            }, 950);
-        }
-
         const p = audioEl.play();
         if (p && typeof p.catch === "function") {
             p.catch((err) => {
                 if (settled || audioEl.dataset.wantPlay !== "1") return;
-                if (err && err.name === "NotAllowedError") {
-                    clearStallTimer();
-                    return;
-                }
+                if (err && err.name === "NotAllowedError") return;
                 if (idx + 1 < orderedCandidates.length) {
-                    idx++;
-                    tryCurrent();
+                    startCandidate(idx + 1);
                 } else {
-                    tryBlobFallback();
+                    tryBlobOnce();
                 }
             });
         }
@@ -174,35 +133,20 @@ function playAudioElementWithFallback(audioEl, candidates, onAllFail, rawUrl = "
 
     const prevOnPlaying = audioEl.onplaying;
     audioEl.onplaying = (ev) => {
-        markPlayingSuccess();
+        settled = true;
         if (typeof prevOnPlaying === "function") prevOnPlaying(ev);
-    };
-
-    const prevOnCanPlay = audioEl.oncanplay;
-    audioEl.oncanplay = (ev) => {
-        if (!settled && audioEl.dataset.wantPlay === "1" && audioEl.paused) {
-            audioEl.play().catch(() => {});
-        }
-        if (typeof prevOnCanPlay === "function") prevOnCanPlay(ev);
-    };
-
-    const prevOnPause = audioEl.onpause;
-    audioEl.onpause = (ev) => {
-        if (audioEl.dataset.wantPlay !== "1") clearStallTimer();
-        if (typeof prevOnPause === "function") prevOnPause(ev);
     };
 
     audioEl.onerror = () => {
         if (settled || audioEl.dataset.wantPlay !== "1") return;
         if (idx + 1 < orderedCandidates.length) {
-            idx++;
-            tryCurrent();
+            startCandidate(idx + 1);
         } else {
-            tryBlobFallback();
+            tryBlobOnce();
         }
     };
 
-    tryCurrent();
+    startCandidate(0);
 }
 
 // ================= 1. WIZARD UNDANGAN =================
@@ -213,7 +157,6 @@ function stopPreviewAudio() {
         previewAudio.dataset.wantPlay = "0";
         previewAudio.onerror = null;
         previewAudio.onplaying = null;
-        previewAudio.oncanplay = null;
         try { previewAudio.pause(); } catch {}
         previewAudio = null;
     }
@@ -1029,13 +972,6 @@ function setupGuestInvitationAudio(audioUrl) {
     document.body.appendChild(el);
     guestAudio = el;
     try { el.load(); } catch {}
-
-    if (typeof fetchAudioAsBlobUrl === "function" && guestAudioRawUrl) {
-        const alreadyCached = (typeof _audioBlobCache !== "undefined" && _audioBlobCache && _audioBlobCache.has(guestAudioRawUrl));
-        if (!alreadyCached) {
-            fetchAudioAsBlobUrl(guestAudioRawUrl, guestAudioCandidates).catch(() => {});
-        }
-    }
 }
 
 function openGuestViewWithObject(inv, guestName, isDirectLink = false) {
@@ -1417,7 +1353,7 @@ function unlockInvitationWithRandomFx() {
     setTimeout(() => {
         cover.classList.add("hide"); ov.style.overflowY = "auto"; ov.scrollTo(0, 0);
         updateGuestScrollInteractiveEffects(); startWishHorizontalAutoScroll();
-    }, 2450);
+    }, 950);
 }
 function toggleGuestMusic() {
     if (!guestAudio || !guestAudioCandidates.length) return showToast("Musik belum diatur untuk undangan ini.", "info");
