@@ -1,5 +1,5 @@
 // =========================================================================
-// MR UNDANGAN — PORTFOLIO ENGINE (CV 9 TEMA, LAMARAN, AUTO-SCAN & PDF)
+// MR UNDANGAN — PORTFOLIO ENGINE (9 DESAIN CV UNIK, LAMARAN, AUTO-SCAN & PDF)
 // File: js/portfolio.js
 // =========================================================================
 let pfWizardState = {
@@ -33,19 +33,61 @@ const DEFAULT_LAMARAN_TEMPLATE = {
     closing: "Besar harapan saya untuk dapat mengikuti tahap seleksi atau wawancara berikutnya. Atas perhatian dan kesempatan yang diberikan, saya ucapkan terima kasih."
 };
 
-// ================= 1. KARTU MINI & PRATINJAU A4 =================
+// ================= 1. KARTU MINI ETALASE & DATA CONTOH =================
 function buildPortfolioMiniCardHtml(docType, tObj, showFavBtn = true) {
     const isLam = docType === "lamaran";
     const favKey = `pf::${docType}::${tObj.id}`;
     const isFav = isItemFavorited(favKey);
     const favObjStr = esc(JSON.stringify({ favKey, kind: "pf", docType, id: tObj.id }));
-    return `
-        <div class="relative aspect-[3/4] w-full overflow-hidden select-none p-3 flex flex-col justify-between text-white" style="background:linear-gradient(155deg,${tObj.accent} 0%,#141418 72%,#09090b 100%);">
-            <div class="flex items-center justify-between gap-1 z-10">
-                <span class="text-[8px] font-extrabold uppercase px-2 py-0.5 rounded-full bg-white/20 backdrop-blur">${isLam ? "LAMARAN" : "CV"}</span>
-                ${tObj.badge ? `<span class="text-[8px] font-extrabold px-1.5 py-0.5 rounded-full bg-amber-400 text-black uppercase">${escHtml(tObj.badge)}</span>` : ""}
-            </div>
-            ${showFavBtn ? `<button type="button" data-fav-btn="${esc(favKey)}" onclick="toggleFavoriteItem(event, JSON.parse('${favObjStr}'))" class="fav-heart-btn ${isFav ? "is-fav" : ""}" title="Simpan ke Favorit"><i class="fa-${isFav ? "solid" : "regular"} fa-heart"></i></button>` : ""}
+
+    // Ilustrasi mini mencerminkan bentuk tata letak asli masing-masing tema
+    let miniThumb = "";
+    if (isLam) {
+        miniThumb = `
+            <div class="bg-white/95 text-zinc-900 rounded-xl p-2 shadow-lg space-y-1 my-auto">
+                <div class="h-1.5 rounded w-2/3" style="background:${tObj.accent}"></div>
+                <div class="h-1 rounded bg-zinc-200 w-full"></div>
+                <div class="h-1 rounded bg-zinc-200 w-5/6"></div>
+                <div class="h-3 rounded bg-zinc-100 border border-zinc-200"></div>
+                <div class="flex justify-end"><div class="h-1 rounded bg-zinc-400 w-1/3"></div></div>
+            </div>`;
+    } else if (tObj.id === "cv_ats" || tObj.id === "cv_royal") {
+        miniThumb = `
+            <div class="bg-white/95 text-zinc-900 rounded-xl p-2 shadow-lg space-y-1 my-auto">
+                <div class="h-1.5 rounded w-3/4 mx-auto" style="background:${tObj.accent}"></div>
+                <div class="h-0.5 rounded bg-zinc-300 w-full"></div>
+                <div class="h-1 rounded bg-zinc-200 w-full"></div>
+                <div class="h-1 rounded bg-zinc-200 w-5/6"></div>
+                <div class="h-0.5 rounded bg-zinc-300 w-full"></div>
+                <div class="h-1 rounded bg-zinc-200 w-4/5"></div>
+            </div>`;
+    } else if (tObj.id === "cv_charcoal" || tObj.id === "cv_navy") {
+        miniThumb = `
+            <div class="bg-white/95 text-zinc-900 rounded-xl overflow-hidden shadow-lg grid grid-cols-[34%_1fr] h-14 my-auto">
+                <div class="p-1.5 flex flex-col items-center gap-1" style="background:${tObj.accent}">
+                    <span class="w-3.5 h-3.5 rounded-full bg-white/80"></span>
+                    <div class="h-0.5 w-full bg-white/40 rounded"></div>
+                    <div class="h-0.5 w-3/4 bg-white/40 rounded"></div>
+                </div>
+                <div class="p-1.5 space-y-1">
+                    <div class="h-1.5 rounded bg-zinc-700 w-4/5"></div>
+                    <div class="h-1 rounded bg-zinc-200 w-full"></div>
+                    <div class="h-1 rounded bg-zinc-200 w-3/4"></div>
+                    <div class="h-1 rounded bg-zinc-200 w-5/6"></div>
+                </div>
+            </div>`;
+    } else if (tObj.id === "cv_teal") {
+        miniThumb = `
+            <div class="bg-white/95 text-zinc-900 rounded-xl p-2 shadow-lg space-y-1 my-auto">
+                <div class="h-2 rounded w-full" style="background:${tObj.accent}"></div>
+                <div class="grid grid-cols-2 gap-0.5 border border-zinc-200 p-0.5">
+                    <div class="h-1.5 bg-zinc-200"></div><div class="h-1.5 bg-zinc-100"></div>
+                    <div class="h-1.5 bg-zinc-200"></div><div class="h-1.5 bg-zinc-100"></div>
+                </div>
+                <div class="h-1 rounded bg-zinc-200 w-5/6"></div>
+            </div>`;
+    } else {
+        miniThumb = `
             <div class="bg-white/95 text-zinc-900 rounded-xl p-2 shadow-lg space-y-1 my-auto">
                 <div class="flex items-center gap-1.5">
                     <span class="w-4 h-4 rounded-full shrink-0" style="background:${tObj.accent}"></span>
@@ -56,7 +98,17 @@ function buildPortfolioMiniCardHtml(docType, tObj, showFavBtn = true) {
                     <div class="h-5 rounded bg-zinc-100 border border-zinc-200"></div>
                     <div class="h-5 rounded bg-zinc-100 border border-zinc-200"></div>
                 </div>
+            </div>`;
+    }
+
+    return `
+        <div class="relative aspect-[3/4] w-full overflow-hidden select-none p-3 flex flex-col justify-between text-white" style="background:linear-gradient(155deg,${tObj.accent} 0%,#141418 72%,#09090b 100%);">
+            <div class="flex items-center justify-between gap-1 z-10">
+                <span class="text-[8px] font-extrabold uppercase px-2 py-0.5 rounded-full bg-white/20 backdrop-blur">${isLam ? "LAMARAN" : "CV"}</span>
+                ${tObj.badge ? `<span class="text-[8px] font-extrabold px-1.5 py-0.5 rounded-full bg-amber-400 text-black uppercase">${escHtml(tObj.badge)}</span>` : ""}
             </div>
+            ${showFavBtn ? `<button type="button" data-fav-btn="${esc(favKey)}" onclick="toggleFavoriteItem(event, JSON.parse('${favObjStr}'))" class="fav-heart-btn ${isFav ? "is-fav" : ""}" title="Simpan ke Favorit"><i class="fa-${isFav ? "solid" : "regular"} fa-heart"></i></button>` : ""}
+            ${miniThumb}
             <div class="z-10">
                 <span class="text-[9px] text-white/75 block truncate">${escHtml(tObj.tag || "")}</span>
                 <h4 class="font-bold text-xs text-white truncate">${escHtml(tObj.name)}</h4>
@@ -85,7 +137,8 @@ function buildDemoPortfolioDoc(docType, themeId) {
         skills: [
             { name: "Administrasi & Pelaporan", level: 5 },
             { name: "Koordinasi Lapangan & K3", level: 4 },
-            { name: "Komunikasi & Problem Solving", level: 4 }
+            { name: "Komunikasi & Problem Solving", level: 4 },
+            { name: "Microsoft Excel & Pengarsipan", level: 5 }
         ],
         experiences: [
             { role: "Koordinator Operasional & Admin", company: "PT Borneo Karya Utama", period: "2023 - Sekarang", desc: "Mengatur jadwal kerja tim, dokumentasi harian, serta memastikan kelengkapan berkas administrasi." },
@@ -102,72 +155,45 @@ function buildDemoPortfolioDoc(docType, themeId) {
     };
 }
 
-// Bug 14: Watermark menggunakan logo + tulisan Mr Undangan
-function renderPortfolioA4Html(doc, showWatermark = false) {
-    const tObj = getPortfolioThemeObj(doc.docType || "cv", doc.themeId);
-    const acc = tObj.accent || "#1b7a49";
-    const wmRow = `<div class="a4-wm-item"><img src="./logo.png" onerror="this.style.display='none'"><span>MR UNDANGAN</span></div>`;
-    const wmHtml = showWatermark
-        ? `<div class="a4-watermark-overlay">${wmRow}${wmRow}${wmRow}${wmRow}${wmRow}</div>`
-        : "";
+// ================= 2. RENDERER 9 DESAIN CV UNIK + 3 SURAT LAMARAN (A4) =================
+function _pfInitials(name) {
+    const parts = String(name || "CV").trim().split(/\s+/).filter(Boolean);
+    if (parts.length >= 2) return (parts[0][0] + parts[1][0]).toUpperCase();
+    return String(name || "CV").slice(0, 2).toUpperCase();
+}
 
-    if (doc.docType === "lamaran") {
-        const l = Object.assign({}, DEFAULT_LAMARAN_TEMPLATE, doc.lamaran || {});
-        const birthInfo = [doc.birthPlace, doc.birthDate].filter(Boolean).join(", ") || "Banjarmasin, 12 Mei 1996";
-        return `
-            <div class="a4-paper-sheet p-12 flex flex-col justify-between text-[13.5px] leading-relaxed text-zinc-800">
-                ${wmHtml}
-                <div class="space-y-5 relative z-10">
-                    <div class="flex justify-between items-start border-b-2 pb-3" style="border-color:${acc}">
-                        <div>
-                            <span class="text-[10px] uppercase tracking-widest font-extrabold" style="color:${acc}">${escHtml(tObj.name)}</span>
-                            <h2 class="text-xl font-extrabold text-zinc-900 mt-0.5">${escHtml(l.subject || "Lamaran Pekerjaan")}</h2>
-                        </div>
-                        <span class="text-xs text-zinc-600 font-semibold">${escHtml(l.cityDate || "")}</span>
-                    </div>
-
-                    <div class="space-y-0.5 text-xs">
-                        <p class="font-bold text-zinc-900">${escHtml(l.recipientTitle || "Yth. Bapak/Ibu HRD")}</p>
-                        <p class="font-bold" style="color:${acc}">${escHtml(l.companyName || "")}</p>
-                        <p class="text-zinc-600">${escHtml(l.companyAddress || "")}</p>
-                    </div>
-
-                    <p>${escHtml(l.salutation || "Dengan hormat,")}</p>
-                    <p>${escHtml(l.opening || "")}</p>
-
-                    <div class="bg-zinc-50 border border-zinc-200 rounded-xl p-4 space-y-1.5 text-xs">
-                        <div class="grid grid-cols-[145px_12px_1fr]"><strong>Nama Lengkap</strong><span>:</span><strong>${escHtml(doc.fullName || "")}</strong></div>
-                        <div class="grid grid-cols-[145px_12px_1fr]"><strong>Tempat, Tgl Lahir</strong><span>:</span><span>${escHtml(birthInfo)}</span></div>
-                        <div class="grid grid-cols-[145px_12px_1fr]"><strong>Posisi Dilamar</strong><span>:</span><strong style="color:${acc}">${escHtml(l.position || doc.headline || "")}</strong></div>
-                        <div class="grid grid-cols-[145px_12px_1fr]"><strong>No. HP / WA</strong><span>:</span><span>${escHtml(doc.phone || "")}</span></div>
-                        <div class="grid grid-cols-[145px_12px_1fr]"><strong>Email</strong><span>:</span><span>${escHtml(doc.email || "")}</span></div>
-                        <div class="grid grid-cols-[145px_12px_1fr]"><strong>Alamat</strong><span>:</span><span>${escHtml(doc.address || "")}</span></div>
-                    </div>
-
-                    ${doc.summary ? `<p>${escHtml(doc.summary)}</p>` : ""}
-
-                    ${l.attachmentsList ? `<div class="text-xs"><strong class="block mb-1 text-zinc-900">Sebagai bahan pertimbangan, turut saya lampirkan:</strong><p class="text-zinc-700">${escHtml(l.attachmentsList)}</p></div>` : ""}
-
-                    <p>${escHtml(l.closing || "")}</p>
-                </div>
-
-                <div class="pt-8 flex justify-end relative z-10">
-                    <div class="text-center w-52 space-y-14">
-                        <p class="text-xs font-semibold text-zinc-700">Hormat saya,</p>
-                        <p class="text-sm font-extrabold text-zinc-900 border-t border-zinc-400 pt-1">${escHtml(doc.fullName || "")}</p>
-                    </div>
-                </div>
-            </div>
-        `;
+function _pfPhotoBox(doc, cls = "w-24 h-24 rounded-2xl", bgStyle = "background:rgba(255,255,255,0.16);color:#ffffff;") {
+    if (doc.photo) {
+        return `<img src="${doc.photo}" class="${cls} object-cover border-2 border-white shadow-md shrink-0">`;
     }
+    return `<div class="${cls} border border-white/35 flex items-center justify-center text-2xl font-extrabold shrink-0" style="${bgStyle}">${escHtml(_pfInitials(doc.fullName))}</div>`;
+}
 
-    const skillsHtml = (doc.skills || []).map(s => {
+function _pfSkillsStars(skills, acc, darkMode = false) {
+    if (!skills || !skills.length) return `<p class="text-xs opacity-60">-</p>`;
+    return skills.map(s => {
         const lv = Math.max(1, Math.min(5, Number(s.level) || 4));
-        const stars = Array.from({ length: 5 }, (_, idx) => `<i class="fa-${idx < lv ? "solid" : "regular"} fa-star text-[10px]" style="color:${acc}"></i>`).join("");
-        return `<div class="flex items-center justify-between gap-2 text-xs py-1 border-b border-zinc-200/70"><span>${escHtml(s.name)}</span><span class="shrink-0">${stars}</span></div>`;
+        const starCol = darkMode ? "#facc15" : acc;
+        const stars = Array.from({ length: 5 }, (_, idx) => `<i class="fa-${idx < lv ? "solid" : "regular"} fa-star text-[10px]" style="color:${starCol}"></i>`).join("");
+        return `<div class="flex items-center justify-between gap-2 text-xs py-1.5 border-b ${darkMode ? "border-white/15" : "border-zinc-200/80"} last:border-b-0"><span>${escHtml(s.name)}</span><span class="shrink-0">${stars}</span></div>`;
     }).join("");
+}
 
-    const expHtml = (doc.experiences || []).map(ex => `
+function _pfSkillsBars(skills, acc, darkMode = false) {
+    if (!skills || !skills.length) return `<p class="text-xs opacity-60">-</p>`;
+    return skills.map(s => {
+        const lv = Math.max(1, Math.min(5, Number(s.level) || 4));
+        const pct = lv * 20;
+        return `<div class="space-y-1">
+            <div class="flex justify-between text-[11px] font-semibold"><span>${escHtml(s.name)}</span><span class="opacity-75">${pct}%</span></div>
+            <div class="w-full h-1.5 rounded-full ${darkMode ? "bg-white/15" : "bg-zinc-200"} overflow-hidden"><div class="h-full rounded-full" style="width:${pct}%;background:${darkMode ? "#f8fafc" : acc};"></div></div>
+        </div>`;
+    }).join("");
+}
+
+function _pfExpStandard(exps, acc) {
+    if (!exps || !exps.length) return `<p class="text-xs text-zinc-500">-</p>`;
+    return exps.map(ex => `
         <div class="space-y-0.5 pb-3 border-b border-zinc-200 last:border-b-0">
             <div class="flex justify-between items-baseline gap-2">
                 <strong class="text-xs font-extrabold text-zinc-900">${escHtml(ex.role)}</strong>
@@ -177,27 +203,514 @@ function renderPortfolioA4Html(doc, showWatermark = false) {
             ${ex.desc ? `<p class="text-[11px] text-zinc-700 leading-relaxed pt-0.5">${escHtml(ex.desc)}</p>` : ""}
         </div>
     `).join("");
+}
 
-    const eduHtml = (doc.educations || []).map(ed => `
+function _pfEduStandard(edus, acc) {
+    if (!edus || !edus.length) return `<p class="text-xs text-zinc-500">-</p>`;
+    return edus.map(ed => `
         <div class="space-y-0.5 pb-2.5 border-b border-zinc-200 last:border-b-0">
             <div class="flex justify-between items-baseline gap-2">
                 <strong class="text-xs font-bold text-zinc-900">${escHtml(ed.degree)}</strong>
-                <span class="text-[11px] font-semibold text-zinc-500 shrink-0">${escHtml(ed.period)}</span>
+                <span class="text-[11px] font-semibold shrink-0" style="color:${acc}">${escHtml(ed.period)}</span>
             </div>
-            <p class="text-[11px] text-zinc-700">${escHtml(ed.school)}</p>
+            <p class="text-[11px] font-medium text-zinc-700">${escHtml(ed.school)}</p>
             ${ed.desc ? `<p class="text-[11px] text-zinc-600">${escHtml(ed.desc)}</p>` : ""}
         </div>
     `).join("");
+}
 
-    const photoHtml = doc.photo
-        ? `<img src="${doc.photo}" class="w-24 h-24 rounded-2xl object-cover border-2 border-white shadow-md shrink-0">`
-        : `<div class="w-24 h-24 rounded-2xl bg-white/15 border border-white/30 flex items-center justify-center text-2xl font-extrabold text-white shrink-0">${escHtml((doc.fullName || "CV").slice(0, 2).toUpperCase())}</div>`;
+function renderPortfolioA4Html(doc, showWatermark = false) {
+    const tObj = getPortfolioThemeObj(doc.docType || "cv", doc.themeId);
+    const acc = tObj.accent || "#1b7a49";
+    const wmRow = `<div class="a4-wm-item"><img src="./logo.png" onerror="this.style.display='none'"><span>MR UNDANGAN</span></div>`;
+    const wmHtml = showWatermark
+        ? `<div class="a4-watermark-overlay">${wmRow}${wmRow}${wmRow}${wmRow}${wmRow}</div>`
+        : "";
 
+    // ================= A. 3 GAYA SURAT LAMARAN KERJA =================
+    if (doc.docType === "lamaran") {
+        const l = Object.assign({}, DEFAULT_LAMARAN_TEMPLATE, doc.lamaran || {});
+        const birthInfo = [doc.birthPlace, doc.birthDate].filter(Boolean).join(", ") || "Banjarmasin, 12 Mei 1996";
+        const isModern = tObj.id === "lam_modern";
+        const isFresh = tObj.id === "lam_fresh";
+
+        const headerBlock = isModern
+            ? `<div class="px-10 py-6 text-white flex justify-between items-center" style="background:${acc}">
+                <div>
+                    <span class="text-[10px] uppercase tracking-[0.22em] opacity-80 block">Surat Lamaran Pekerjaan</span>
+                    <h1 class="text-2xl font-extrabold mt-0.5">${escHtml(doc.fullName || "")}</h1>
+                    <p class="text-xs opacity-90">${escHtml(l.position || doc.headline || "")}</p>
+                </div>
+                <div class="text-right text-[11px] opacity-90 space-y-0.5">
+                    <p class="font-bold">${escHtml(l.cityDate || "")}</p>
+                    ${doc.phone ? `<p>${escHtml(doc.phone)}</p>` : ""}
+                    ${doc.email ? `<p>${escHtml(doc.email)}</p>` : ""}
+                </div>
+               </div>`
+            : isFresh
+                ? `<div class="px-12 pt-10 pb-4">
+                    <div class="border-l-4 pl-4 flex justify-between items-start gap-4" style="border-color:${acc}">
+                        <div>
+                            <span class="text-[10px] uppercase tracking-widest font-extrabold" style="color:${acc}">Aplikasi Lamaran Kerja</span>
+                            <h2 class="text-xl font-extrabold text-zinc-900 mt-0.5">${escHtml(l.subject || "Lamaran Pekerjaan")}</h2>
+                        </div>
+                        <span class="text-xs text-zinc-600 font-semibold shrink-0">${escHtml(l.cityDate || "")}</span>
+                    </div>
+                   </div>`
+                : `<div class="px-12 pt-12 pb-2">
+                    <div class="flex justify-between items-start border-b-2 pb-3" style="border-color:${acc}">
+                        <div>
+                            <span class="text-[10px] uppercase tracking-widest font-extrabold" style="color:${acc}">${escHtml(tObj.name)}</span>
+                            <h2 class="text-xl font-extrabold text-zinc-900 mt-0.5">${escHtml(l.subject || "Lamaran Pekerjaan")}</h2>
+                        </div>
+                        <span class="text-xs text-zinc-600 font-semibold">${escHtml(l.cityDate || "")}</span>
+                    </div>
+                   </div>`;
+
+        return `
+            <div class="a4-paper-sheet flex flex-col justify-between text-[13.5px] leading-relaxed text-zinc-800">
+                ${wmHtml}
+                <div class="relative z-10">
+                    ${headerBlock}
+                    <div class="${isModern ? "px-12 py-8" : "px-12 py-5"} space-y-4">
+                        <div class="space-y-0.5 text-xs">
+                            <p class="font-bold text-zinc-900">${escHtml(l.recipientTitle || "Yth. Bapak/Ibu HRD")}</p>
+                            <p class="font-bold" style="color:${acc}">${escHtml(l.companyName || "")}</p>
+                            <p class="text-zinc-600">${escHtml(l.companyAddress || "")}</p>
+                        </div>
+
+                        <p>${escHtml(l.salutation || "Dengan hormat,")}</p>
+                        <p>${escHtml(l.opening || "")}</p>
+
+                        <div class="${isFresh ? "bg-emerald-50/50 border-emerald-200" : "bg-zinc-50 border-zinc-200"} border rounded-xl p-4 space-y-1.5 text-xs">
+                            <div class="grid grid-cols-[145px_12px_1fr]"><strong>Nama Lengkap</strong><span>:</span><strong>${escHtml(doc.fullName || "")}</strong></div>
+                            <div class="grid grid-cols-[145px_12px_1fr]"><strong>Tempat, Tgl Lahir</strong><span>:</span><span>${escHtml(birthInfo)}</span></div>
+                            <div class="grid grid-cols-[145px_12px_1fr]"><strong>Posisi Dilamar</strong><span>:</span><strong style="color:${acc}">${escHtml(l.position || doc.headline || "")}</strong></div>
+                            <div class="grid grid-cols-[145px_12px_1fr]"><strong>No. HP / WA</strong><span>:</span><span>${escHtml(doc.phone || "")}</span></div>
+                            <div class="grid grid-cols-[145px_12px_1fr]"><strong>Email</strong><span>:</span><span>${escHtml(doc.email || "")}</span></div>
+                            <div class="grid grid-cols-[145px_12px_1fr]"><strong>Alamat</strong><span>:</span><span>${escHtml(doc.address || "")}</span></div>
+                        </div>
+
+                        ${doc.summary ? `<p>${escHtml(doc.summary)}</p>` : ""}
+                        ${l.attachmentsList ? `<div class="text-xs"><strong class="block mb-1 text-zinc-900">Sebagai bahan pertimbangan, turut saya lampirkan:</strong><p class="text-zinc-700">${escHtml(l.attachmentsList)}</p></div>` : ""}
+                        <p>${escHtml(l.closing || "")}</p>
+                    </div>
+                </div>
+
+                <div class="px-12 pb-12 pt-4 flex justify-end relative z-10">
+                    <div class="text-center w-52 space-y-14">
+                        <p class="text-xs font-semibold text-zinc-700">Hormat saya,</p>
+                        <p class="text-sm font-extrabold text-zinc-900 border-t border-zinc-400 pt-1">${escHtml(doc.fullName || "")}</p>
+                    </div>
+                </div>
+            </div>
+        `;
+    }
+
+    // ================= B. 9 DESAIN CV UNIK (TATA LETAK BERBEDA) =================
+    const tid = tObj.id || "cv_emerald";
+    const skills = doc.skills || [];
+    const exps = doc.experiences || [];
+    const edus = doc.educations || [];
+
+    // 1. ATS CLASSIC PRO — 1 Kolom Murni Standar HRD (Tanpa Foto, Ramah Mesin ATS)
+    if (tid === "cv_ats") {
+        const contactLine = [doc.phone, doc.email, doc.address].filter(Boolean).map(escHtml).join("  |  ");
+        return `
+            <div class="a4-paper-sheet px-12 py-11 flex flex-col text-zinc-900" style="font-family:'Plus Jakarta Sans',Arial,sans-serif;">
+                ${wmHtml}
+                <div class="relative z-10 space-y-5">
+                    <div class="text-center border-b-2 border-zinc-900 pb-4 space-y-1">
+                        <h1 class="text-3xl font-extrabold uppercase tracking-wider text-zinc-950">${escHtml(doc.fullName || "Nama Lengkap")}</h1>
+                        ${doc.headline ? `<p class="text-sm font-bold text-zinc-700">${escHtml(doc.headline)}</p>` : ""}
+                        <p class="text-[11px] text-zinc-600 pt-1">${contactLine}</p>
+                    </div>
+
+                    ${doc.summary ? `<div class="space-y-1.5">
+                        <h3 class="text-xs font-extrabold uppercase tracking-[0.16em] text-zinc-950 border-b border-zinc-400 pb-1">Ringkasan Profesional</h3>
+                        <p class="text-xs text-zinc-800 leading-relaxed">${escHtml(doc.summary)}</p>
+                    </div>` : ""}
+
+                    <div class="space-y-3">
+                        <h3 class="text-xs font-extrabold uppercase tracking-[0.16em] text-zinc-950 border-b border-zinc-400 pb-1">Pengalaman Kerja</h3>
+                        ${exps.length ? exps.map(ex => `
+                            <div class="space-y-0.5">
+                                <div class="flex justify-between items-baseline gap-2">
+                                    <strong class="text-xs font-extrabold text-zinc-950">${escHtml(ex.role)} — <span class="font-semibold text-zinc-700">${escHtml(ex.company)}</span></strong>
+                                    <span class="text-[11px] font-bold text-zinc-700 shrink-0">${escHtml(ex.period)}</span>
+                                </div>
+                                ${ex.desc ? `<p class="text-xs text-zinc-800 leading-relaxed pl-3 border-l-2 border-zinc-300">${escHtml(ex.desc)}</p>` : ""}
+                            </div>
+                        `).join("") : '<p class="text-xs text-zinc-500">-</p>'}
+                    </div>
+
+                    <div class="space-y-2.5">
+                        <h3 class="text-xs font-extrabold uppercase tracking-[0.16em] text-zinc-950 border-b border-zinc-400 pb-1">Pendidikan</h3>
+                        ${edus.length ? edus.map(ed => `
+                            <div class="flex justify-between items-baseline gap-2">
+                                <div>
+                                    <strong class="text-xs font-bold text-zinc-950">${escHtml(ed.degree)}</strong>
+                                    <span class="text-xs text-zinc-700"> • ${escHtml(ed.school)}</span>
+                                    ${ed.desc ? `<p class="text-[11px] text-zinc-600">${escHtml(ed.desc)}</p>` : ""}
+                                </div>
+                                <span class="text-[11px] font-semibold text-zinc-700 shrink-0">${escHtml(ed.period)}</span>
+                            </div>
+                        `).join("") : '<p class="text-xs text-zinc-500">-</p>'}
+                    </div>
+
+                    <div class="space-y-2">
+                        <h3 class="text-xs font-extrabold uppercase tracking-[0.16em] text-zinc-950 border-b border-zinc-400 pb-1">Keahlian Utama</h3>
+                        <p class="text-xs text-zinc-800 leading-relaxed">
+                            ${skills.length ? skills.map(s => `<span class="font-semibold">${escHtml(s.name)}</span>`).join(" &nbsp;•&nbsp; ") : "-"}
+                        </p>
+                    </div>
+                </div>
+            </div>
+        `;
+    }
+
+    // 2. ROYAL BLUE EXECUTIVE — Korporat Tanpa Foto, Tipografi Tegas & Grid Keahlian
+    if (tid === "cv_royal") {
+        return `
+            <div class="a4-paper-sheet flex flex-col text-zinc-800">
+                ${wmHtml}
+                <div class="h-3 w-full" style="background:${acc}"></div>
+                <div class="px-12 py-9 space-y-6 relative z-10 flex-1">
+                    <div class="flex justify-between items-end gap-6 border-b-2 pb-5" style="border-color:${acc}">
+                        <div class="space-y-1">
+                            <span class="text-[10px] font-extrabold uppercase tracking-[0.25em]" style="color:${acc}">Executive Resume</span>
+                            <h1 class="text-3xl font-extrabold tracking-tight text-zinc-950">${escHtml(doc.fullName || "Nama Lengkap")}</h1>
+                            <p class="text-sm font-semibold text-zinc-600">${escHtml(doc.headline || "")}</p>
+                        </div>
+                        <div class="text-right text-[11px] text-zinc-600 space-y-1 shrink-0">
+                            ${doc.phone ? `<p><i class="fa-solid fa-phone mr-1.5" style="color:${acc}"></i>${escHtml(doc.phone)}</p>` : ""}
+                            ${doc.email ? `<p><i class="fa-solid fa-envelope mr-1.5" style="color:${acc}"></i>${escHtml(doc.email)}</p>` : ""}
+                            ${doc.address ? `<p><i class="fa-solid fa-location-dot mr-1.5" style="color:${acc}"></i>${escHtml(doc.address)}</p>` : ""}
+                        </div>
+                    </div>
+
+                    ${doc.summary ? `<div class="bg-blue-50/60 border-l-4 rounded-r-xl p-4" style="border-color:${acc}">
+                        <h3 class="text-[11px] font-extrabold uppercase tracking-wider mb-1" style="color:${acc}">Profil Eksekutif</h3>
+                        <p class="text-xs text-zinc-700 leading-relaxed">${escHtml(doc.summary)}</p>
+                    </div>` : ""}
+
+                    <div class="space-y-3">
+                        <h3 class="text-xs font-extrabold uppercase tracking-[0.18em] pb-1 border-b" style="color:${acc};border-color:${acc}40">Pengalaman Profesional</h3>
+                        ${_pfExpStandard(exps, acc)}
+                    </div>
+
+                    <div class="grid grid-cols-2 gap-8 pt-1">
+                        <div class="space-y-2.5">
+                            <h3 class="text-xs font-extrabold uppercase tracking-[0.18em] pb-1 border-b" style="color:${acc};border-color:${acc}40">Pendidikan</h3>
+                            ${_pfEduStandard(edus, acc)}
+                        </div>
+                        <div class="space-y-2.5">
+                            <h3 class="text-xs font-extrabold uppercase tracking-[0.18em] pb-1 border-b" style="color:${acc};border-color:${acc}40">Kompetensi Inti</h3>
+                            <div class="space-y-2">${_pfSkillsBars(skills, acc, false)}</div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        `;
+    }
+
+    // 3. CHARCOAL TIMELINE — Sidebar Gelap Kiri + Garis Timeline Vertikal di Kanan
+    if (tid === "cv_charcoal") {
+        return `
+            <div class="a4-paper-sheet grid grid-cols-[255px_1fr] text-zinc-800">
+                ${wmHtml}
+                <aside class="text-white p-8 flex flex-col gap-6 relative z-10" style="background:${acc}">
+                    <div class="text-center space-y-3 pt-2">
+                        <div class="flex justify-center">${_pfPhotoBox(doc, "w-28 h-28 rounded-full", "background:rgba(255,255,255,0.12);color:#ffffff;")}</div>
+                        <div>
+                            <h1 class="text-xl font-extrabold leading-tight">${escHtml(doc.fullName || "Nama Lengkap")}</h1>
+                            <p class="text-[11px] text-white/80 mt-1">${escHtml(doc.headline || "")}</p>
+                        </div>
+                    </div>
+                    <div class="space-y-2 text-[11px] text-white/85 border-t border-white/15 pt-4">
+                        <h3 class="text-[10px] font-extrabold uppercase tracking-[0.2em] text-white/60">Kontak</h3>
+                        ${doc.phone ? `<p class="flex items-start gap-2"><i class="fa-solid fa-phone mt-0.5 text-white/70"></i><span>${escHtml(doc.phone)}</span></p>` : ""}
+                        ${doc.email ? `<p class="flex items-start gap-2"><i class="fa-solid fa-envelope mt-0.5 text-white/70"></i><span class="break-all">${escHtml(doc.email)}</span></p>` : ""}
+                        ${doc.address ? `<p class="flex items-start gap-2"><i class="fa-solid fa-location-dot mt-0.5 text-white/70"></i><span>${escHtml(doc.address)}</span></p>` : ""}
+                    </div>
+                    <div class="space-y-2.5 border-t border-white/15 pt-4">
+                        <h3 class="text-[10px] font-extrabold uppercase tracking-[0.2em] text-white/60">Keahlian</h3>
+                        <div class="space-y-2.5">${_pfSkillsBars(skills, acc, true)}</div>
+                    </div>
+                </aside>
+                <div class="p-9 space-y-6 relative z-10 bg-white">
+                    ${doc.summary ? `<div class="space-y-1.5">
+                        <h3 class="text-xs font-extrabold uppercase tracking-[0.18em] text-zinc-900">Tentang Saya</h3>
+                        <p class="text-xs text-zinc-600 leading-relaxed">${escHtml(doc.summary)}</p>
+                    </div>` : ""}
+
+                    <div class="space-y-3">
+                        <h3 class="text-xs font-extrabold uppercase tracking-[0.18em] text-zinc-900">Linimasa Pengalaman</h3>
+                        <div class="border-l-2 pl-5 space-y-4 ml-1.5" style="border-color:${acc}">
+                            ${exps.length ? exps.map(ex => `
+                                <div class="relative space-y-0.5">
+                                    <span class="w-3 h-3 rounded-full absolute -left-[27px] top-1 border-2 border-white" style="background:${acc}"></span>
+                                    <span class="text-[10px] font-extrabold uppercase tracking-wider text-zinc-500 block">${escHtml(ex.period)}</span>
+                                    <strong class="text-xs font-extrabold text-zinc-900 block">${escHtml(ex.role)}</strong>
+                                    <p class="text-[11px] font-semibold text-zinc-600">${escHtml(ex.company)}</p>
+                                    ${ex.desc ? `<p class="text-[11px] text-zinc-600 leading-relaxed pt-0.5">${escHtml(ex.desc)}</p>` : ""}
+                                </div>
+                            `).join("") : '<p class="text-xs text-zinc-500">-</p>'}
+                        </div>
+                    </div>
+
+                    <div class="space-y-3">
+                        <h3 class="text-xs font-extrabold uppercase tracking-[0.18em] text-zinc-900">Linimasa Pendidikan</h3>
+                        <div class="border-l-2 pl-5 space-y-3.5 ml-1.5" style="border-color:${acc}">
+                            ${edus.length ? edus.map(ed => `
+                                <div class="relative space-y-0.5">
+                                    <span class="w-3 h-3 rounded-full absolute -left-[27px] top-1 border-2 border-white" style="background:${acc}"></span>
+                                    <span class="text-[10px] font-extrabold text-zinc-500 block">${escHtml(ed.period)}</span>
+                                    <strong class="text-xs font-bold text-zinc-900 block">${escHtml(ed.degree)}</strong>
+                                    <p class="text-[11px] text-zinc-700">${escHtml(ed.school)}</p>
+                                    ${ed.desc ? `<p class="text-[11px] text-zinc-500">${escHtml(ed.desc)}</p>` : ""}
+                                </div>
+                            `).join("") : '<p class="text-xs text-zinc-500">-</p>'}
+                        </div>
+                    </div>
+                </div>
+            </div>
+        `;
+    }
+
+    // 4. DEEP NAVY CORPORATE — Panel Kiri Navy Formal + Foto Kotak + Isi Kanan Tegas
+    if (tid === "cv_navy") {
+        return `
+            <div class="a4-paper-sheet grid grid-cols-[265px_1fr] text-zinc-800">
+                ${wmHtml}
+                <aside class="text-white p-8 flex flex-col gap-5 relative z-10" style="background:${acc}">
+                    <div class="flex justify-center pt-1">${_pfPhotoBox(doc, "w-28 h-32 rounded-xl", "background:rgba(255,255,255,0.14);color:#ffffff;")}</div>
+                    <div class="space-y-2 text-[11px] text-white/90 border-t border-white/20 pt-4">
+                        <h3 class="text-[10px] font-extrabold uppercase tracking-[0.2em] text-amber-300">Informasi Kontak</h3>
+                        ${doc.phone ? `<p><i class="fa-solid fa-phone w-4 text-amber-300"></i>${escHtml(doc.phone)}</p>` : ""}
+                        ${doc.email ? `<p class="break-all"><i class="fa-solid fa-envelope w-4 text-amber-300"></i>${escHtml(doc.email)}</p>` : ""}
+                        ${doc.address ? `<p><i class="fa-solid fa-location-dot w-4 text-amber-300"></i>${escHtml(doc.address)}</p>` : ""}
+                    </div>
+                    ${doc.summary ? `<div class="space-y-1.5 border-t border-white/20 pt-4">
+                        <h3 class="text-[10px] font-extrabold uppercase tracking-[0.2em] text-amber-300">Ringkasan</h3>
+                        <p class="text-[11px] text-white/85 leading-relaxed">${escHtml(doc.summary)}</p>
+                    </div>` : ""}
+                    <div class="space-y-2 border-t border-white/20 pt-4">
+                        <h3 class="text-[10px] font-extrabold uppercase tracking-[0.2em] text-amber-300">Keahlian</h3>
+                        ${_pfSkillsStars(skills, acc, true)}
+                    </div>
+                </aside>
+                <div class="p-9 space-y-6 relative z-10 bg-white">
+                    <div class="border-b-4 pb-4" style="border-color:${acc}">
+                        <h1 class="text-3xl font-extrabold tracking-tight" style="color:${acc}">${escHtml(doc.fullName || "Nama Lengkap")}</h1>
+                        <p class="text-sm font-bold text-zinc-600 mt-1">${escHtml(doc.headline || "")}</p>
+                    </div>
+                    <div class="space-y-3">
+                        <h3 class="text-xs font-extrabold uppercase tracking-[0.18em] px-3 py-1.5 rounded-lg text-white inline-block" style="background:${acc}">Pengalaman Kerja</h3>
+                        <div class="space-y-3 pt-1">${_pfExpStandard(exps, acc)}</div>
+                    </div>
+                    <div class="space-y-3">
+                        <h3 class="text-xs font-extrabold uppercase tracking-[0.18em] px-3 py-1.5 rounded-lg text-white inline-block" style="background:${acc}">Riwayat Pendidikan</h3>
+                        <div class="space-y-2.5 pt-1">${_pfEduStandard(edus, acc)}</div>
+                    </div>
+                </div>
+            </div>
+        `;
+    }
+
+    // 5. PASTEL PEACH GEN-Z — Estetik, Melengkung, Chip Keahlian Kreatif
+    if (tid === "cv_peach") {
+        return `
+            <div class="a4-paper-sheet flex flex-col text-zinc-800" style="background:#fffaf8;">
+                ${wmHtml}
+                <div class="mx-8 mt-8 rounded-3xl p-7 flex items-center gap-5 relative z-10" style="background:${acc}2e;border:1.5px solid ${acc}66;">
+                    ${_pfPhotoBox(doc, "w-24 h-24 rounded-full", `background:${acc};color:#ffffff;`)}
+                    <div class="flex-1 min-w-0 space-y-1">
+                        <span class="inline-block px-2.5 py-0.5 rounded-full text-[9px] font-extrabold uppercase tracking-wider text-white" style="background:${acc}">Portfolio &amp; CV</span>
+                        <h1 class="text-2xl font-extrabold text-zinc-900 leading-tight">${escHtml(doc.fullName || "Nama Lengkap")}</h1>
+                        <p class="text-xs font-semibold text-zinc-700">${escHtml(doc.headline || "")}</p>
+                        <div class="flex flex-wrap gap-x-4 gap-y-1 text-[11px] text-zinc-600 pt-1">
+                            ${doc.phone ? `<span><i class="fa-solid fa-phone mr-1" style="color:${acc}"></i>${escHtml(doc.phone)}</span>` : ""}
+                            ${doc.email ? `<span><i class="fa-solid fa-envelope mr-1" style="color:${acc}"></i>${escHtml(doc.email)}</span>` : ""}
+                            ${doc.address ? `<span><i class="fa-solid fa-location-dot mr-1" style="color:${acc}"></i>${escHtml(doc.address)}</span>` : ""}
+                        </div>
+                    </div>
+                </div>
+
+                <div class="p-8 space-y-5 relative z-10 flex-1">
+                    ${doc.summary ? `<div class="bg-white rounded-2xl p-5 border shadow-sm space-y-1.5" style="border-color:${acc}45;">
+                        <h3 class="text-xs font-extrabold uppercase tracking-wider" style="color:${acc}">Tentang Saya</h3>
+                        <p class="text-xs text-zinc-700 leading-relaxed">${escHtml(doc.summary)}</p>
+                    </div>` : ""}
+
+                    <div class="grid grid-cols-[1.45fr_1fr] gap-5">
+                        <div class="bg-white rounded-2xl p-5 border shadow-sm space-y-3" style="border-color:${acc}45;">
+                            <h3 class="text-xs font-extrabold uppercase tracking-wider" style="color:${acc}">Pengalaman</h3>
+                            ${_pfExpStandard(exps, acc)}
+                        </div>
+                        <div class="space-y-5">
+                            <div class="bg-white rounded-2xl p-5 border shadow-sm space-y-2.5" style="border-color:${acc}45;">
+                                <h3 class="text-xs font-extrabold uppercase tracking-wider" style="color:${acc}">Pendidikan</h3>
+                                ${_pfEduStandard(edus, acc)}
+                            </div>
+                            <div class="bg-white rounded-2xl p-5 border shadow-sm space-y-2.5" style="border-color:${acc}45;">
+                                <h3 class="text-xs font-extrabold uppercase tracking-wider" style="color:${acc}">Keahlian</h3>
+                                <div class="flex flex-wrap gap-1.5">
+                                    ${skills.length ? skills.map(s => `<span class="px-2.5 py-1 rounded-full text-[10px] font-bold" style="background:${acc}24;color:#4a2520;">${escHtml(s.name)} ★${s.level || 4}</span>`).join("") : '<span class="text-xs text-zinc-500">-</span>'}
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        `;
+    }
+
+    // 6. OCEAN TEAL FORMAL — Gaya Tabel & Data Lengkap Terstruktur
+    if (tid === "cv_teal") {
+        return `
+            <div class="a4-paper-sheet px-11 py-10 flex flex-col text-zinc-800">
+                ${wmHtml}
+                <div class="relative z-10 space-y-5">
+                    <div class="flex items-center justify-between gap-5 pb-4 border-b-4" style="border-color:${acc}">
+                        <div>
+                            <span class="text-[10px] font-extrabold uppercase tracking-[0.22em]" style="color:${acc}">Daftar Riwayat Hidup</span>
+                            <h1 class="text-2xl font-extrabold text-zinc-950 mt-0.5">${escHtml(doc.fullName || "Nama Lengkap")}</h1>
+                            <p class="text-xs font-semibold text-zinc-600">${escHtml(doc.headline || "")}</p>
+                        </div>
+                        ${_pfPhotoBox(doc, "w-20 h-24 rounded-lg", `background:${acc};color:#ffffff;`)}
+                    </div>
+
+                    <div class="border rounded-xl overflow-hidden text-xs" style="border-color:${acc}40;">
+                        <div class="px-4 py-1.5 font-extrabold uppercase tracking-wider text-[10px] text-white" style="background:${acc}">I. Data Pribadi</div>
+                        <div class="divide-y divide-zinc-200 bg-white">
+                            <div class="grid grid-cols-[160px_1fr] px-4 py-2"><strong class="text-zinc-600">Nama Lengkap</strong><span class="font-bold text-zinc-900">${escHtml(doc.fullName || "-")}</span></div>
+                            <div class="grid grid-cols-[160px_1fr] px-4 py-2"><strong class="text-zinc-600">Bidang / Posisi</strong><span>${escHtml(doc.headline || "-")}</span></div>
+                            <div class="grid grid-cols-[160px_1fr] px-4 py-2"><strong class="text-zinc-600">No. Telepon / WA</strong><span>${escHtml(doc.phone || "-")}</span></div>
+                            <div class="grid grid-cols-[160px_1fr] px-4 py-2"><strong class="text-zinc-600">Alamat Email</strong><span>${escHtml(doc.email || "-")}</span></div>
+                            <div class="grid grid-cols-[160px_1fr] px-4 py-2"><strong class="text-zinc-600">Alamat Domisili</strong><span>${escHtml(doc.address || "-")}</span></div>
+                            ${doc.summary ? `<div class="grid grid-cols-[160px_1fr] px-4 py-2"><strong class="text-zinc-600">Ringkasan Diri</strong><span class="leading-relaxed">${escHtml(doc.summary)}</span></div>` : ""}
+                        </div>
+                    </div>
+
+                    <div class="border rounded-xl overflow-hidden text-xs" style="border-color:${acc}40;">
+                        <div class="px-4 py-1.5 font-extrabold uppercase tracking-wider text-[10px] text-white" style="background:${acc}">II. Riwayat Pendidikan</div>
+                        <div class="divide-y divide-zinc-200 bg-white">
+                            ${edus.length ? edus.map(ed => `<div class="grid grid-cols-[130px_1fr] px-4 py-2.5 gap-3"><span class="font-bold" style="color:${acc}">${escHtml(ed.period)}</span><div><strong class="block text-zinc-900">${escHtml(ed.degree)}</strong><span class="text-zinc-600">${escHtml(ed.school)}</span>${ed.desc ? `<p class="text-[11px] text-zinc-500 mt-0.5">${escHtml(ed.desc)}</p>` : ""}</div></div>`).join("") : '<div class="px-4 py-2 text-zinc-500">-</div>'}
+                        </div>
+                    </div>
+
+                    <div class="border rounded-xl overflow-hidden text-xs" style="border-color:${acc}40;">
+                        <div class="px-4 py-1.5 font-extrabold uppercase tracking-wider text-[10px] text-white" style="background:${acc}">III. Pengalaman Kerja</div>
+                        <div class="divide-y divide-zinc-200 bg-white">
+                            ${exps.length ? exps.map(ex => `<div class="grid grid-cols-[130px_1fr] px-4 py-2.5 gap-3"><span class="font-bold" style="color:${acc}">${escHtml(ex.period)}</span><div><strong class="block text-zinc-900">${escHtml(ex.role)}</strong><span class="text-[11px] font-semibold text-zinc-600">${escHtml(ex.company)}</span>${ex.desc ? `<p class="text-[11px] text-zinc-700 mt-0.5 leading-relaxed">${escHtml(ex.desc)}</p>` : ""}</div></div>`).join("") : '<div class="px-4 py-2 text-zinc-500">-</div>'}
+                        </div>
+                    </div>
+
+                    <div class="border rounded-xl overflow-hidden text-xs" style="border-color:${acc}40;">
+                        <div class="px-4 py-1.5 font-extrabold uppercase tracking-wider text-[10px] text-white" style="background:${acc}">IV. Keahlian &amp; Kompetensi</div>
+                        <div class="p-4 grid grid-cols-2 gap-x-6 gap-y-1 bg-white">
+                            ${_pfSkillsStars(skills, acc, false)}
+                        </div>
+                    </div>
+                </div>
+            </div>
+        `;
+    }
+
+    // 7. SLATE FRESH GRAD — Pendidikan & Keahlian Menonjol di Atas (Untuk Lulusan Baru)
+    if (tid === "cv_slate") {
+        return `
+            <div class="a4-paper-sheet flex flex-col text-zinc-800">
+                ${wmHtml}
+                <div class="px-10 py-7 text-white flex items-center justify-between gap-5 relative z-10" style="background:${acc}">
+                    <div class="space-y-1 flex-1 min-w-0">
+                        <span class="text-[10px] uppercase tracking-[0.22em] text-teal-200 font-bold">Fresh Graduate Profile</span>
+                        <h1 class="text-2xl font-extrabold">${escHtml(doc.fullName || "Nama Lengkap")}</h1>
+                        <p class="text-xs text-white/85">${escHtml(doc.headline || "")}</p>
+                        <div class="flex flex-wrap gap-3 text-[11px] text-white/80 pt-1">
+                            ${doc.phone ? `<span><i class="fa-solid fa-phone mr-1"></i>${escHtml(doc.phone)}</span>` : ""}
+                            ${doc.email ? `<span><i class="fa-solid fa-envelope mr-1"></i>${escHtml(doc.email)}</span>` : ""}
+                            ${doc.address ? `<span><i class="fa-solid fa-location-dot mr-1"></i>${escHtml(doc.address)}</span>` : ""}
+                        </div>
+                    </div>
+                    ${_pfPhotoBox(doc, "w-24 h-24 rounded-full", "background:rgba(255,255,255,0.16);color:#ffffff;")}
+                </div>
+                <div class="p-10 space-y-6 relative z-10 flex-1">
+                    ${doc.summary ? `<div class="space-y-1.5">
+                        <h3 class="text-xs font-extrabold uppercase tracking-wider" style="color:${acc}">Tujuan Karier &amp; Profil</h3>
+                        <p class="text-xs text-zinc-700 leading-relaxed">${escHtml(doc.summary)}</p>
+                    </div>` : ""}
+
+                    <div class="grid grid-cols-2 gap-6 bg-slate-50 border border-slate-200 rounded-2xl p-5">
+                        <div class="space-y-2.5">
+                            <h3 class="text-xs font-extrabold uppercase tracking-wider pb-1 border-b-2" style="color:${acc};border-color:${acc}">Pendidikan Utama</h3>
+                            ${_pfEduStandard(edus, acc)}
+                        </div>
+                        <div class="space-y-2.5">
+                            <h3 class="text-xs font-extrabold uppercase tracking-wider pb-1 border-b-2" style="color:${acc};border-color:${acc}">Keahlian &amp; Kemampuan</h3>
+                            <div class="space-y-2">${_pfSkillsBars(skills, acc, false)}</div>
+                        </div>
+                    </div>
+
+                    <div class="space-y-3">
+                        <h3 class="text-xs font-extrabold uppercase tracking-wider pb-1 border-b-2" style="color:${acc};border-color:${acc}">Pengalaman Kerja / Magang / Organisasi</h3>
+                        ${_pfExpStandard(exps, acc)}
+                    </div>
+                </div>
+            </div>
+        `;
+    }
+
+    // 8. CLEAN MINIMALIST — Putih Bersih Elegan Tanpa Blok Warna Berat
+    if (tid === "cv_clean") {
+        return `
+            <div class="a4-paper-sheet px-12 py-11 flex flex-col text-zinc-900 bg-white">
+                ${wmHtml}
+                <div class="relative z-10 space-y-7">
+                    <div class="flex items-start justify-between gap-6 border-b border-zinc-300 pb-6">
+                        <div class="space-y-1.5">
+                            <h1 class="text-3xl font-light tracking-tight text-zinc-950" style="font-family:'Cormorant Garamond',Georgia,serif;font-weight:700;">${escHtml(doc.fullName || "Nama Lengkap")}</h1>
+                            <p class="text-xs uppercase tracking-[0.2em] text-zinc-500 font-bold">${escHtml(doc.headline || "")}</p>
+                            <div class="flex flex-wrap gap-x-4 gap-y-1 text-[11px] text-zinc-600 pt-2">
+                                ${doc.phone ? `<span>${escHtml(doc.phone)}</span>` : ""}
+                                ${doc.email ? `<span>• &nbsp;${escHtml(doc.email)}</span>` : ""}
+                                ${doc.address ? `<span>• &nbsp;${escHtml(doc.address)}</span>` : ""}
+                            </div>
+                        </div>
+                        ${doc.photo ? `<img src="${doc.photo}" class="w-20 h-20 rounded-full object-cover border border-zinc-300 shrink-0">` : ""}
+                    </div>
+
+                    ${doc.summary ? `<div class="grid grid-cols-[150px_1fr] gap-6">
+                        <h3 class="text-[11px] font-extrabold uppercase tracking-[0.18em] text-zinc-400">Profil</h3>
+                        <p class="text-xs text-zinc-700 leading-relaxed">${escHtml(doc.summary)}</p>
+                    </div>` : ""}
+
+                    <div class="grid grid-cols-[150px_1fr] gap-6 border-t border-zinc-200 pt-6">
+                        <h3 class="text-[11px] font-extrabold uppercase tracking-[0.18em] text-zinc-400">Pengalaman</h3>
+                        <div class="space-y-3">${_pfExpStandard(exps, "#18181b")}</div>
+                    </div>
+
+                    <div class="grid grid-cols-[150px_1fr] gap-6 border-t border-zinc-200 pt-6">
+                        <h3 class="text-[11px] font-extrabold uppercase tracking-[0.18em] text-zinc-400">Pendidikan</h3>
+                        <div class="space-y-2.5">${_pfEduStandard(edus, "#18181b")}</div>
+                    </div>
+
+                    <div class="grid grid-cols-[150px_1fr] gap-6 border-t border-zinc-200 pt-6">
+                        <h3 class="text-[11px] font-extrabold uppercase tracking-[0.18em] text-zinc-400">Keahlian</h3>
+                        <div class="grid grid-cols-2 gap-x-6 gap-y-1">${_pfSkillsStars(skills, "#18181b", false)}</div>
+                    </div>
+                </div>
+            </div>
+        `;
+    }
+
+    // 9. EMERALD FRESH (Default) — Header Emerald Modern + 2 Kolom Seimbang
     return `
         <div class="a4-paper-sheet flex flex-col text-zinc-800">
             ${wmHtml}
-            <div class="px-10 py-8 text-white flex items-center gap-5" style="background:${acc}">
-                ${photoHtml}
+            <div class="px-10 py-8 text-white flex items-center gap-5 relative z-10" style="background:${acc}">
+                ${_pfPhotoBox(doc, "w-24 h-24 rounded-2xl", "background:rgba(255,255,255,0.16);color:#ffffff;")}
                 <div class="min-w-0 flex-1 space-y-1">
                     <h1 class="text-2xl font-extrabold tracking-tight leading-tight">${escHtml(doc.fullName || "Nama Lengkap")}</h1>
                     <p class="text-xs font-semibold text-white/90">${escHtml(doc.headline || "")}</p>
@@ -208,21 +721,21 @@ function renderPortfolioA4Html(doc, showWatermark = false) {
                     </div>
                 </div>
             </div>
-            <div class="p-10 grid grid-cols-[1.35fr_1fr] gap-8 flex-1">
+            <div class="p-10 grid grid-cols-[1.35fr_1fr] gap-8 flex-1 relative z-10">
                 <div class="space-y-6">
                     ${doc.summary ? `<div class="space-y-1.5"><h3 class="text-xs font-extrabold uppercase tracking-wider pb-1 border-b-2" style="color:${acc};border-color:${acc}">Profil Ringkas</h3><p class="text-xs text-zinc-700 leading-relaxed">${escHtml(doc.summary)}</p></div>` : ""}
-                    <div class="space-y-2.5"><h3 class="text-xs font-extrabold uppercase tracking-wider pb-1 border-b-2" style="color:${acc};border-color:${acc}">Pengalaman Kerja</h3>${expHtml || '<p class="text-xs text-zinc-500">-</p>'}</div>
-                    <div class="space-y-2.5"><h3 class="text-xs font-extrabold uppercase tracking-wider pb-1 border-b-2" style="color:${acc};border-color:${acc}">Pendidikan</h3>${eduHtml || '<p class="text-xs text-zinc-500">-</p>'}</div>
+                    <div class="space-y-2.5"><h3 class="text-xs font-extrabold uppercase tracking-wider pb-1 border-b-2" style="color:${acc};border-color:${acc}">Pengalaman Kerja</h3>${_pfExpStandard(exps, acc)}</div>
+                    <div class="space-y-2.5"><h3 class="text-xs font-extrabold uppercase tracking-wider pb-1 border-b-2" style="color:${acc};border-color:${acc}">Pendidikan</h3>${_pfEduStandard(edus, acc)}</div>
                 </div>
-                <div class="space-y-6 bg-zinc-50 rounded-2xl p-5 border border-zinc-200/80 h-fit">
-                    <div class="space-y-2"><h3 class="text-xs font-extrabold uppercase tracking-wider pb-1 border-b" style="color:${acc};border-color:${acc}">Keahlian</h3>${skillsHtml || '<p class="text-xs text-zinc-500">-</p>'}</div>
+                <div class="space-y-6 bg-emerald-50/40 rounded-2xl p-5 border border-emerald-200/70 h-fit">
+                    <div class="space-y-2"><h3 class="text-xs font-extrabold uppercase tracking-wider pb-1 border-b" style="color:${acc};border-color:${acc}">Keahlian</h3>${_pfSkillsStars(skills, acc, false)}</div>
                 </div>
             </div>
         </div>
     `;
 }
 
-// Bug 14: Skala kertas A4 otomatis pas selebar layar HP tanpa geser kanan-kiri
+// Skala kertas A4 otomatis pas selebar layar HP (sambil tetap mendukung cubit zoom)
 function fitPreviewA4Scale() {
     const body = document.getElementById("pfp-scroll-body");
     const mount = document.getElementById("pfp-a4-mount");
@@ -230,10 +743,11 @@ function fitPreviewA4Scale() {
     if (!body || !mount || !sheet) return;
     const availW = Math.max(240, Math.min(window.innerWidth - 16, body.clientWidth - 16));
     const scale = Math.min(1, availW / 794);
+    const fullH = Math.max(1123, sheet.scrollHeight || 1123);
     sheet.style.transformOrigin = "top left";
     sheet.style.transform = `scale(${scale})`;
     mount.style.width = `${Math.floor(794 * scale)}px`;
-    mount.style.height = `${Math.ceil(1123 * scale)}px`;
+    mount.style.height = `${Math.ceil(fullH * scale)}px`;
     mount.style.overflow = "hidden";
     body.scrollTop = 0;
 }
@@ -302,7 +816,7 @@ function openSempurnakanFromPreview() {
     openSempurnakanModal(previewPfDocObj.id);
 }
 
-// ================= 2. WIZARD CV & LAMARAN KERJA =================
+// ================= 3. WIZARD CV & LAMARAN KERJA =================
 function startCreatePortfolio(isCabang = false, initType = "cv", initThemeId = null) {
     if (isCabang) {
         const cab = getCurrentUserObj();
@@ -403,16 +917,21 @@ function bindPortfolioAutoSave() {
 
 function renderPortfolioFormFields(prefill = null) {
     const isLam = pfWizardState.docType === "lamaran";
+    const isNoPhotoTheme = pfWizardState.themeId === "cv_ats" || pfWizardState.themeId === "cv_royal";
     const d = prefill || {};
     const l = Object.assign({}, DEFAULT_LAMARAN_TEMPLATE, d.lamaran || {});
     const box = document.getElementById("pfw-dynamic-fields"); if (!box) return;
+
+    const photoHint = isNoPhotoTheme
+        ? "Desain ini bergaya korporat/ATS tanpa foto (foto tetap boleh disimpan jika suatu saat ganti tema)."
+        : "Akan disesuaikan otomatis ke rasio 3:4 dan tampil tajam di PDF.";
 
     const photoBlock = !isLam ? `
         <div class="app-card-soft border rounded-2xl p-4 flex items-center gap-4">
             <img id="pf-photo-prev" src="${pfWizardState.photoData || DEFAULT_AVATAR}" class="w-16 h-16 rounded-2xl object-cover border gold-border bg-zinc-800 shrink-0">
             <div class="flex-1 space-y-1.5">
                 <strong class="text-xs block">Pas Foto Formal (Opsional)</strong>
-                <p class="text-[10px] app-muted">Akan disesuaikan otomatis ke rasio 3:4.</p>
+                <p class="text-[10px] app-muted">${photoHint}</p>
                 <div class="flex gap-2">
                     <label class="px-3 py-1.5 rounded-lg gold-pill-btn text-[11px] cursor-pointer"><i class="fa-solid fa-crop-simple mr-1"></i>Upload Foto<input type="file" accept="image/*" class="hide" onchange="pickCroppedPortfolioPhoto(this)"></label>
                     ${pfWizardState.photoData ? `<button type="button" onclick="pfWizardState.photoData='';renderPortfolioFormFields(collectPortfolioFormPayload(true));" class="px-2.5 py-1.5 rounded-lg bg-red-600/15 text-red-500 text-[11px] font-bold">Hapus</button>` : ""}
@@ -492,9 +1011,14 @@ function pickCroppedPortfolioPhoto(inp) {
         showLoading("Mengunggah pas foto...");
         const up = await apiAction({ action: "upload_media", dataUrl, prefix: "pf_photo" });
         hideLoading();
-        pfWizardState.photoData = (up && up.ok && up.url) ? up.url : dataUrl;
+        const finalUrl = (up && up.ok && up.url) ? up.url : dataUrl;
+        pfWizardState.photoData = finalUrl;
+        // Simpan salinan lokal agar foto tidak pernah blank putih saat cetak PDF
+        if (finalUrl && !finalUrl.startsWith("data:")) {
+            idbSet("pf_photo_url_" + finalUrl, dataUrl);
+        }
         const prev = document.getElementById("pf-photo-prev");
-        if (prev) prev.src = pfWizardState.photoData;
+        if (prev) prev.src = finalUrl;
         showToast("Pas foto tersimpan!");
     });
 }
@@ -733,7 +1257,92 @@ async function submitPortfolioForm(e) {
     openUnifiedPayment("portfolio", newPf.id);
 }
 
-// ================= 3. SEMPURNAKAN (AUTO-SCAN LAMPIRAN & GABUNG 1 PDF) =================
+// ================= 4. SEMPURNAKAN (AUTO-SCAN, SIMPAN LOKAL & PDF ANTI-BLANK) =================
+function _getLampiranCacheKey(pfId) {
+    return `pf_lampiran_${String(pfId || "draft")}`;
+}
+
+async function _persistSempurnakanAttachments() {
+    if (!sempurnakanPfDocObj || !sempurnakanPfDocObj.id) return;
+    try {
+        await idbSet(_getLampiranCacheKey(sempurnakanPfDocObj.id), sempurnakanPfDocObj.lampiranDocs || []);
+    } catch {}
+}
+
+async function _fetchImageAsDataUrl(url) {
+    try {
+        const res = await fetch(url, { mode: "cors", cache: "force-cache" });
+        if (!res.ok) return "";
+        const blob = await res.blob();
+        if (!blob || !blob.type.startsWith("image/")) return "";
+        return await new Promise((resolve) => {
+            const r = new FileReader();
+            r.onload = (e) => resolve(e.target.result || "");
+            r.onerror = () => resolve("");
+            r.readAsDataURL(blob);
+        });
+    } catch {
+        return "";
+    }
+}
+
+// Konversi foto profil CV ke dataUrl aman sebelum cetak PDF agar tidak blank putih akibat CORS Drive
+async function _resolvePdfSafePhotoDataUrl(photoUrl) {
+    const raw = String(photoUrl || "").trim();
+    if (!raw) return "";
+    if (raw.startsWith("data:image/")) return raw;
+
+    try {
+        const cached = await idbGet("pf_photo_url_" + raw);
+        if (cached && String(cached).startsWith("data:image/")) return cached;
+    } catch {}
+
+    const candidates = [];
+    const m = raw.match(/(?:drive|docs)\.google\.com\/(?:file\/d\/|uc\?(?:.*&)?id=|open\?id=|thumbnail\?(?:.*&)?id=)([a-zA-Z0-9_-]{15,})/)
+        || raw.match(/lh3\.googleusercontent\.com\/d\/([a-zA-Z0-9_-]{15,})/);
+    if (m) {
+        const id = m[1];
+        candidates.push(`https://lh3.googleusercontent.com/d/${id}=w640`);
+        candidates.push(`https://drive.google.com/thumbnail?id=${id}&sz=w640`);
+    }
+    candidates.push(raw);
+
+    for (const url of candidates) {
+        const dataUrl = await _fetchImageAsDataUrl(url);
+        if (dataUrl) {
+            idbSet("pf_photo_url_" + raw, dataUrl);
+            return dataUrl;
+        }
+    }
+
+    // Fallback terakhir: coba gambar lewat elemen Image crossOrigin anonymous
+    for (const url of candidates) {
+        const viaCanvas = await new Promise((resolve) => {
+            const im = new Image();
+            im.crossOrigin = "anonymous";
+            im.onload = () => {
+                try {
+                    const c = document.createElement("canvas");
+                    c.width = im.naturalWidth || 480;
+                    c.height = im.naturalHeight || 640;
+                    c.getContext("2d").drawImage(im, 0, 0);
+                    resolve(c.toDataURL("image/jpeg", 0.88));
+                } catch {
+                    resolve("");
+                }
+            };
+            im.onerror = () => resolve("");
+            im.src = url;
+        });
+        if (viaCanvas) {
+            idbSet("pf_photo_url_" + raw, viaCanvas);
+            return viaCanvas;
+        }
+    }
+
+    return raw;
+}
+
 async function applyAutoScanFilter(dataUrl) {
     return await new Promise((resolve) => {
         const img = new Image();
@@ -753,10 +1362,24 @@ async function applyAutoScanFilter(dataUrl) {
     });
 }
 
-function openSempurnakanModal(pfId) {
+async function openSempurnakanModal(pfId) {
     const pf = (db.portfolios || []).find(p => String(p.id) === String(pfId)); if (!pf) return;
     sempurnakanPfDocObj = pf;
     sempurnakanPdfMode = "hrd";
+
+    // Muat kembali lampiran scan yang tersimpan di HP agar tidak hilang saat refresh
+    try {
+        const savedAtts = await idbGet(_getLampiranCacheKey(pf.id));
+        if (Array.isArray(savedAtts) && savedAtts.length) {
+            const existingIds = new Set((pf.lampiranDocs || []).map(x => x.id));
+            const merged = [...(pf.lampiranDocs || [])];
+            savedAtts.forEach(item => {
+                if (item && item.src && !existingIds.has(item.id)) merged.push(item);
+            });
+            pf.lampiranDocs = merged;
+        }
+    } catch {}
+
     document.getElementById("smp-doc-subtitle").innerText = `${pf.title} • ${pf.themeName || pf.themeId}`;
     setPdfQualityMode("hrd");
     renderSempurnakanAttachments();
@@ -787,14 +1410,16 @@ async function addAttachmentsToSempurnakan(inp) {
             src: processed
         });
     }
+    await _persistSempurnakanAttachments();
     hideLoading();
     renderSempurnakanAttachments();
-    showToast(`${files.length} lampiran ditambahkan!`);
+    showToast(`${files.length} lampiran ditambahkan & tersimpan otomatis di HP!`);
 }
 
-function removeSempurnakanAttachment(attId) {
+async function removeSempurnakanAttachment(attId) {
     if (!sempurnakanPfDocObj) return;
     sempurnakanPfDocObj.lampiranDocs = (sempurnakanPfDocObj.lampiranDocs || []).filter(x => x.id !== attId);
+    await _persistSempurnakanAttachments();
     renderSempurnakanAttachments();
 }
 
@@ -807,7 +1432,7 @@ function renderSempurnakanAttachments() {
     }
     box.innerHTML = list.map((item, idx) => `
         <div class="app-card border rounded-xl p-2 relative space-y-1">
-            <button type="button" onclick="removeSempurnakanAttachment('${item.id}')" class="absolute top-1.5 right-1.5 w-6 h-6 rounded-full bg-red-600 text-white text-[10px]"><i class="fa-solid fa-xmark"></i></button>
+            <button type="button" onclick="removeSempurnakanAttachment('${esc(item.id)}')" class="absolute top-1.5 right-1.5 w-6 h-6 rounded-full bg-red-600 text-white text-[10px]"><i class="fa-solid fa-xmark"></i></button>
             <img src="${item.src}" class="w-full h-24 object-contain bg-white rounded-lg border">
             <span class="text-[10px] font-bold block truncate">Lampiran #${idx + 1}</span>
         </div>
@@ -831,11 +1456,18 @@ function copyCoverLetterMsg() {
 
 async function generateMergedPortfolioPdf() {
     if (!sempurnakanPfDocObj) return;
-    setBtnLoading("btn-generate-merged-pdf", true, "Menyusun PDF...");
+    setBtnLoading("btn-generate-merged-pdf", true, "Menyiapkan Foto & PDF...");
     try {
         await loadScriptOnce("https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js");
         await loadScriptOnce("https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js");
 
+        // Konversi pas foto ke base64 lokal agar tidak terblokir CORS saat dirender ke PDF
+        const safePhoto = sempurnakanPfDocObj.photo
+            ? await _resolvePdfSafePhotoDataUrl(sempurnakanPfDocObj.photo)
+            : "";
+        const docForPdf = Object.assign({}, sempurnakanPfDocObj, { photo: safePhoto });
+
+        setBtnLoading("btn-generate-merged-pdf", true, "Menyusun Halaman PDF...");
         const { jsPDF } = window.jspdf;
         const pdf = new jsPDF({ orientation: "portrait", unit: "mm", format: "a4" });
         const scale = sempurnakanPdfMode === "hd" ? 2.0 : 1.45;
@@ -845,10 +1477,20 @@ async function generateMergedPortfolioPdf() {
         tempHost.style.position = "fixed";
         tempHost.style.left = "-9999px";
         tempHost.style.top = "0";
-        tempHost.innerHTML = renderPortfolioA4Html(sempurnakanPfDocObj, false);
+        tempHost.innerHTML = renderPortfolioA4Html(docForPdf, false);
         document.body.appendChild(tempHost);
+
+        // Tunggu seluruh gambar di dalam lembaran A4 selesai dimuat sebelum memotret ke kanvas
+        const imgs = Array.from(tempHost.querySelectorAll("img"));
+        await Promise.all(imgs.map(im => im.complete ? Promise.resolve() : new Promise(r => { im.onload = r; im.onerror = r; })));
+
         const sheetEl = tempHost.querySelector(".a4-paper-sheet");
-        const canvas = await window.html2canvas(sheetEl, { scale, useCORS: true, backgroundColor: "#ffffff" });
+        const canvas = await window.html2canvas(sheetEl, {
+            scale,
+            useCORS: true,
+            allowTaint: false,
+            backgroundColor: "#ffffff"
+        });
         document.body.removeChild(tempHost);
 
         const imgData = canvas.toDataURL("image/jpeg", jpgQuality);
@@ -859,7 +1501,7 @@ async function generateMergedPortfolioPdf() {
 
         pdf.addImage(imgData, "JPEG", 0, position, pageW, imgH);
         heightLeft -= pageH;
-        while (heightLeft > 2) {
+        while (heightLeft > 4) {
             position = heightLeft - imgH;
             pdf.addPage();
             pdf.addImage(imgData, "JPEG", 0, position, pageW, imgH);
@@ -888,7 +1530,7 @@ async function generateMergedPortfolioPdf() {
         pdf.save(`${slugify(sempurnakanPfDocObj.title || "berkas_lamaran")}.pdf`);
         showToast("File PDF berhasil digabung & diunduh!");
     } catch {
-        showToast("Gagal membuat PDF. Coba lagi atau gunakan cetak browser.", "error");
+        showToast("Gagal membuat PDF. Coba lagi atau periksa koneksi internet Anda.", "error");
     } finally {
         setBtnLoading("btn-generate-merged-pdf", false);
     }
