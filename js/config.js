@@ -363,7 +363,7 @@ function setBtnLoading(btnOrId, isLoading, text = "Memproses...") {
         el.innerHTML = `<i class="fa-solid fa-circle-notch fa-spin mr-1"></i>${text}`;
     } else {
         el.disabled = false;
-        if (el.dataset.origHtml) { el.innerHTML = el.dataset.origHtml; delete _el?.dataset?.origHtml; }
+        if (el.dataset.origHtml) { el.innerHTML = el.dataset.origHtml; delete el.dataset.origHtml; }
     }
 }
 
@@ -740,7 +740,6 @@ function getAudioUrlCandidates(url) {
     return [raw];
 }
 
-// Mengambil audio lewat fetch -> Blob agar lolos blokir langsung <audio> dari Google Drive
 async function fetchAudioAsBlobUrl(rawUrl, candidates) {
     const cacheKey = String(rawUrl || (candidates && candidates[0]) || "");
     if (!cacheKey) return "";
@@ -754,7 +753,6 @@ async function fetchAudioAsBlobUrl(rawUrl, candidates) {
             const buf = await resp.arrayBuffer();
             if (!buf || buf.byteLength < 1024) continue;
 
-            // Cek apakah respon berupa halaman HTML (misal halaman konfirmasi/izin Drive)
             const headStr = new TextDecoder().decode(buf.slice(0, 128)).trim().toLowerCase();
             if (headStr.startsWith("<!doctype") || headStr.startsWith("<html") || headStr.includes("google-site-verification")) {
                 continue;
