@@ -363,7 +363,7 @@ function setBtnLoading(btnOrId, isLoading, text = "Memproses...") {
         el.innerHTML = `<i class="fa-solid fa-circle-notch fa-spin mr-1"></i>${text}`;
     } else {
         el.disabled = false;
-        if (el.dataset.origHtml) { el.innerHTML = el.dataset.origHtml; delete el.dataset.origHtml; }
+        if (el.dataset.origHtml) { el.innerHTML = el.dataset.origHtml; delete _el?.dataset?.origHtml; }
     }
 }
 
@@ -718,17 +718,21 @@ function quickResizeImage(file, maxSide = 820, quality = 0.80) {
     });
 }
 
+const _audioBlobCache = new Map();
+
 function getAudioUrlCandidates(url) {
     if (!url) return [];
     const raw = String(url).trim();
     if (!raw) return [];
-    if (raw.startsWith("data:audio/")) return [raw];
+    if (raw.startsWith("data:audio/") || raw.startsWith("blob:")) return [raw];
     const m = raw.match(/(?:drive|docs)\.google\.com\/(?:file\/d\/|uc\?(?:.*&)?id=|open\?id=|download\?(?:.*&)?id=)([a-zA-Z0-9_-]{15,})/)
-        || raw.match(/drive\.usercontent\.google\.com\/download\?(?:.*&)?id=([a-zA-Z0-9_-]{15,})/);
+        || raw.match(/drive\.usercontent\.google\.com\/(?:uc|download)\?(?:.*&)?id=([a-zA-Z0-9_-]{15,})/);
     if (m) {
         const id = m[1];
         return [
             `https://drive.usercontent.google.com/download?id=${id}&export=download&confirm=t`,
+            `https://drive.usercontent.google.com/uc?id=${id}&export=download`,
+            `https://docs.google.com/uc?export=download&id=${id}`,
             `https://docs.google.com/uc?export=open&id=${id}`,
             `https://drive.google.com/uc?export=download&id=${id}`
         ];
@@ -736,9 +740,46 @@ function getAudioUrlCandidates(url) {
     return [raw];
 }
 
+// Mengambil audio lewat fetch -> Blob agar lolos blokir langsung <audio> dari Google Drive
+async function fetchAudioAsBlobUrl(rawUrl, candidates) {
+    const cacheKey = String(rawUrl || (candidates && candidates[0]) || "");
+    if (!cacheKey) return "";
+    if (_audioBlobCache.has(cacheKey)) return _audioBlobCache.get(cacheKey);
+
+    const list = (candidates && candidates.length) ? candidates : getAudioUrlCandidates(rawUrl);
+    for (const u of list) {
+        try {
+            const resp = await fetch(u, { mode: "cors", cache: "force-cache", redirect: "follow" });
+            if (!resp.ok) continue;
+            const buf = await resp.arrayBuffer();
+            if (!buf || buf.byteLength < 1024) continue;
+
+            // Cek apakah respon berupa halaman HTML (misal halaman konfirmasi/izin Drive)
+            const headStr = new TextDecoder().decode(buf.slice(0, 128)).trim().toLowerCase();
+            if (headStr.startsWith("<!doctype") || headStr.startsWith("<html") || headStr.includes("google-site-verification")) {
+                continue;
+            }
+
+            let mime = (resp.headers.get("content-type") || "").split(";")[0].trim().toLowerCase();
+            if (!mime || mime === "application/octet-stream") {
+                const sig = new Uint8Array(buf.slice(0, 4));
+                if (sig[0] === 0x52 && sig[1] === 0x49 && sig[2] === 0x46 && sig[3] === 0x46) mime = "audio/wav";
+                else if (sig[0] === 0x4F && sig[1] === 0x67 && sig[2] === 0x67 && sig[3] === 0x53) mime = "audio/ogg";
+                else mime = "audio/mpeg";
+            }
+            const blob = new Blob([buf], { type: mime });
+            const blobUrl = URL.createObjectURL(blob);
+            _audioBlobCache.set(cacheKey, blobUrl);
+            return blobUrl;
+        } catch {}
+    }
+    return "";
+}
+
 async function resolveAudioUrl(url) {
     const list = getAudioUrlCandidates(url);
-    return list[0] || "";
+    const blobUrl = await fetchAudioAsBlobUrl(url, list);
+    return blobUrl || list[0] || "";
 }
 
 let _cropperInst = null, _cropCfg = { outW: 600, outH: 600, onDone: null };
@@ -1005,6 +1046,7 @@ async function processAndUploadCroppedAudio() {
     const up = await apiAction({ action: "upload_media", dataUrl: audioDataUrl, prefix: "audio_clip" });
     setBtnLoading("btn-save-audio-crop", false);
     if (up && up.ok && up.url) {
+        _audioBlobCache.set(up.url, audioDataUrl);
         if (typeof wizardState !== "undefined") {
             wizardState.customAudioUrl = up.url;
             wizardState.customAudioTitle = songTitle;
