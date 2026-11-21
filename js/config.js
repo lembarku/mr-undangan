@@ -313,6 +313,7 @@ function loadScriptOnce(url) {
     });
     return _loadedScripts[url];
 }
+
 // ================= UI FEEDBACK: LOADING, TOAST, CONFIRM, SPLASH, TEMA =================
 let _toastTimer = null;
 function showLoading(txt = "Memproses...") {
@@ -718,6 +719,7 @@ function quickResizeImage(file, maxSide = 820, quality = 0.80) {
 }
 
 const _audioBlobCache = new Map();
+const _audioPreloadJobs = new Map();
 
 function extractGoogleDriveAudioId(url) {
     if (!url) return "";
@@ -773,48 +775,76 @@ async function fetchAudioAsBlobUrl(rawUrl, candidates) {
         return cachedVal;
     }
 
-    const driveId = extractGoogleDriveAudioId(rawUrl) || extractGoogleDriveAudioId((candidates && candidates[0]) || "");
-    if (driveId) {
-        try {
-            const streamJson = await fetchJsonWithTimeout(`${CLOUD_API_URL}?action=stream_audio&id=${encodeURIComponent(driveId)}&t=${Date.now()}`, {}, 25000);
-            if (streamJson && streamJson.ok && streamJson.dataUrl) {
-                const bUrl = dataUrlToBlobUrl(streamJson.dataUrl);
-                if (bUrl) {
-                    _audioBlobCache.set(cacheKey, bUrl);
-                    return bUrl;
+    const idbKey = "audio_data_" + encodeURIComponent(cacheKey);
+    const idbCachedData = await idbGet(idbKey);
+    if (idbCachedData && typeof idbCachedData === "string" && idbCachedData.startsWith("data:")) {
+        const bUrl = dataUrlToBlobUrl(idbCachedData);
+        if (bUrl) {
+            _audioBlobCache.set(cacheKey, bUrl);
+            return bUrl;
+        }
+    }
+
+    if (_audioPreloadJobs.has(cacheKey)) {
+        return await _audioPreloadJobs.get(cacheKey);
+    }
+
+    const job = (async () => {
+        const driveId = extractGoogleDriveAudioId(rawUrl) || extractGoogleDriveAudioId((candidates && candidates[0]) || "");
+        if (driveId) {
+            try {
+                const streamJson = await fetchJsonWithTimeout(`${CLOUD_API_URL}?action=stream_audio&id=${encodeURIComponent(driveId)}&t=${Date.now()}`, {}, 25000);
+                if (streamJson && streamJson.ok && streamJson.dataUrl) {
+                    idbSet(idbKey, streamJson.dataUrl);
+                    const bUrl = dataUrlToBlobUrl(streamJson.dataUrl);
+                    if (bUrl) {
+                        _audioBlobCache.set(cacheKey, bUrl);
+                        return bUrl;
+                    }
                 }
-            }
-        } catch {}
-    }
+            } catch {}
+        }
 
-    const list = (candidates && candidates.length) ? candidates : getAudioUrlCandidates(rawUrl);
-    for (const u of list) {
-        if (u.indexOf("action=stream_audio") !== -1) continue;
-        try {
-            const resp = await fetch(u, { mode: "cors", cache: "force-cache", redirect: "follow" });
-            if (!resp.ok) continue;
-            const buf = await resp.arrayBuffer();
-            if (!buf || buf.byteLength < 1024) continue;
+        const list = (candidates && candidates.length) ? candidates : getAudioUrlCandidates(rawUrl);
+        for (const u of list) {
+            if (u.indexOf("action=stream_audio") !== -1) continue;
+            try {
+                const resp = await fetch(u, { mode: "cors", cache: "force-cache", redirect: "follow" });
+                if (!resp.ok) continue;
+                const buf = await resp.arrayBuffer();
+                if (!buf || buf.byteLength < 1024) continue;
 
-            const headStr = new TextDecoder().decode(buf.slice(0, 128)).trim().toLowerCase();
-            if (headStr.startsWith("<!doctype") || headStr.startsWith("<html") || headStr.includes("google-site-verification")) {
-                continue;
-            }
+                const headStr = new TextDecoder().decode(buf.slice(0, 128)).trim().toLowerCase();
+                if (headStr.startsWith("<!doctype") || headStr.startsWith("<html") || headStr.includes("google-site-verification")) {
+                    continue;
+                }
 
-            let mime = (resp.headers.get("content-type") || "").split(";")[0].trim().toLowerCase();
-            if (!mime || mime === "application/octet-stream") {
-                const sig = new Uint8Array(buf.slice(0, 4));
-                if (sig[0] === 0x52 && sig[1] === 0x49 && sig[2] === 0x46 && sig[3] === 0x46) mime = "audio/wav";
-                else if (sig[0] === 0x4F && sig[1] === 0x67 && sig[2] === 0x67 && sig[3] === 0x53) mime = "audio/ogg";
-                else mime = "audio/mpeg";
-            }
-            const blob = new Blob([buf], { type: mime });
-            const blobUrl = URL.createObjectURL(blob);
-            _audioBlobCache.set(cacheKey, blobUrl);
-            return blobUrl;
-        } catch {}
-    }
-    return "";
+                let mime = (resp.headers.get("content-type") || "").split(";")[0].trim().toLowerCase();
+                if (!mime || mime === "application/octet-stream") {
+                    const sig = new Uint8Array(buf.slice(0, 4));
+                    if (sig[0] === 0x52 && sig[1] === 0x49 && sig[2] === 0x46 && sig[3] === 0x46) mime = "audio/wav";
+                    else if (sig[0] === 0x4F && sig[1] === 0x67 && sig[2] === 0x67 && sig[3] === 0x53) mime = "audio/ogg";
+                    else mime = "audio/mpeg";
+                }
+                const blob = new Blob([buf], { type: mime });
+                const blobUrl = URL.createObjectURL(blob);
+                _audioBlobCache.set(cacheKey, blobUrl);
+                return blobUrl;
+            } catch {}
+        }
+        return "";
+    })().finally(() => {
+        _audioPreloadJobs.delete(cacheKey);
+    });
+
+    _audioPreloadJobs.set(cacheKey, job);
+    return await job;
+}
+
+function preloadAudioInBackground(rawUrl) {
+    const cleanRaw = String(rawUrl || "").trim();
+    if (!cleanRaw) return;
+    fetchAudioAsBlobUrl(cleanRaw, getAudioUrlCandidates(cleanRaw)).catch(() => {});
 }
 
 async function resolveAudioUrl(url) {
@@ -1087,6 +1117,7 @@ async function processAndUploadCroppedAudio() {
     const up = await apiAction({ action: "upload_media", dataUrl: audioDataUrl, prefix: "audio_clip" });
     setBtnLoading("btn-save-audio-crop", false);
     if (up && up.ok && up.url) {
+        idbSet("audio_data_" + encodeURIComponent(up.url), audioDataUrl);
         const localBlobUrl = dataUrlToBlobUrl(audioDataUrl) || audioDataUrl;
         _audioBlobCache.set(up.url, localBlobUrl);
         if (typeof wizardState !== "undefined") {
