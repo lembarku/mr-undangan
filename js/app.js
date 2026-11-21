@@ -147,7 +147,10 @@ async function handleAuthSubmit(e) {
     const res = await apiAction({ action: "login", username: u, password: p });
     if (res && res.ok && res.user) {
         currentSessionUser = res.user.username;
+        currentSessionToken = res.token || "";
         localStorage.setItem(SESSION_KEY, currentSessionUser);
+        if (currentSessionToken) localStorage.setItem(SESSION_TOKEN_KEY, currentSessionToken);
+        else localStorage.removeItem(SESSION_TOKEN_KEY);
         localStorage.setItem(DISPLAY_NAME_KEY, (res.user.name || res.user.username).split(" ")[0]);
         ensureUserInLocalDb(res.user);
         setBtnLoading("auth-submit-btn", false);
@@ -181,7 +184,9 @@ async function confirmLogout() {
 }
 function logoutSession() {
     currentSessionUser = null;
+    currentSessionToken = "";
     localStorage.removeItem(SESSION_KEY);
+    localStorage.removeItem(SESSION_TOKEN_KEY);
     localStorage.removeItem(DISPLAY_NAME_KEY);
     localStorage.removeItem(USER_CACHE_KEY);
     idbRemove("db_snapshot");
@@ -205,7 +210,6 @@ function initBackNavigationGuard() {
 }
 function pushBackGuard() {
     try {
-        // Hanya pasang 1 lapis penjaga agar tutup modal pakai tombol X tidak menumpuk history HP
         if (history.state && history.state.mrActive) return;
         history.pushState({ mrActive: true }, "");
     } catch {}
@@ -1023,7 +1027,6 @@ function refreshActiveViewSmart() {
         const fresh = db.invitations.find(i => String(i.id) === String(activeGuestInv.id));
         if (fresh) {
             activeGuestInv = fresh;
-            // Jangan hapus ketikan tamu saat sedang mengetik ucapan atau balasan
             if (!isUserTypingIn("guest-invitation-overlay")) {
                 renderGuestWishes();
             }
