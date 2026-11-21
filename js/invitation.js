@@ -68,17 +68,32 @@ function playAudioElementWithFallback(audioEl, candidates, onAllFail, rawUrl = "
     let idx = 0;
     let blobTried = false;
     let settled = false;
+    let failTimer = null;
 
     audioEl.dataset.wantPlay = "1";
 
+    const clearFailTimer = () => {
+        if (failTimer) {
+            clearTimeout(failTimer);
+            failTimer = null;
+        }
+    };
+
     const markPlayingSuccess = () => {
         settled = true;
+        clearFailTimer();
+    };
+
+    const finishWithError = () => {
+        if (settled || audioEl.dataset.wantPlay !== "1") return;
+        clearFailTimer();
+        if (onAllFail) onAllFail();
     };
 
     const tryBlobFallback = async () => {
         if (settled || audioEl.dataset.wantPlay !== "1") return;
         if (blobTried || typeof fetchAudioAsBlobUrl !== "function") {
-            if (onAllFail) onAllFail();
+            finishWithError();
             return;
         }
         blobTried = true;
@@ -90,12 +105,13 @@ function playAudioElementWithFallback(audioEl, candidates, onAllFail, rawUrl = "
             const p = audioEl.play();
             if (p && typeof p.catch === "function") {
                 p.catch((err) => {
+                    if (settled || audioEl.dataset.wantPlay !== "1") return;
                     if (err && err.name === "NotAllowedError") return;
-                    if (onAllFail) onAllFail();
+                    finishWithError();
                 });
             }
-        } else if (onAllFail) {
-            onAllFail();
+        } else {
+            finishWithError();
         }
     };
 
@@ -105,13 +121,33 @@ function playAudioElementWithFallback(audioEl, candidates, onAllFail, rawUrl = "
             tryBlobFallback();
             return;
         }
-        audioEl.src = candidates[idx];
+        const targetSrc = candidates[idx];
+        audioEl.src = targetSrc;
         try { audioEl.load(); } catch {}
+
+        clearFailTimer();
+        failTimer = setTimeout(() => {
+            if (settled || audioEl.dataset.wantPlay !== "1") return;
+            if (!audioEl.paused && audioEl.currentTime > 0) {
+                markPlayingSuccess();
+                return;
+            }
+            if (idx + 1 < candidates.length) {
+                idx++;
+                tryCurrent();
+            } else {
+                tryBlobFallback();
+            }
+        }, 4500);
+
         const p = audioEl.play();
         if (p && typeof p.catch === "function") {
             p.catch((err) => {
                 if (settled || audioEl.dataset.wantPlay !== "1") return;
-                if (err && err.name === "NotAllowedError") return;
+                if (err && err.name === "NotAllowedError") {
+                    clearFailTimer();
+                    return;
+                }
                 if (idx + 1 < candidates.length) {
                     idx++;
                     tryCurrent();
@@ -126,6 +162,12 @@ function playAudioElementWithFallback(audioEl, candidates, onAllFail, rawUrl = "
     audioEl.onplaying = (ev) => {
         markPlayingSuccess();
         if (typeof prevOnPlaying === "function") prevOnPlaying(ev);
+    };
+
+    const prevOnPause = audioEl.onpause;
+    audioEl.onpause = (ev) => {
+        if (audioEl.dataset.wantPlay !== "1") clearFailTimer();
+        if (typeof prevOnPause === "function") prevOnPause(ev);
     };
 
     audioEl.onerror = () => {
@@ -818,660 +860,805 @@ function launchSocialShare(p) {
     document.getElementById("modal-share-sosmed").classList.add("hide");
 }
 
-// ================= 3. GUEST VIEW =================
-let activeGuestInv = null, guestAudio = null, guestAudioCandidates = [], guestAudioRawUrl = "", guestAudioStarted = false;
-let cdInterval = null, tempWishPhoto = "";
-let polaroidPhotos = [], polaroidIndex = 0, wishAutoTimer = null, wishScrollPaused = false;
-let promoShownThisView = false, promoTouchStartY = 0, activeThemeTransitionPref = "random", scrollRafId = null;
-
-function randScrubType() {
-    const types = ["up", "left", "right", "zoom", "tilt-l", "tilt-r", "blur", "flip-x"];
-    return types[Math.floor(Math.random() * types.length)];
+// ================= UI FEEDBACK: LOADING, TOAST, CONFIRM, SPLASH, TEMA =================
+let _toastTimer = null;
+function showLoading(txt = "Memproses...") {
+    const bar = document.getElementById("global-loading-bar"), el = document.getElementById("global-loading-text");
+    if (el) el.innerText = txt;
+    if (bar) bar.classList.remove("hide");
 }
-function parseDateParts(str) {
-    const d = new Date(str);
-    if (isNaN(d)) return { day:"Minggu", num:"21", monthYear:"Februari 2027", full:str||"Minggu, 21 Februari 2027" };
-    return { day:d.toLocaleDateString("id-ID",{weekday:"long"}), num:String(d.getDate()).padStart(2,"0"), monthYear:d.toLocaleDateString("id-ID",{month:"long",year:"numeric"}), full:d.toLocaleDateString("id-ID",{weekday:"long",day:"numeric",month:"long",year:"numeric"}) };
-}
+function hideLoading() { document.getElementById("global-loading-bar")?.classList.add("hide"); }
 
-function buildDemoInvitation(cat, themeName) {
-    const t = findThemeObject(cat, themeName);
-    const dm = t.demoData || {};
-    const cov = getThemeCoverPair(cat, t);
-    const pPria = getThemeSlotPair(t, "pria", "pria.jpg", IMG("1507003211169-0a1dd7228f2d"));
-    const pWanita = getThemeSlotPair(t, "wanita", "wanita.jpg", IMG("1534528741775-53994a69daeb"));
-    const pCouple = getThemeSlotPair(t, "couple", "cover.jpg", cov.fb);
-    const g1 = getThemeSlotPair(t, "g1", "1.jpg", IMG("1519741497674-611481863552"));
-    const g2 = getThemeSlotPair(t, "g2", "2.jpg", IMG("1511285560929-80b456fea0bc"));
-    const g3 = getThemeSlotPair(t, "g3", "3.jpg", IMG("1522673607200-164d1b6ce486"));
-    const defOpen = getDefaultOpeningText(cat, t), defClose = getDefaultClosingText(cat);
-
-    const base = {
-        id:"demo", category:cat, theme:t.name, showCountdown:true, showWishes:true,
-        greeting:defOpen.greeting, introText:defOpen.quote, closingTitle:defClose.title, closingText:defClose.text,
-        couplePhoto:pCouple.src, couplePhotoFb:pCouple.fb,
-        groomPhoto:pPria.src, groomPhotoFb:pPria.fb,
-        bridePhoto:pWanita.src, bridePhotoFb:pWanita.fb,
-        photos:[cov.src, g1.src, g2.src, g3.src], photosFb:[cov.fb, g1.fb, g2.fb, g3.fb],
-        audioUrl: t.defaultAudio || (db.musicLibrary[0] && db.musicLibrary[0].url) || "",
-        banks:[{bank:"BCA",no:"8830918273",holder:"Keluarga Penyelenggara"}],
-        wishes:[
-            {id:1,name:"Bapak Budi & Keluarga",rsvp:"Hadir",msg:"Selamat menempuh hidup baru, semoga menjadi keluarga yang sakinah, mawaddah, warahmah!",photo:null,time:"16:30",replies:[]},
-            {id:2,name:"Sahabat Kampus",rsvp:"Hadir",msg:"MasyaAllah keren banget undangannya! Semoga acaranya berjalan lancar.",photo:null,time:"16:45",replies:[]}
-        ]
-    };
-    if (cat === "Pernikahan") return {
-        ...base,
-        title: dm.title || "Aqila & Fauzi",
-        groomName: dm.groom || "Fauzi Ramadhan, S.T.", groomIg:"@fauzi.id",
-        groomParents: dm.gparents || "Putra Bapak H. Hendra & Ibu Hj. Aminah",
-        brideName: dm.bride || "Aqila Putri, S.E.", brideIg:"@aqila.id",
-        brideParents: dm.bparents || "Putri Bapak H. Syamsul & Ibu Hj. Rahmawati",
-        akadVenue: dm.venue || "Rumah Mempelai Wanita", akadAddress: dm.address || "Jl. Slamet Riyadi No. 1, Samarinda",
-        akadDate: dm.date || "2027-02-20", akadTime:"09:00 - 11:00 WITA", akadMap:"https://maps.google.com",
-        resepsiVenue: dm.venue || "Gedung Serbaguna", resepsiAddress: dm.address || "Jl. Mulawarman No. 171, Samarinda",
-        resepsiDate: dm.date || "2027-02-21", resepsiTime:"11:00 - 15:00 WITA", resepsiMap:"https://maps.google.com",
-        stories:[{title:"Perkenalan",year:"2021",desc:"Pertemuan awal kami di kampus yang menumbuhkan rasa saling menghargai."},{title:"Lamaran",year:"2026",desc:"Mengikat janji suci dengan restu hangat dari kedua orang tua."}]
-    };
-    if (cat === "Ulang Tahun") return { ...base, title:dm.title||"Arsyilla Fadillah", age:"10 Tahun", groomParents:dm.gparents||"Putri Bapak Fadli & Ibu Rina", akadVenue:dm.venue||"Rumah Mempelai Wanita", akadAddress:dm.address||"Jl. A. Yani No. 25, Samarinda", akadDate:dm.date||"2027-03-14", akadTime:"15.00 WITA - Selesai", akadMap:"https://maps.google.com" };
-    if (cat === "Aqiqah") return { ...base, title:dm.title||"Ahmad Fathallah", birthDate:"10 November 2026", groomParents:dm.gparents||"Bapak Fathan & Ibu Nadia", akadVenue:dm.venue||"Kediaman Keluarga", akadAddress:dm.address||"Perumahan Bumi Asri Blok B2 No. 12, Samarinda", akadDate:dm.date||"2027-01-18", akadTime:"10.00 WITA - Selesai", akadMap:"https://maps.google.com" };
-    if (cat === "Syukuran") {
-        if (t.isKhitan) return { ...base, title:dm.title||"Walimatul Khitan — Muhammad Al-Fatih", groomParents:dm.gparents||"Bapak H. Kurniawan & Ibu Hj. Rahmawati", subTitle:dm.groom||"Semoga menjadi anak yang sholeh & berbakti", akadVenue:dm.venue||"Kediaman Keluarga", akadAddress:dm.address||"Jl. Ahmad Yani No. 88, Samarinda", akadDate:dm.date||"2027-01-30", akadTime:"10.00 WITA - Selesai", akadMap:"https://maps.google.com" };
-        return { ...base, title:dm.title||"Syukuran Pindah Rumah", groomParents:dm.gparents||"Ardilla Fhatiyyah & Keluarga", akadVenue:dm.venue||"Kediaman Baru", akadAddress:dm.address||"Jl. Juanda Indah Blok F/7, Samarinda", akadDate:dm.date||"2027-01-25", akadTime:"11.00 WITA - Selesai", akadMap:"https://maps.google.com" };
+function showToast(msg, type = "success") {
+    const el = document.getElementById("app-toast"), txt = document.getElementById("app-toast-msg"), ic = document.getElementById("app-toast-icon");
+    if (!el || !txt) return;
+    txt.innerText = msg;
+    if (ic) {
+        ic.className = type === "error"
+            ? "fa-solid fa-circle-exclamation text-red-500 text-base"
+            : type === "info"
+                ? "fa-solid fa-circle-info app-accent text-base"
+                : "fa-solid fa-circle-check text-emerald-500 text-base";
     }
-    return { ...base, title:dm.title||t.demoTitle||"Acara Spesial", subTitle:dm.groom||t.demoSub||"Silaturahmi", groomParents:dm.gparents||t.demoOrg||"Panitia", akadVenue:dm.venue||"Gedung Serbaguna", akadAddress:dm.address||"Jl. Jenderal Sudirman No. 10, Samarinda", akadDate:dm.date||"2027-02-10", akadTime:"19.30 WITA - Selesai", akadMap:"https://maps.google.com" };
+    el.classList.remove("hide");
+    clearTimeout(_toastTimer);
+    _toastTimer = setTimeout(() => el.classList.add("hide"), 3200);
 }
 
-function openThemeLivePreview(cat, themeName, isDirectDemoLink = false) {
-    openGuestViewWithObject(buildDemoInvitation(cat, themeName), "Tamu Kehormatan", isDirectDemoLink);
+function showConfirm(title, msg, icon = "fa-solid fa-circle-question", okText = "Ya, Lanjutkan") {
+    return new Promise((resolve) => {
+        const m = document.getElementById("app-confirm-modal"); if (!m) return resolve(confirm(msg));
+        document.getElementById("app-confirm-title").innerText = title || "Konfirmasi";
+        document.getElementById("app-confirm-msg").innerText = msg || "";
+        document.getElementById("app-confirm-icon").className = icon;
+        const okBtn = document.getElementById("app-confirm-ok"), canBtn = document.getElementById("app-confirm-cancel");
+        okBtn.innerText = okText;
+        const done = (val) => { m.classList.add("hide"); resolve(val); };
+        okBtn.onclick = () => done(true);
+        canBtn.onclick = () => done(false);
+        m.classList.remove("hide");
+    });
 }
 
-async function openGuestView(invId, guestName = "Tamu Kehormatan") {
-    let inv = (clientPortalState.active && clientPortalState.invitation && String(clientPortalState.invitation.id) === String(invId))
-        ? clientPortalState.invitation
-        : (db.invitations || []).find(i => String(i.id) === String(invId));
-    if (!inv && invId && invId !== "demo") {
-        showLoading("Memuat undangan...");
-        inv = await fetchSingleInvitationFast(invId);
-        hideLoading();
-    }
-    if (!inv) return showToast("Data undangan tidak ditemukan.", "error");
-    openGuestViewWithObject(inv, guestName, false);
-}
-
-function usePreviewedThemeNow() {
-    if (!activeGuestInv) return;
-    const cat = activeGuestInv.category || "Pernikahan", theme = activeGuestInv.theme || "Adat Kalimantan";
-    closeGuestInvitation();
-    if (currentSessionUser && getCurrentUserObj()) {
-        startCreateInvitation(getCurrentUserObj().role === "cabang", cat, theme);
-        showToast(`Tema "${theme}" dipilih! Silakan isi data acara Anda.`);
+function setBtnLoading(btnOrId, isLoading, text = "Memproses...") {
+    const el = typeof btnOrId === "string" ? document.getElementById(btnOrId) : btnOrId;
+    if (!el) return;
+    if (isLoading) {
+        if (!el.dataset.origHtml) el.dataset.origHtml = el.innerHTML;
+        el.disabled = true;
+        el.innerHTML = `<i class="fa-solid fa-circle-notch fa-spin mr-1"></i>${text}`;
     } else {
-        window.pendingActionAfterLogin = { type: "inv", cat, theme };
-        if (typeof openAuthModal === "function") openAuthModal();
-        showToast(`Masuk / daftar dulu untuk langsung membuat undangan tema "${theme}"!`, "info");
+        el.disabled = false;
+        if (el.dataset.origHtml) { el.innerHTML = el.dataset.origHtml; delete el.dataset.origHtml; }
     }
 }
 
-function wrapPaperTurnLeaf(innerHtml, hintLabel = "Geser ➔ Buka Lembaran") {
-    return `<div class="pt-stage"><div class="pt-sticky"><div class="pt-leaf">${innerHtml}<div class="pt-paper-shade"></div><span class="pt-edge-hint"><i class="fa-solid fa-book-open mr-1"></i>${hintLabel}</span></div></div></div>`;
+function togglePassVis(id, btn) {
+    const inp = document.getElementById(id); if (!inp) return;
+    const isP = inp.type === "password";
+    inp.type = isP ? "text" : "password";
+    if (btn) btn.innerHTML = `<i class="fa-regular fa-${isP ? "eye-slash" : "eye"}"></i>`;
 }
 
-function buildAmbientShadowLayer(tObj, preset) {
-    const mode = (tObj.ornament === "batik" || tObj.ornament === "jawa" || tObj.ornament === "sulawesi" || (preset && preset.ambient === "batik")) ? "batik"
-        : (tObj.ornament === "none") ? "none" : "leaf";
-    if (mode === "none") return "";
-    if (mode === "batik") {
-        return `<div class="ambient-bg-layer" style="color:var(--th-accent);"><div class="ambient-batik-drift">${SVG_BATIK_SHADOW}</div></div>`;
-    }
-    return `<div class="ambient-bg-layer" style="color:var(--th-accent);"><div class="ambient-leaf-a">${SVG_LEAF_SHADOW}</div><div class="ambient-leaf-b">${SVG_LEAF_SHADOW}</div></div>`;
+function hideHelloSplash() {
+    const sp = document.getElementById("ios-hello-splash");
+    if (!sp || sp.classList.contains("hide")) return;
+    sp.classList.add("splash-out");
+    setTimeout(() => sp.classList.add("hide"), 520);
+}
+function showEnvelopeLoader(txt = "Membuka Undangan...") {
+    const el = document.getElementById("envelope-loader"), t = document.getElementById("envelope-loader-text");
+    if (t) t.innerText = txt;
+    if (el) el.classList.remove("hide");
+}
+function hideEnvelopeLoader() { document.getElementById("envelope-loader")?.classList.add("hide"); }
+
+function applyAppTheme(theme, save = true) {
+    const valid = ["light", "dark", "gold", "blue", "black", "orange"];
+    const t = valid.includes(theme) ? theme : "light";
+    document.documentElement.setAttribute("data-app-theme", t);
+    if (save) localStorage.setItem(APP_THEME_KEY, t);
+    document.querySelectorAll(".theme-opt-row").forEach(row => {
+        const chk = row.querySelector(".theme-chk");
+        if (chk) chk.classList.toggle("hide", row.dataset.topt !== t);
+    });
+}
+function cycleAppThemeQuick() {
+    const order = ["light", "dark", "gold", "blue", "black", "orange"];
+    const cur = localStorage.getItem(APP_THEME_KEY) || "light";
+    applyAppTheme(order[(order.indexOf(cur) + 1) % order.length], true);
 }
 
-function syncGuestMusicBtnState(isPlaying) {
-    const btn = document.getElementById("gv-music-btn");
-    const icon = btn ? btn.querySelector("i") : null;
-    if (icon) icon.classList.toggle("spin-slow", !!isPlaying);
-    if (btn) btn.style.opacity = isPlaying ? "1" : "0.65";
+// ================= HELPER USER, TEMA, HARGA, FAVORIT =================
+function getCurrentUserObj() {
+    if (!currentSessionUser) return null;
+    return (db.users || []).find(u => String(u.username || "").toLowerCase() === String(currentSessionUser).toLowerCase()) || null;
 }
 
-function setupGuestInvitationAudio(audioUrl) {
-    if (guestAudio) {
-        guestAudio.dataset.wantPlay = "0";
-        guestAudio.onerror = null;
-        guestAudio.onplay = null;
-        guestAudio.onpause = null;
-        try { guestAudio.pause(); } catch {}
-        guestAudio = null;
-    }
-    document.getElementById("gv-hidden-audio-el")?.remove();
-    guestAudioRawUrl = String(audioUrl || "").trim();
-    guestAudioCandidates = getSafeAudioCandidates(guestAudioRawUrl);
-    guestAudioStarted = false;
-    syncGuestMusicBtnState(false);
-
-    if (!guestAudioCandidates.length) return;
-
-    const el = document.createElement("audio");
-    el.id = "gv-hidden-audio-el";
-    el.src = guestAudioCandidates[0];
-    el.loop = true;
-    el.preload = "auto";
-    el.setAttribute("playsinline", "");
-    el.style.display = "none";
-    el.onplay = () => syncGuestMusicBtnState(true);
-    el.onpause = () => syncGuestMusicBtnState(false);
-    document.body.appendChild(el);
-    guestAudio = el;
-    try { el.load(); } catch {}
+function getMasterBanksList() {
+    const ms = db.masterSettings || {};
+    if (Array.isArray(ms.banks) && ms.banks.length) return ms.banks;
+    if (ms.bankNo) return [{ bank: ms.bankName || "DANA", no: ms.bankNo, holder: ms.bankHolder || "Mr Undangan" }];
+    return [{ bank: "DANA", no: "085117488828", holder: "Kausar.pictures" }];
 }
 
-function openGuestViewWithObject(inv, guestName, isDirectLink = false) {
-    activeGuestInv = inv; promoShownThisView = false;
-    document.getElementById("gv-download-promo")?.classList.add("hide");
-    document.getElementById("gv-reading-progress").style.width = "0%";
+function getInvBrandInfo(inv) {
+    const b = (inv && inv.brandName && String(inv.brandName).trim()) ? String(inv.brandName).trim() : "";
+    if (b) return { topLabel: b, footerMain: b, footerSub: "Powered by Mr Undangan", waFooter: `${b} — Powered by Mr Undangan` };
+    return { topLabel: "MR UNDANGAN", footerMain: "Mr Undangan", footerSub: "Powered by Kausar.pictures", waFooter: "Mr Undangan — Powered by Kausar.pictures" };
+}
 
-    const effectiveAudio = inv.audioUrl || (db.musicLibrary && db.musicLibrary[0] && db.musicLibrary[0].url) || "";
-    setupGuestInvitationAudio(effectiveAudio);
+function deepCloneSafe(obj) {
+    try { return JSON.parse(JSON.stringify(obj)); } catch { return Object.assign({}, obj); }
+}
 
-    const tObj = findThemeObject(inv.category, inv.theme);
-    const preset = VISUAL_PRESETS[tObj.preset] || VISUAL_PRESETS["dark-gold"];
-    const brand = getInvBrandInfo(inv);
-    activeThemeTransitionPref = tObj.transition || "random";
+function getMergedThemes(cat, includeHidden = false) {
+    const builtIn = (THEME_CATALOG[cat] || []).map(t => {
+        const baseT = deepCloneSafe(t);
+        const key = `${cat}::${baseT.name}`;
+        const ov = deepCloneSafe((db.themeOverrides && db.themeOverrides[key]) || {});
+        const isHidden = (db.hiddenThemes || []).includes(key);
+        const merged = Object.assign({}, baseT, ov, { cat, key, isCustom: false, isHidden });
+        merged.demoPhotos = Object.assign({}, baseT.demoPhotos || {}, ov.demoPhotos || {});
+        merged.demoData = Object.assign({}, baseT.demoData || {}, ov.demoData || {});
+        return merged;
+    });
+    const custom = (db.customThemes || []).filter(t => t.category === cat).map(t => {
+        const baseT = deepCloneSafe(t);
+        const merged = Object.assign({}, baseT, { cat, key: `custom::${baseT.id}`, isCustom: true, isHidden: false });
+        merged.demoPhotos = Object.assign({}, baseT.demoPhotos || {});
+        merged.demoData = Object.assign({}, baseT.demoData || {});
+        return merged;
+    });
+    const all = [...custom, ...builtIn];
+    return includeHidden ? all : all.filter(t => !t.isHidden);
+}
 
-    const extraCls = [
-        preset.extra || "",
-        tObj.ornament === "batik" ? "batik-pattern" : tObj.ornament === "linen" ? "linen-pattern" : "",
-        tObj.photoFilter === "mono" ? "photo-filter-mono" : tObj.photoFilter === "vintage" ? "photo-filter-vintage" : ""
-    ].filter(Boolean).join(" ");
+function findThemeObject(cat, name) {
+    const list = getMergedThemes(cat || "Pernikahan", true);
+    return list.find(t => String(t.name).toLowerCase() === String(name || "").toLowerCase()) || list[0] || deepCloneSafe(THEME_CATALOG["Pernikahan"][0]);
+}
 
-    const w = document.getElementById("guest-theme-wrapper");
-    w.className = `w-full max-w-[430px] mx-auto min-h-screen shadow-[0_0_60px_rgba(0,0,0,0.9)] relative overflow-x-hidden ${extraCls}`;
-    for (const [k, v] of Object.entries(preset.vars)) w.style.setProperty(k, v);
+function getThemePricing(tObj) {
+    const price = Number((tObj && tObj.price) || 99000);
+    const origPrice = Number((tObj && tObj.origPrice) || 0);
+    const hasDisc = origPrice > price && price > 0;
+    const discPct = hasDisc ? Math.round(((origPrice - price) / origPrice) * 100) : 0;
+    return { price, origPrice, hasDisc, discPct };
+}
 
-    if (tObj.customColors) {
-        if (tObj.customColors.bg) w.style.setProperty("--th-bg", tObj.customColors.bg);
-        if (tObj.customColors.card) w.style.setProperty("--th-card-bg", tObj.customColors.card);
-        if (tObj.customColors.text) w.style.setProperty("--th-text", tObj.customColors.text);
-        if (tObj.customColors.accent) { w.style.setProperty("--th-accent", tObj.customColors.accent); w.style.setProperty("--th-btn-bg", tObj.customColors.accent); }
-    }
-    if (tObj.font) w.style.setProperty("--th-font-heading", tObj.font);
-    if (tObj.frame === "sharp") w.style.setProperty("--th-card-radius", "0.35rem");
-    else if (tObj.frame === "glass") { w.style.setProperty("--th-card-bg", "rgba(255,255,255,0.14)"); w.style.setProperty("--th-backdrop", "blur(14px)"); }
+function getThemeCoverPair(cat, tObj) {
+    const fb = (tObj && tObj.img) || IMG("1519741497674-611481863552");
+    const src = (tObj && tObj.demoPhotos && tObj.demoPhotos.cover) || (tObj && tObj.customCover) || fb;
+    return { src, fb };
+}
 
-    const countdownTargetDate = (inv.category === "Pernikahan" && inv.resepsiDate) ? inv.resepsiDate : inv.akadDate;
-    const dp = parseDateParts(inv.akadDate);
-    const dpResepsi = parseDateParts(inv.resepsiDate || inv.akadDate);
-    const coverDateFull = (inv.category === "Pernikahan" && inv.resepsiDate) ? dpResepsi.full : dp.full;
+function getThemeSlotPair(tObj, slotKey, _file, fallback) {
+    const dp = (tObj && tObj.demoPhotos) || {};
+    if (dp[slotKey]) return { src: dp[slotKey], fb: fallback };
+    if (slotKey === "pria") return { src: "./assets/model-pria.jpg", fb: fallback };
+    if (slotKey === "wanita") return { src: "./assets/model-wanita.jpg", fb: fallback };
+    return { src: fallback, fb: fallback };
+}
 
-    const mainPhoto = (inv.photos && inv.photos[0]) || tObj.img;
-    const mainPhotoFb = (inv.photosFb && inv.photosFb[0]) || tObj.img || IMG("1519741497674-611481863552");
-    const styleKey = tObj.layout || tObj.style || "";
-    const isPremiumBlack = styleKey === "premium_black";
-    const isStoryEditorial = styleKey === "kalimantan_story" || styleKey === "editorial";
-    const isCombinedCouple = (inv.category === "Pernikahan" && tObj.coupleMode === "combined" && (inv.groomName || inv.brideName));
-    const defOpen = getDefaultOpeningText(inv.category, tObj);
-    const openingGreeting = inv.greeting || defOpen.greeting;
-    const openingQuote = inv.introText || defOpen.quote;
+function getPortfolioThemeObj(docType, id) {
+    const list = PORTFOLIO_CATALOG[docType] || PORTFOLIO_CATALOG.cv;
+    const base = list.find(x => x.id === id) || list[0];
+    const ov = (db.cvPriceOverrides && db.cvPriceOverrides[base.id]) || {};
+    return Object.assign({}, base, ov);
+}
 
-    document.getElementById("gv-music-btn").classList.toggle("hide", !effectiveAudio);
-    document.getElementById("gv-use-theme-btn").classList.toggle("hide", inv.id !== "demo");
+function isItemFavorited(favKey) {
+    const u = getCurrentUserObj();
+    if (u && Array.isArray(u.favorites)) return u.favorites.some(f => f.favKey === favKey);
+    try { return JSON.parse(localStorage.getItem("MR_LOCAL_FAVS") || "[]").some(f => f.favKey === favKey); } catch { return false; }
+}
 
-    const safeTitle = escHtml(inv.title || "");
-    const safeAge = escHtml(inv.age || "");
-    let coverDecor = "", coverTitleHtml = "", coverBtnLabel = `<i class="fa-solid fa-envelope-open-text"></i> Buka Undangan`;
-    if (isPremiumBlack || tObj.ornament === "floral_mono") {
-        coverDecor = `<div class="absolute top-0 inset-x-0 z-20">${SVG_ROSES_MONO}</div><div class="absolute bottom-0 inset-x-0 z-20 rotate-180">${SVG_ROSES_MONO}</div>`;
-        coverTitleHtml = `<h1 class="font-script text-6xl text-white mt-2 drop-shadow-lg leading-tight">${safeTitle.replace(/&amp;/, "<br>&amp;")}</h1>`;
-        coverBtnLabel = `<i class="fa-solid fa-chevron-right text-[10px]"></i> BUKA UNDANGAN`;
-    } else if (styleKey === "jawa" || tObj.ornament === "jawa") {
-        coverDecor = `<div class="pt-4 relative z-20">${SVG_GUNUNGAN_JAWA}</div>`;
-        coverTitleHtml = `<span class="text-[11px] uppercase tracking-[0.3em] text-amber-300 font-bold">The Wedding Of</span><h1 class="th-heading text-5xl text-amber-300 mt-1">${safeTitle}</h1>`;
-    } else if (styleKey === "sulawesi" || tObj.ornament === "sulawesi") {
-        coverDecor = `<div class="absolute inset-y-0 left-0 w-3 sulawesi-border z-20"></div><div class="absolute inset-y-0 right-0 w-3 sulawesi-border z-20"></div><div class="pt-4 relative z-20">${SVG_RUMAH_SULAWESI}</div>`;
-        coverTitleHtml = `<span class="text-[10px] uppercase tracking-[0.3em] text-yellow-300 font-bold">The Wedding Of</span><h1 class="th-heading text-5xl text-yellow-300 mt-1">${safeTitle}</h1>`;
-    } else if (styleKey === "batik") {
-        coverDecor = `<div class="absolute top-0 inset-x-0 h-20 batik-pattern border-b-2 border-amber-400/60 rounded-b-[45%] z-10"></div><div class="absolute bottom-0 inset-x-0 h-20 batik-pattern border-t-2 border-amber-400/60 rounded-t-[45%] z-10"></div>`;
-        coverTitleHtml = `<span class="text-[10px] uppercase tracking-[0.35em] text-amber-300 font-bold">HAPPY WEDDING • SAVE THE DATE</span><h1 class="th-heading text-5xl text-amber-300 mt-2">${safeTitle}</h1>`;
+async function toggleFavoriteItem(ev, favObj) {
+    if (ev) ev.stopPropagation();
+    const u = getCurrentUserObj();
+    let list = u ? [...(u.favorites || [])] : JSON.parse(localStorage.getItem("MR_LOCAL_FAVS") || "[]");
+    const idx = list.findIndex(f => f.favKey === favObj.favKey);
+    const added = idx === -1;
+    if (added) list.unshift(favObj); else list.splice(idx, 1);
+
+    document.querySelectorAll(`[data-fav-btn="${CSS.escape(favObj.favKey)}"]`).forEach(btn => {
+        btn.classList.toggle("is-fav", added);
+        btn.innerHTML = `<i class="fa-${added ? "solid" : "regular"} fa-heart"></i>`;
+    });
+
+    if (u) {
+        u.favorites = list;
+        if (typeof renderProfileFavoritesShelf === "function") renderProfileFavoritesShelf();
+        apiAction({ action: "upsert_user", oldUsername: u.username, user: Object.assign({}, u, { favorites: list }) });
     } else {
-        const badgeTxt = inv.category === "Pernikahan" ? "THE WEDDING OF" : inv.category === "Ulang Tahun" ? "BIRTHDAY INVITATION" : inv.category === "Aqiqah" ? "TASYAKURAN AQIQAH" : inv.category === "Syukuran" ? (tObj.isKhitan ? "WALIMATUL KHITAN" : "UNDANGAN SYUKURAN") : "UNDANGAN RESMI";
-        coverTitleHtml = `<span class="text-[10px] uppercase tracking-[0.32em] text-amber-200 font-semibold">${badgeTxt}</span><h1 class="th-heading text-5xl md:text-6xl text-white mt-2 drop-shadow-lg">${safeTitle}</h1>${inv.age?`<span class="inline-block mt-1 px-4 py-1 rounded-full bg-white/20 backdrop-blur text-white text-xs font-bold">${inv.category==="Ulang Tahun"?"Ke - "+safeAge:safeAge}</span>`:""}`;
+        localStorage.setItem("MR_LOCAL_FAVS", JSON.stringify(list));
     }
+    showToast(added ? "Disimpan ke Favorit!" : "Dihapus dari Favorit.", "info");
+}
 
-    const coverHtml = `
-        <div id="gv-cover-stage" class="fixed inset-0 z-50 max-w-[430px] mx-auto overflow-hidden bg-black flex flex-col justify-between">
-            <div class="curtain-l absolute inset-0 pointer-events-none" style="clip-path:inset(0 49.8% 0 0);"><img src="${mainPhoto}" ${imgFbAttr(mainPhotoFb)} class="inv-photo w-full h-full object-cover object-center"><div class="absolute inset-0" style="background:${preset.coverOverlay}"></div></div>
-            <div class="curtain-r absolute inset-0 pointer-events-none" style="clip-path:inset(0 0 0 49.8%);"><img src="${mainPhoto}" ${imgFbAttr(mainPhotoFb)} class="inv-photo w-full h-full object-cover object-center"><div class="absolute inset-0" style="background:${preset.coverOverlay}"></div></div>
-            ${coverDecor}
-            <div class="cover-inner relative z-20 flex-1 flex flex-col justify-between p-7 text-center text-white">
-                <div class="pt-4"><span class="text-[9px] uppercase tracking-[0.35em] text-white/80 font-semibold">${escHtml(brand.topLabel)}</span></div>
-                <div class="my-auto py-4 space-y-2">${coverTitleHtml}<p class="text-xs tracking-[0.2em] uppercase text-white/90 font-semibold pt-1">${escHtml(coverDateFull)}</p></div>
-                <div class="space-y-4 pb-8">
-                    <div class="bg-black/45 backdrop-blur-md border border-white/25 rounded-2xl p-4 space-y-1">
-                        <p class="text-[10px] text-white/75 uppercase tracking-wider">Kepada Yth. Bapak/Ibu/Saudara/i</p>
-                        <h2 class="text-base font-bold ${isPremiumBlack?"text-white":"text-amber-200"} tracking-wide">${escHtml(guestName)}</h2>
-                        <p class="text-[10px] text-white/65">di Tempat</p>
-                    </div>
-                    <button onclick="unlockInvitationWithRandomFx()" class="${isPremiumBlack?"bg-white text-black font-extrabold rounded-full":"th-btn-primary"} px-8 py-3.5 text-xs uppercase tracking-wider inline-flex items-center gap-2 shadow-2xl border border-white/20">
-                        ${coverBtnLabel}
-                    </button>
-                </div>
+function buildMiniCoverCardHtml(cat, tObj, showFavBtn = true) {
+    const cov = getThemeCoverPair(cat, tObj);
+    const favKey = `inv::${cat}::${tObj.name}`;
+    const isFav = isItemFavorited(favKey);
+    const favObjStr = esc(JSON.stringify({ favKey, kind: "inv", cat, name: tObj.name }));
+    return `
+        <div class="relative aspect-[3/4] w-full overflow-hidden bg-zinc-900 select-none">
+            <img src="${cov.src}" ${imgFbAttr(cov.fb)} loading="lazy" class="w-full h-full object-cover group-hover:scale-105 transition duration-500">
+            <div class="absolute inset-0 bg-gradient-to-t from-black/90 via-black/25 to-transparent"></div>
+            ${tObj.badge ? `<span class="absolute top-2 left-2 z-20 text-[8px] font-extrabold px-1.5 py-0.5 rounded-full bg-amber-400 text-black uppercase shadow">${escHtml(tObj.badge)}</span>` : ""}
+            ${showFavBtn ? `<button type="button" data-fav-btn="${esc(favKey)}" onclick="toggleFavoriteItem(event, JSON.parse('${favObjStr}'))" class="fav-heart-btn ${isFav ? "is-fav" : ""}" title="Simpan ke Favorit"><i class="fa-${isFav ? "solid" : "regular"} fa-heart"></i></button>` : ""}
+            <div class="absolute inset-x-0 bottom-0 p-2.5 text-left">
+                <span class="text-[8px] uppercase font-bold px-1.5 py-0.5 rounded bg-white/20 text-white backdrop-blur">${escHtml(cat)}</span>
+                <h4 class="font-bold text-xs text-white truncate mt-1">${escHtml(tObj.name)}</h4>
             </div>
         </div>
     `;
+}
 
-    const ambientShadowHtml = buildAmbientShadowLayer(tObj, preset);
-    const fixedBackdropHtml = isStoryEditorial ? `<div class="sticky top-0 w-full h-screen -mb-[100vh] pointer-events-none overflow-hidden z-0"><img src="${mainPhoto}" ${imgFbAttr(mainPhotoFb)} class="inv-photo w-full h-full object-cover object-center opacity-50"><div class="absolute inset-0" style="background:${styleKey==="kalimantan_story"?"linear-gradient(180deg, rgba(118,16,24,0.68) 0%, rgba(84,10,16,0.78) 55%, rgba(48,4,8,0.92) 100%)":"linear-gradient(180deg, rgba(12,12,15,0.68) 0%, rgba(12,12,15,0.84) 100%)"};"></div></div>` : "";
-
-    const openingSectionHtml = `
-        <section class="relative z-10 min-h-[82vh] flex flex-col justify-center items-center text-center px-7 py-14 space-y-5">
-            <div class="th-card p-7 space-y-4 w-full">
-                ${(inv.category==="Pernikahan" || inv.category==="Aqiqah" || tObj.ornament==="islami" || (inv.category==="Syukuran" && tObj.faith==="islami")) ? `<p class="font-arab text-2xl th-accent">بِسْمِ اللَّهِ الرَّحْمَنِ الرَّحِيمِ</p>` : `<i class="fa-solid fa-sparkles text-xl th-accent"></i>`}
-                <h3 class="font-serif-ed text-base font-bold th-accent tracking-wide">${escHtml(openingGreeting)}</h3>
-                <p class="text-xs leading-relaxed opacity-90 italic">${escHtml(openingQuote)}</p>
-                <div class="w-16 h-[1px] bg-current opacity-30 mx-auto pt-1"></div>
-                <p class="text-[10px] uppercase tracking-[0.25em] opacity-70">Gulir ke bawah <i class="fa-solid fa-angles-down ml-1 animate-bounce"></i></p>
+function buildPriceStripHtml(tObj, compact = true) {
+    const pr = getThemePricing(tObj);
+    return `
+        <div class="px-2.5 py-2 bg-[#111115] text-white flex items-center justify-between gap-1 border-t border-white/10">
+            <div class="leading-tight min-w-0">
+                ${pr.hasDisc ? `<span class="block text-[9px] text-zinc-400 line-through">${fmtRp(pr.origPrice)}</span>` : ""}
+                <strong class="text-xs text-amber-400 font-extrabold">${fmtRp(pr.price)}</strong>
             </div>
-        </section>
+            ${pr.hasDisc ? `<span class="text-[8px] px-1.5 py-0.5 rounded bg-red-600 text-white font-extrabold shrink-0">-${pr.discPct}%</span>` : ""}
+        </div>
     `;
+}
 
-    let coupleSlidesHtml = "", bodyInner = "";
-    if (inv.category === "Pernikahan") {
-        const gImg = inv.groomPhoto || "./assets/model-pria.jpg", gFb = inv.groomPhotoFb || IMG("1507003211169-0a1dd7228f2d");
-        const bImg = inv.bridePhoto || "./assets/model-wanita.jpg", bFb = inv.bridePhotoFb || IMG("1534528741775-53994a69daeb");
-        const gShort = (inv.groomName || "Mempelai Pria").split(" ")[0], bShort = (inv.brideName || "Mempelai Wanita").split(" ")[0];
-        const gIgClean = (inv.groomIg || "").replace(/^@/, ""), bIgClean = (inv.brideIg || "").replace(/^@/, "");
+// ================= INDEXEDDB CACHE RINGAN =================
+function openMrIdb() {
+    return new Promise((resolve) => {
+        if (!window.indexedDB) return resolve(null);
+        const req = indexedDB.open("MR_UNDANGAN_DB", 1);
+        req.onupgradeneeded = () => req.result.createObjectStore("kv");
+        req.onsuccess = () => resolve(req.result);
+        req.onerror = () => resolve(null);
+    });
+}
+async function idbGet(key) {
+    const dbi = await openMrIdb(); if (!dbi) return null;
+    return new Promise((resolve) => {
+        const tx = dbi.transaction("kv", "readonly");
+        const req = tx.objectStore("kv").get(key);
+        req.onsuccess = () => resolve(req.result || null);
+        req.onerror = () => resolve(null);
+    });
+}
+async function idbSet(key, val) {
+    const dbi = await openMrIdb(); if (!dbi) return;
+    return new Promise((resolve) => {
+        const tx = dbi.transaction("kv", "readwrite");
+        tx.objectStore("kv").put(val, key);
+        tx.oncomplete = () => resolve(true);
+        tx.onerror = () => resolve(false);
+    });
+}
+async function idbRemove(key) {
+    const dbi = await openMrIdb(); if (!dbi) return;
+    return new Promise((resolve) => {
+        const tx = dbi.transaction("kv", "readwrite");
+        tx.objectStore("kv").delete(key);
+        tx.oncomplete = () => resolve(true);
+        tx.onerror = () => resolve(false);
+    });
+}
 
-        if (isCombinedCouple) {
-            const cImg = inv.couplePhoto || mainPhoto, cFb = inv.couplePhotoFb || mainPhotoFb;
-            const combinedInner = `
-                <div class="w-full h-full flex flex-col bg-[var(--th-bg)]">
-                    <div class="relative w-full h-[54vh] overflow-hidden shrink-0">
-                        <img src="${cImg}" ${imgFbAttr(cFb)} class="inv-photo w-full h-full object-cover object-center">
-                        <div class="absolute inset-x-0 bottom-0 h-28" style="background:linear-gradient(to top, var(--th-bg) 8%, transparent 100%);"></div>
-                    </div>
-                    <div class="flex-1 px-7 pb-12 -mt-6 relative z-10 text-center space-y-3 flex flex-col justify-center">
-                        ${(styleKey==="jawa"||tObj.ornament==="jawa")?`<div class="scale-75 -my-4">${SVG_GUNUNGAN_JAWA}</div>`:""}
-                        ${inv.brideName?`<div class="space-y-0.5"><h2 class="th-heading text-4xl">${escHtml(inv.brideName)}</h2>${inv.brideParents?`<p class="text-[11px] opacity-80">${escHtml(inv.brideParents)}</p>`:""}</div>`:""}
-                        ${(inv.groomName&&inv.brideName)?`<div class="th-heading text-3xl leading-none">&amp;</div>`:""}
-                        ${inv.groomName?`<div class="space-y-0.5"><h2 class="th-heading text-4xl">${escHtml(inv.groomName)}</h2>${inv.groomParents?`<p class="text-[11px] opacity-80">${escHtml(inv.groomParents)}</p>`:""}</div>`:""}
-                    </div>
-                </div>
-            `;
-            coupleSlidesHtml = `<div class="scrub-el" data-scrub="${randScrubType()}">${wrapPaperTurnLeaf(combinedInner, "Geser ➔ Buka Isi Undangan")}</div>`;
-        } else if (inv.groomName || inv.brideName) {
-            let leaf1Html = "", slide2Html = "";
-            if (isPremiumBlack) {
-                leaf1Html = `<div class="w-full h-full flex flex-col justify-center items-center text-center px-7 py-12 space-y-5 bg-[#070709] relative">${SVG_ROSES_MONO}<div class="w-48 h-48 rounded-full overflow-hidden border-2 border-white/75 shadow-2xl"><img src="${gImg}" ${imgFbAttr(gFb)} class="inv-photo w-full h-full object-cover"></div><span class="text-[10px] uppercase tracking-[0.35em] text-zinc-400 font-bold">The Groom</span><h2 class="font-script text-5xl text-white">${escHtml(inv.groomName)}</h2>${inv.groomParents?`<p class="text-xs text-zinc-300 max-w-xs leading-relaxed">${escHtml(inv.groomParents)}</p>`:""}${gIgClean?`<a href="https://instagram.com/${encodeURIComponent(gIgClean)}" target="_blank" class="px-4 py-1.5 rounded-full border border-white/30 text-[11px] text-white"><i class="fa-brands fa-instagram mr-1.5"></i>@${escHtml(gIgClean)}</a>`:""}</div>`;
-                slide2Html = `<section class="min-h-screen flex flex-col justify-center items-center text-center px-7 py-14 space-y-5 bg-[#070709] relative"><div class="scrub-el w-48 h-48 rounded-full overflow-hidden border-2 border-white/75 shadow-2xl" data-scrub="zoom"><img src="${bImg}" ${imgFbAttr(bFb)} class="inv-photo w-full h-full object-cover"></div><span class="scrub-el text-[10px] uppercase tracking-[0.35em] text-zinc-400 font-bold" data-scrub="up">The Bride</span><h2 class="scrub-el font-script text-5xl text-white" data-scrub="blur">${escHtml(inv.brideName)}</h2>${inv.brideParents?`<p class="scrub-el text-xs text-zinc-300 max-w-xs leading-relaxed" data-scrub="up">${escHtml(inv.brideParents)}</p>`:""}${bIgClean?`<a href="https://instagram.com/${encodeURIComponent(bIgClean)}" target="_blank" class="px-4 py-1.5 rounded-full border border-white/30 text-[11px] text-white"><i class="fa-brands fa-instagram mr-1.5"></i>@${escHtml(bIgClean)}</a>`:""}</section>`;
-            } else if (isStoryEditorial) {
-                leaf1Html = `<div class="w-full h-full flex flex-col justify-center px-6 py-10 space-y-5 bg-[var(--th-bg)]"><div class="relative text-center py-1"><span class="font-serif-ed text-7xl opacity-20 absolute inset-0 flex items-center justify-center pointer-events-none">&amp;</span><h2 class="font-serif-ed text-3xl text-white tracking-wide relative z-10 leading-tight">Groom &amp; Bride</h2></div><div class="relative w-[80%] mr-auto -rotate-2"><div class="editorial-polaroid"><div class="aspect-[4/5] w-full overflow-hidden bg-black"><img src="${gImg}" ${imgFbAttr(gFb)} class="inv-photo w-full h-full object-cover object-center"></div>${gIgClean?`<div class="mt-2.5 text-center text-xs font-semibold text-zinc-800"><i class="fa-brands fa-instagram mr-1"></i>${escHtml(gIgClean)}</div>`:`<div class="mt-2.5 text-center text-[11px] font-semibold text-zinc-500 tracking-widest uppercase">The Groom</div>`}</div><span class="font-script text-4xl text-white drop-shadow-[0_3px_10px_rgba(0,0,0,0.85)] absolute -right-4 bottom-12 rotate-2">${escHtml(gShort)}</span></div><div class="text-left space-y-1 px-1"><h3 class="font-serif-ed text-3xl font-bold th-accent">${escHtml(inv.groomName)}</h3>${inv.groomParents?`<p class="text-xs text-white/90 leading-relaxed max-w-xs">${escHtml(inv.groomParents)}</p>`:""}</div></div>`;
-                slide2Html = `<section class="min-h-screen flex flex-col justify-center px-6 py-12 space-y-6"><div class="scrub-el text-center" data-scrub="zoom"><span class="font-serif-ed text-5xl text-white/75">&amp;</span></div><div class="scrub-el relative w-[82%] ml-auto rotate-2" data-scrub="${randScrubType()}"><div class="editorial-polaroid"><div class="aspect-[4/5] w-full overflow-hidden bg-black"><img src="${bImg}" ${imgFbAttr(bFb)} class="inv-photo w-full h-full object-cover object-center"></div>${bIgClean?`<a href="https://instagram.com/${encodeURIComponent(bIgClean)}" target="_blank" class="mt-3 flex items-center justify-center gap-1.5 text-xs font-semibold text-zinc-800"><i class="fa-brands fa-instagram text-sm"></i>${escHtml(bIgClean)}</a>`:`<div class="mt-3 text-center text-[11px] font-semibold text-zinc-500 tracking-widest uppercase">The Bride</div>`}</div><span class="font-script text-4xl text-white drop-shadow-[0_3px_10px_rgba(0,0,0,0.85)] absolute -left-4 bottom-12 -rotate-2">${escHtml(bShort)}</span></div><div class="scrub-el text-right space-y-1 pt-2 px-1" data-scrub="right"><h3 class="font-serif-ed text-4xl font-bold th-accent">${escHtml(inv.brideName)}</h3>${inv.brideParents?`<p class="text-xs text-white/90 leading-relaxed max-w-xs ml-auto">${escHtml(inv.brideParents)}</p>`:""}</div></section>`;
-            } else {
-                leaf1Html = `<div class="relative w-full h-full flex flex-col justify-end overflow-hidden bg-black"><img src="${gImg}" ${imgFbAttr(gFb)} class="inv-photo absolute inset-0 w-full h-full object-cover object-center"><div class="absolute inset-0" style="background:linear-gradient(to top, rgba(255,255,255,0.97) 0%, rgba(255,255,255,0.85) 26%, rgba(255,255,255,0.18) 54%, transparent 72%);"></div><div class="relative z-10 px-7 pb-14 pt-20 text-center text-zinc-900 space-y-1.5"><span class="text-[10px] uppercase tracking-[0.3em] text-amber-700 font-extrabold block">Mempelai Pria</span><h2 class="text-4xl font-bold text-zinc-900" style="font-family:var(--th-font-heading);">${escHtml(inv.groomName)}</h2>${inv.groomParents?`<p class="text-xs text-zinc-700 font-medium max-w-xs mx-auto leading-relaxed">${escHtml(inv.groomParents)}</p>`:""}</div></div>`;
-                slide2Html = `<section class="relative w-full min-h-screen flex flex-col justify-end overflow-hidden bg-black"><img src="${bImg}" ${imgFbAttr(bFb)} class="inv-photo absolute inset-0 w-full h-full object-cover object-center"><div class="absolute inset-0" style="background:linear-gradient(to top, rgba(255,255,255,0.97) 0%, rgba(255,255,255,0.85) 26%, rgba(255,255,255,0.18) 54%, transparent 72%);"></div><div class="scrub-el relative z-10 px-7 pb-14 pt-20 text-center text-zinc-900 space-y-1.5" data-scrub="up"><span class="text-[10px] uppercase tracking-[0.3em] text-amber-700 font-extrabold block">Mempelai Wanita</span><h2 class="text-4xl font-bold text-zinc-900" style="font-family:var(--th-font-heading);">${escHtml(inv.brideName)}</h2>${inv.brideParents?`<p class="text-xs text-zinc-700 font-medium max-w-xs mx-auto leading-relaxed">${escHtml(inv.brideParents)}</p>`:""}</div></section>`;
+// ================= CLOUD SYNC & API =================
+function applyPublicDb(data) {
+    if (!data || typeof data !== "object") return;
+    ["customThemes", "hiddenThemes", "themeOverrides", "cvPriceOverrides", "musicLibrary", "testimonials", "promoBanners", "masterSettings"].forEach(k => {
+        if (data[k] !== undefined) db[k] = data[k];
+    });
+}
+function applyServerDb(data) {
+    if (!data || typeof data !== "object") return;
+    applyPublicDb(data);
+    ["users", "invitations", "portfolios", "chats", "adminLogs"].forEach(k => {
+        if (Array.isArray(data[k])) db[k] = data[k];
+    });
+    idbSet("db_snapshot", db);
+    idbSet("public_snapshot", {
+        customThemes: db.customThemes,
+        hiddenThemes: db.hiddenThemes,
+        themeOverrides: db.themeOverrides,
+        cvPriceOverrides: db.cvPriceOverrides,
+        musicLibrary: db.musicLibrary,
+        testimonials: db.testimonials,
+        promoBanners: db.promoBanners,
+        masterSettings: db.masterSettings
+    });
+}
+
+async function fetchJsonWithTimeout(url, opts = {}, ms = 18000) {
+    const ctrl = new AbortController();
+    const t = setTimeout(() => ctrl.abort(), ms);
+    try {
+        const res = await fetch(url, Object.assign({}, opts, { signal: ctrl.signal, cache: "no-store" }));
+        clearTimeout(t);
+        return await res.json();
+    } catch {
+        clearTimeout(t);
+        return null;
+    }
+}
+
+async function fetchPublicCloud() {
+    const j = await fetchJsonWithTimeout(`${CLOUD_API_URL}?action=get_public&t=${Date.now()}`, {}, 14000);
+    if (j && j.ok && j.data) {
+        applyPublicDb(j.data);
+        idbSet("public_snapshot", j.data);
+        return true;
+    }
+    return false;
+}
+
+async function fetchFullCloud() {
+    const url = `${CLOUD_API_URL}?action=get_full&username=${encodeURIComponent(currentSessionUser || "")}&token=${encodeURIComponent(currentSessionToken || "")}&guestId=${encodeURIComponent(guestChatId || "")}&t=${Date.now()}`;
+    const j = await fetchJsonWithTimeout(url, {}, 18000);
+    if (j && j.ok && j.data) {
+        applyServerDb(j.data);
+        return true;
+    }
+    return false;
+}
+
+async function fetchSingleInvitationFast(id) {
+    const j = await fetchJsonWithTimeout(`${CLOUD_API_URL}?action=get_invitation&id=${encodeURIComponent(id)}&t=${Date.now()}`, {}, 12000);
+    return (j && j.ok && j.invitation) ? j.invitation : null;
+}
+
+async function fetchClientPortalData(invId, key) {
+    return await fetchJsonWithTimeout(`${CLOUD_API_URL}?action=get_client_portal&client=${encodeURIComponent(invId)}&key=${encodeURIComponent(key || "")}&t=${Date.now()}`, {}, 14000);
+}
+
+async function apiAction(payload) {
+    const u = getCurrentUserObj();
+    const enriched = Object.assign({
+        actor: currentSessionUser || "",
+        actorRole: (u && u.role) || "user",
+        token: currentSessionToken || "",
+        guestId: guestChatId || ""
+    }, payload);
+    const j = await fetchJsonWithTimeout(CLOUD_API_URL, {
+        method: "POST",
+        headers: { "Content-Type": "text/plain;charset=utf-8" },
+        body: JSON.stringify(enriched)
+    }, 35000);
+
+    if (j && j.ok) {
+        if (j.data) {
+            applyServerDb(j.data);
+        } else if (j.user) {
+            const idx = (db.users || []).findIndex(x => String(x.username || "").toLowerCase() === String(j.user.username || "").toLowerCase());
+            if (idx >= 0) db.users[idx] = Object.assign({}, db.users[idx], j.user);
+            else db.users.push(j.user);
+            idbSet("db_snapshot", db);
+        }
+    }
+    return j || { ok: false, message: "Koneksi server sedang sibuk, coba lagi." };
+}
+
+let _pollTimer = null;
+function scheduleAdaptivePoll() {
+    clearTimeout(_pollTimer);
+    const chatOpen = !document.getElementById("full-chat-overlay")?.classList.contains("hide");
+    if (!currentSessionUser && !chatOpen) return;
+    const delay = chatOpen ? 6000 : 20000;
+    _pollTimer = setTimeout(async () => {
+        if (!document.hidden && (currentSessionUser || chatOpen)) {
+            const ok = await fetchFullCloud();
+            if (ok && typeof refreshActiveViewSmart === "function") refreshActiveViewSmart();
+        }
+        scheduleAdaptivePoll();
+    }, delay);
+}
+
+// ================= IMAGE RESIZER, AUDIO FALLBACK & CROPPER =================
+function quickResizeImage(file, maxSide = 820, quality = 0.80) {
+    return new Promise((resolve) => {
+        const reader = new FileReader();
+        reader.onload = (e) => {
+            const img = new Image();
+            img.onload = () => {
+                let w = img.width, h = img.height;
+                if (w > maxSide || h > maxSide) {
+                    const sc = maxSide / Math.max(w, h);
+                    w = Math.round(w * sc); h = Math.round(h * sc);
+                }
+                const c = document.createElement("canvas");
+                c.width = w; c.height = h;
+                const ctx = c.getContext("2d");
+                ctx.imageSmoothingEnabled = true;
+                ctx.imageSmoothingQuality = "high";
+                ctx.drawImage(img, 0, 0, w, h);
+                resolve(c.toDataURL("image/jpeg", quality));
+            };
+            img.onerror = () => resolve(e.target.result);
+            img.src = e.target.result;
+        };
+        reader.readAsDataURL(file);
+    });
+}
+
+const _audioBlobCache = new Map();
+
+function extractGoogleDriveAudioId(url) {
+    if (!url) return "";
+    const s = String(url).trim();
+    const m1 = s.match(/[?&]id=([a-zA-Z0-9_-]{15,})/);
+    if (m1) return m1[1];
+    const m2 = s.match(/\/d\/([a-zA-Z0-9_-]{15,})/);
+    if (m2) return m2[1];
+    return "";
+}
+
+function getAudioUrlCandidates(url) {
+    if (!url) return [];
+    const raw = String(url).trim();
+    if (!raw) return [];
+    if (raw.startsWith("data:audio/") || raw.startsWith("blob:")) return [raw];
+    const id = extractGoogleDriveAudioId(raw);
+    if (id) {
+        return [
+            `${CLOUD_API_URL}?action=stream_audio&id=${encodeURIComponent(id)}`,
+            `https://drive.usercontent.google.com/download?id=${id}&export=download&confirm=t`,
+            `https://docs.google.com/uc?export=download&id=${id}`,
+            `https://drive.google.com/uc?export=download&id=${id}`
+        ];
+    }
+    return [raw];
+}
+
+function dataUrlToBlobUrl(dataUrl) {
+    if (!dataUrl || typeof dataUrl !== "string") return "";
+    if (dataUrl.startsWith("blob:")) return dataUrl;
+    const match = dataUrl.match(/^data:([^;]+);base64,(.+)$/);
+    if (!match) return dataUrl;
+    const mime = match[1] || "audio/mpeg";
+    const bin = atob(match[2]);
+    const len = bin.length;
+    const bytes = new Uint8Array(len);
+    for (let i = 0; i < len; i++) bytes[i] = bin.charCodeAt(i);
+    const blob = new Blob([bytes], { type: mime });
+    return URL.createObjectURL(blob);
+}
+
+async function fetchAudioAsBlobUrl(rawUrl, candidates) {
+    const cacheKey = String(rawUrl || (candidates && candidates[0]) || "");
+    if (!cacheKey) return "";
+    if (_audioBlobCache.has(cacheKey)) {
+        const cachedVal = _audioBlobCache.get(cacheKey);
+        if (cachedVal && cachedVal.startsWith("data:")) {
+            const bUrl = dataUrlToBlobUrl(cachedVal);
+            _audioBlobCache.set(cacheKey, bUrl);
+            return bUrl;
+        }
+        return cachedVal;
+    }
+
+    const driveId = extractGoogleDriveAudioId(rawUrl) || extractGoogleDriveAudioId((candidates && candidates[0]) || "");
+    if (driveId) {
+        try {
+            const streamJson = await fetchJsonWithTimeout(`${CLOUD_API_URL}?action=stream_audio&id=${encodeURIComponent(driveId)}&t=${Date.now()}`, {}, 25000);
+            if (streamJson && streamJson.ok && streamJson.dataUrl) {
+                const bUrl = dataUrlToBlobUrl(streamJson.dataUrl);
+                if (bUrl) {
+                    _audioBlobCache.set(cacheKey, bUrl);
+                    return bUrl;
+                }
             }
-            coupleSlidesHtml = `<div class="relative z-10"><div class="scrub-el" data-scrub="${randScrubType()}">${wrapPaperTurnLeaf(leaf1Html, "Geser ➔ Mempelai Wanita")}</div><div class="pt-reveal-target">${slide2Html}</div></div>`;
-        }
-
-        const scheduleHtml = isPremiumBlack ? `
-            ${inv.showCountdown !== false ? buildCountdownOnly(dpResepsi, "Menuju Hari Resepsi") : ""}
-            <section class="scrub-el pb-white-card p-6 text-center space-y-5 relative overflow-hidden" data-scrub="${randScrubType()}">
-                <div class="space-y-2.5">
-                    <span class="scrub-el font-script text-xl text-zinc-600 block -mb-2" data-scrub="up">Detail Acara</span>
-                    <h3 class="scrub-el font-script text-4xl text-zinc-900" data-scrub="zoom">Akad Nikah</h3>
-                    ${inv.akadVenue ? `<p class="scrub-el text-xs font-bold text-zinc-800" data-scrub="left">${escHtml(inv.akadVenue)}</p>` : ""}
-                    <p class="scrub-el text-[11px] text-zinc-600 leading-relaxed max-w-xs mx-auto" data-scrub="right">${escHtml(inv.akadAddress)}</p>
-                    <p class="scrub-el text-xs font-semibold text-zinc-700 pt-1" data-scrub="up">${dp.full}<br>${escHtml(inv.akadTime)}</p>
-                    <div class="space-y-2 pt-2">
-                        ${inv.akadMap ? `<button onclick="openEventMap('akad')" class="w-full py-2.5 rounded-full bg-zinc-950 text-white text-xs font-bold tracking-wider uppercase"><i class="fa-solid fa-location-dot mr-1.5"></i>MAP</button>` : ""}
-                        <button onclick="saveEventToGoogleCalendar()" class="w-full py-2.5 rounded-full bg-white text-zinc-900 border border-zinc-900 text-xs font-bold tracking-wider uppercase"><i class="fa-regular fa-calendar-check mr-1.5"></i>CALENDAR</button>
-                    </div>
-                </div>
-                ${(inv.resepsiVenue || inv.resepsiDate) ? `
-                    <div class="w-16 h-[1.5px] bg-zinc-800 mx-auto my-2"></div>
-                    <div class="space-y-2.5">
-                        <h3 class="scrub-el font-script text-4xl text-zinc-900" data-scrub="zoom">Resepsi</h3>
-                        ${inv.resepsiVenue ? `<p class="scrub-el text-xs font-bold text-zinc-800" data-scrub="right">${escHtml(inv.resepsiVenue)}</p>` : ""}
-                        <p class="scrub-el text-[11px] text-zinc-600 leading-relaxed max-w-xs mx-auto" data-scrub="left">${escHtml(inv.resepsiAddress)}</p>
-                        <p class="scrub-el text-xs font-semibold text-zinc-700 pt-1" data-scrub="up">${dpResepsi.full}<br>${escHtml(inv.resepsiTime)}</p>
-                        ${inv.resepsiMap ? `<div class="pt-2"><button onclick="openEventMap('resepsi')" class="w-full py-2.5 rounded-full bg-zinc-950 text-white text-xs font-bold tracking-wider uppercase"><i class="fa-solid fa-location-dot mr-1.5"></i>MAP</button></div>` : ""}
-                    </div>
-                ` : ""}
-            </section>
-        ` : isStoryEditorial ? `
-            <section class="scrub-el arch-tall-card px-6 pt-16 pb-10 text-center text-white space-y-6" data-scrub="${randScrubType()}">
-                ${inv.showCountdown !== false ? `<div class="scrub-el space-y-4" data-scrub="zoom"><div class="leading-none"><span class="font-script text-4xl text-white block -mb-2">Count</span><span class="font-serif-ed text-3xl text-white tracking-wide">the Date</span></div><div class="grid grid-cols-4 gap-2 pt-1"><div><span id="cd-days" class="font-serif-ed text-3xl block">00</span><span class="text-[11px] text-white/80">Hari</span></div><div><span id="cd-hours" class="font-serif-ed text-3xl block">00</span><span class="text-[11px] text-white/80">Jam</span></div><div><span id="cd-mins" class="font-serif-ed text-3xl block">00</span><span class="text-[11px] text-white/80">Menit</span></div><div><span id="cd-secs" class="font-serif-ed text-3xl block">00</span><span class="text-[11px] text-white/80">Detik</span></div></div><button onclick="saveEventToGoogleCalendar()" class="inline-flex items-center gap-2 px-5 py-2.5 rounded-xl bg-black/65 hover:bg-black/80 border border-white/20 text-xs font-semibold text-white"><i class="fa-regular fa-calendar-check"></i> Simpan di Kalender</button></div><div class="w-[1.5px] h-20 mx-auto bg-gradient-to-b from-amber-200/90 via-amber-300/60 to-transparent"></div>` : ""}
-                <div class="scrub-el space-y-2.5" data-scrub="${randScrubType()}"><h3 class="font-serif-ed text-2xl tracking-[0.14em] th-accent uppercase">Akad Nikah</h3><p class="text-sm font-medium">${dp.full}</p><p class="text-xs text-white/90">${escHtml(inv.akadTime)}</p>${inv.akadVenue ? `<p class="text-[11px] tracking-[0.2em] uppercase text-white/75 pt-2 font-semibold">Bertempat Di</p><p class="text-xs font-semibold">${escHtml(inv.akadVenue)}</p>` : ""}<p class="text-xs text-white/85 leading-relaxed">${escHtml(inv.akadAddress)}</p>${inv.akadMap?`<div class="pt-2"><button onclick="openEventMap('akad')" class="inline-flex items-center gap-2 px-5 py-2.5 rounded-xl bg-black/65 hover:bg-black/80 border border-white/20 text-xs font-semibold text-white"><i class="fa-solid fa-location-dot"></i> Google Maps</button></div>`:""}</div>
-                ${(inv.resepsiVenue || inv.resepsiDate) ? `<div class="w-16 h-[1px] bg-amber-200/35 mx-auto my-2"></div><div class="scrub-el space-y-2.5" data-scrub="${randScrubType()}"><h3 class="font-serif-ed text-2xl tracking-[0.14em] th-accent uppercase">Resepsi</h3><p class="text-sm font-medium">${dpResepsi.full}</p><p class="text-xs text-white/90">${escHtml(inv.resepsiTime)}</p>${inv.resepsiVenue ? `<p class="text-xs font-semibold pt-1">${escHtml(inv.resepsiVenue)}</p>` : ""}<p class="text-xs text-white/85 leading-relaxed">${escHtml(inv.resepsiAddress)}</p>${inv.resepsiMap?`<div class="pt-2"><button onclick="openEventMap('resepsi')" class="inline-flex items-center gap-2 px-5 py-2.5 rounded-xl bg-black/65 hover:bg-black/80 border border-white/20 text-xs font-semibold text-white"><i class="fa-solid fa-location-dot"></i> Google Maps</button></div>`:""}</div>` : ""}
-            </section>
-        ` : styleKey === "sulawesi" ? `
-            ${inv.showCountdown !== false ? buildCountdownOnly(dpResepsi, "Menuju Hari Resepsi") : ""}
-            <section class="scrub-el th-card p-5 space-y-4 text-center relative overflow-hidden" data-scrub="${randScrubType()}"><div class="absolute inset-y-0 left-0 w-2 sulawesi-border"></div><div class="absolute inset-y-0 right-0 w-2 sulawesi-border"></div>${SVG_RUMAH_SULAWESI}<h2 class="th-heading text-3xl">Rangkaian Acara</h2><div class="grid grid-cols-3 items-center gap-2 py-2 border-y border-current/20"><div class="text-[11px] space-y-1"><strong class="th-accent block">Akad Nikah</strong><span>${escHtml(inv.akadTime)}</span><span class="block opacity-80">${escHtml(inv.akadVenue || "")}</span></div><div class="border-x border-current/30 px-1 py-2"><span class="text-[10px] uppercase block">${dpResepsi.day}</span><span class="text-3xl font-extrabold th-accent block leading-none my-1">${dpResepsi.num}</span><span class="text-[9px] uppercase">${dpResepsi.monthYear}</span></div><div class="text-[11px] space-y-1"><strong class="th-accent block">${(inv.resepsiVenue||inv.resepsiDate)?"Resepsi":"Lokasi"}</strong><span>${escHtml(inv.resepsiTime||inv.akadTime)}</span><span class="block opacity-80">${escHtml(inv.resepsiVenue||inv.akadAddress)}</span></div></div><p class="text-[11px] opacity-85">${escHtml(inv.resepsiAddress||inv.akadAddress)}</p><div class="flex gap-2">${inv.akadMap?`<button onclick="openEventMap('akad')" class="flex-1 th-btn-primary py-2.5 text-xs uppercase">MAP</button>`:""}<button onclick="saveEventToGoogleCalendar()" class="flex-1 th-btn-outline py-2.5 text-xs uppercase">CALENDAR</button></div></section>
-        ` : buildCountdownAndLoc(inv, dp, styleKey === "jawa", dpResepsi);
-
-        const storyHtml = (inv.stories && inv.stories.length) ? (isPremiumBlack
-            ? `<section class="scrub-el th-card p-6 text-center space-y-4 relative overflow-hidden" data-scrub="${randScrubType()}"><div class="scrub-el w-28 h-28 mx-auto rounded-full overflow-hidden border border-white/60" data-scrub="zoom"><img src="${mainPhoto}" ${imgFbAttr(mainPhotoFb)} class="inv-photo w-full h-full object-cover"></div><h2 class="scrub-el font-script text-4xl text-white" data-scrub="blur">Our Love Story</h2><div class="space-y-4">${inv.stories.map(s => `<div class="scrub-el space-y-1" data-scrub="${randScrubType()}"><h4 class="font-serif-ed text-lg font-bold text-white">${escHtml(s.title)}</h4>${s.year?`<span class="text-[11px] text-zinc-400 font-semibold block">${escHtml(s.year)}</span>`:""}<p class="text-xs text-zinc-300 leading-relaxed">${escHtml(s.desc)}</p></div>`).join("")}</div></section>`
-            : `<section class="scrub-el th-card p-6 text-center space-y-4" data-scrub="${randScrubType()}"><h2 class="th-heading text-3xl">Our Love Story</h2><div class="space-y-3 text-left">${inv.stories.map(s=>`<div class="scrub-el border-l-2 th-border-accent pl-3" data-scrub="${randScrubType()}"><h4 class="font-bold text-xs th-accent">${escHtml(s.title)}${s.year?` (${escHtml(s.year)})`:""}</h4><p class="text-xs opacity-85">${escHtml(s.desc)}</p></div>`).join("")}</div></section>`) : "";
-
-        bodyInner = `${scheduleHtml}${storyHtml}`;
-    } else if (inv.category === "Syukuran") {
-        const sym = tObj.faith === "islami" ? `<p class="font-arab text-3xl th-accent">بِسْمِ اللَّهِ الرَّحْمَنِ الرَّحِيمِ</p>` : tObj.faith === "kristen" ? `<i class="fa-solid fa-cross text-2xl th-accent"></i>` : tObj.faith === "hindu_buddha" ? `<i class="fa-solid fa-spa text-2xl th-accent"></i>` : `<i class="fa-solid fa-leaf text-xl th-accent"></i>`;
-        bodyInner = `<section class="scrub-el bg-white/95 text-zinc-900 rounded-2xl border-2 th-border-accent p-6 text-center space-y-4 shadow-xl" data-scrub="${randScrubType()}"><div class="border th-border-accent rounded-xl p-5 space-y-3.5"><span class="text-[10px] uppercase tracking-[0.25em] th-accent font-extrabold">${tObj.isKhitan?"Walimatul Khitan":"Undangan Syukuran"}</span><h1 class="th-heading text-3xl font-bold">${escHtml(inv.title)}</h1>${inv.subTitle?`<p class="text-xs text-zinc-600 italic">${escHtml(inv.subTitle)}</p>`:""}${sym}<div class="bg-amber-50/60 border th-border-accent rounded-xl p-3.5 text-left text-xs space-y-1 text-zinc-800"><div class="grid grid-cols-[70px_10px_1fr]"><strong>Hari</strong><span>:</span><span>${dp.day}</span></div><div class="grid grid-cols-[70px_10px_1fr]"><strong>Tanggal</strong><span>:</span><span>${dp.num} ${dp.monthYear}</span></div><div class="grid grid-cols-[70px_10px_1fr]"><strong>Pukul</strong><span>:</span><span>${escHtml(inv.akadTime)}</span></div><div class="grid grid-cols-[70px_10px_1fr]"><strong>Tempat</strong><span>:</span><span>${escHtml([inv.akadVenue, inv.akadAddress].filter(Boolean).join(", "))}</span></div></div>${inv.groomParents?`<div class="text-xs pt-1"><p class="text-zinc-500">Hormat kami,</p><h4 class="font-bold text-sm th-accent">${escHtml(inv.groomParents)}</h4></div>`:""}<div class="flex gap-2 pt-2">${inv.akadMap?`<button onclick="openEventMap('akad')" class="flex-1 th-btn-primary py-2.5 text-xs">Peta Lokasi</button>`:""}<button onclick="saveEventToGoogleCalendar()" class="flex-1 th-btn-outline py-2.5 text-xs">Kalender</button></div></div></section>${inv.showCountdown!==false?buildCountdownOnly(dp):""}`;
-    } else if (inv.category === "Ulang Tahun") {
-        bodyInner = `<section class="scrub-el bg-white/95 text-zinc-800 rounded-3xl border-2 th-border-accent p-6 text-center space-y-4 shadow-xl" data-scrub="${randScrubType()}"><div class="scrub-el w-36 h-36 mx-auto rounded-full overflow-hidden border-4 th-border-accent shadow-lg" data-scrub="zoom"><img src="${mainPhoto}" ${imgFbAttr(mainPhotoFb)} class="inv-photo w-full h-full object-cover"></div><div class="inline-block px-6 py-2 rounded-full bg-black/5 border th-border-accent"><h2 class="font-cute text-2xl font-bold th-accent">${escHtml(inv.title)}</h2>${inv.age?`<span class="text-xs font-bold text-zinc-700 block">Ke - ${escHtml(inv.age)}</span>`:""}</div>${inv.groomParents?`<p class="text-xs text-zinc-600">${escHtml(inv.groomParents)}</p>`:""}<div class="grid grid-cols-3 items-center gap-2 max-w-xs mx-auto"><div class="border-y-2 th-border-accent py-1.5 text-xs font-bold text-zinc-700">${dp.day}</div><div class="font-cute text-4xl font-bold th-accent">${dp.num}</div><div class="border-y-2 th-border-accent py-1.5 text-[11px] font-bold text-zinc-700">${escHtml((inv.akadTime||"").split(" ")[0])}</div></div><p class="text-sm font-bold th-accent">${dp.monthYear}</p></section>${buildCountdownAndLoc(inv, dp)}`;
-    } else if (inv.category === "Aqiqah") {
-        bodyInner = `<section class="scrub-el bg-white/95 text-zinc-800 rounded-t-[160px] rounded-b-3xl border-2 th-border-accent p-6 pt-10 text-center space-y-4 shadow-xl" data-scrub="${randScrubType()}"><h2 class="th-heading text-4xl leading-tight">Tasyakuran<br>Aqiqah</h2><div class="scrub-el w-36 h-36 mx-auto rounded-full overflow-hidden scalloped-frame my-2" data-scrub="zoom"><img src="${mainPhoto}" ${imgFbAttr(mainPhotoFb)} class="inv-photo w-full h-full object-cover"></div><div><h3 class="text-2xl font-extrabold th-accent">${escHtml(inv.title)}</h3>${inv.birthDate?`<p class="text-[11px] text-zinc-500">Lahir: ${escHtml(inv.birthDate)}</p>`:""}</div><div class="bg-amber-50/50 border th-border-accent rounded-2xl p-3.5 grid grid-cols-[90px_1fr] items-center gap-3 text-left"><div class="text-center border-r th-border-accent pr-2"><span class="text-[10px] font-bold uppercase text-zinc-500 block">${dp.day}</span><span class="text-3xl font-extrabold th-accent leading-none my-1 block">${dp.num}</span><span class="text-[10px] font-bold uppercase text-zinc-700">${dp.monthYear}</span></div><div class="space-y-1.5 text-[11px] text-zinc-700"><p><i class="fa-regular fa-clock th-accent mr-1"></i><strong>${escHtml(inv.akadTime)}</strong></p><p><i class="fa-solid fa-location-dot th-accent mr-1"></i>${escHtml([inv.akadVenue, inv.akadAddress].filter(Boolean).join(", "))}</p></div></div>${inv.groomParents?`<div class="text-xs"><p class="text-[11px] text-zinc-500">Kami yang berbahagia:</p><p class="font-bold th-accent text-sm">${escHtml(inv.groomParents)}</p></div>`:""}</section>${buildCountdownAndLoc(inv, dp)}`;
-    } else {
-        bodyInner = `<section class="scrub-el th-card p-6 text-center space-y-3" data-scrub="${randScrubType()}"><h2 class="th-heading text-3xl font-extrabold">${escHtml(inv.title)}</h2>${inv.subTitle?`<p class="text-xs font-bold opacity-85 uppercase">${escHtml(inv.subTitle)}</p>`:""}${inv.groomParents?`<p class="text-xs font-semibold th-accent pt-1">${escHtml(inv.groomParents)}</p>`:""}</section>${buildCountdownAndLoc(inv, dp)}`;
+        } catch {}
     }
 
-    const closingText = inv.closingText !== undefined ? inv.closingText : getDefaultClosingText(inv.category).text;
-    const closingTitle = inv.closingTitle || getDefaultClosingText(inv.category).title;
-    const closingHtml = (inv.sections?.closing !== false && closingText) ? `<section class="scrub-el th-card p-7 text-center space-y-4" data-scrub="${randScrubType()}"><div class="scrub-el w-20 h-20 mx-auto rounded-full overflow-hidden border border-white/40 shadow-lg" data-scrub="zoom"><img src="${mainPhoto}" ${imgFbAttr(mainPhotoFb)} class="inv-photo w-full h-full object-cover"></div><h2 class="th-heading text-4xl leading-snug">${escHtml(closingTitle)}</h2><p class="text-xs leading-relaxed opacity-90">${escHtml(closingText)}</p><div class="pt-2 border-t border-current/15"><span class="text-[10px] uppercase tracking-[0.25em] opacity-70 block">Kami yang berbahagia</span><h4 class="th-heading text-3xl mt-1">${escHtml(inv.title)}</h4></div></section>` : "";
+    const list = (candidates && candidates.length) ? candidates : getAudioUrlCandidates(rawUrl);
+    for (const u of list) {
+        if (u.indexOf("action=stream_audio") !== -1) continue;
+        try {
+            const resp = await fetch(u, { mode: "cors", cache: "force-cache", redirect: "follow" });
+            if (!resp.ok) continue;
+            const buf = await resp.arrayBuffer();
+            if (!buf || buf.byteLength < 1024) continue;
 
-    const bankHtml = (inv.banks && inv.banks.length) ? `<section class="scrub-el th-card p-6 space-y-3 text-center" data-scrub="${randScrubType()}"><h2 class="th-heading text-3xl">Amplop Digital</h2><div class="space-y-2.5 text-left">${inv.banks.map(b => { const lg = BANK_LOGOS[b.bank] || { bg:"#333", text:"#fff", label:b.bank }; return `<div class="scrub-el bg-black/15 border border-white/15 rounded-2xl p-3.5 flex items-center justify-between gap-2" data-scrub="${randScrubType()}"><div><span style="background:${lg.bg};color:${lg.text}" class="inline-block px-2.5 py-0.5 rounded text-[10px] font-extrabold">${lg.label}</span><p class="text-sm font-mono font-bold pt-1">${escHtml(b.no)}</p><p class="text-[11px] opacity-75">a.n. ${escHtml(b.holder)}</p></div><button onclick="navigator.clipboard.writeText('${esc(b.no)}');showToast('Nomor rekening disalin!');" class="th-btn-primary px-3 py-1.5 text-[11px]">Salin</button></div>`; }).join("")}</div></section>` : "";
+            const headStr = new TextDecoder().decode(buf.slice(0, 128)).trim().toLowerCase();
+            if (headStr.startsWith("<!doctype") || headStr.startsWith("<html") || headStr.includes("google-site-verification")) {
+                continue;
+            }
 
-    const wishHtml = inv.showWishes !== false ? `<section class="scrub-el th-card p-5 space-y-4" data-scrub="${randScrubType()}"><div class="text-center"><h2 class="th-heading text-3xl">Ucapan &amp; Doa Tamu</h2><p class="text-[10px] opacity-70">Geser ke samping untuk membaca ucapan lainnya</p></div><div id="gv-wishes-feed" class="wishes-h-scroll"></div><form onsubmit="submitGuestWish(event)" class="bg-black/15 p-4 rounded-2xl border border-white/15 space-y-3"><input type="text" id="w-sender-name" value="${guestName!=="Tamu Kehormatan"?esc(guestName):""}" placeholder="Nama Anda" class="w-full p-2.5 bg-white/10 border border-white/20 rounded-xl text-xs" required><textarea id="w-sender-msg" placeholder="Tulis ucapan & doa terbaik Anda..." class="w-full p-2.5 bg-white/10 border border-white/20 rounded-xl text-xs h-20" required></textarea><div class="flex items-center justify-between text-xs"><span class="font-semibold">Kehadiran:</span><select id="w-sender-rsvp" class="p-2 bg-white/20 border border-white/20 rounded-xl text-xs font-bold"><option value="Hadir" class="text-black">✓ Hadir</option><option value="Tidak Hadir" class="text-black">✕ Tidak Hadir</option><option value="Netral" class="text-black">? Netral</option></select></div><div class="border border-dashed border-white/25 rounded-xl p-2 text-center"><label class="cursor-pointer text-xs th-accent font-semibold block"><i class="fa-solid fa-camera-retro mr-1"></i>Lampirkan foto momen bahagia<input type="file" accept="image/*" class="hide" onchange="previewGuestWishPhoto(this)"></label><img id="w-photo-preview" class="hide max-h-32 object-contain rounded-lg mx-auto mt-2"></div><button type="submit" id="btn-send-wish" class="w-full th-btn-primary py-2.5 text-xs uppercase">Kirim Ucapan &amp; Doa</button></form></section>` : "";
-
-    polaroidPhotos = (inv.photos || []).slice(1).map((src, i) => ({ src, fb: (inv.photosFb && inv.photosFb[i+1]) || IMG("1519741497674-611481863552") }));
-    polaroidIndex = 0;
-    const galHtml = polaroidPhotos.length ? `<section class="scrub-el space-y-4 text-center pt-2" data-scrub="${randScrubType()}"><div><h2 class="th-heading text-3xl">Photo Gallery</h2><p class="text-[11px] opacity-75">Geser atau ketuk foto untuk membolak-balik lembaran Polaroid</p></div><div id="polaroid-gallery-stack" class="polaroid-stack"></div><div class="flex items-center justify-center gap-4"><button onclick="flipPolaroidCard(-1)" class="w-9 h-9 rounded-full th-btn-outline flex items-center justify-center text-xs"><i class="fa-solid fa-chevron-left"></i></button><span id="polaroid-counter" class="text-xs font-bold th-accent">1 / ${polaroidPhotos.length}</span><button onclick="flipPolaroidCard(1)" class="w-9 h-9 rounded-full th-btn-outline flex items-center justify-center text-xs"><i class="fa-solid fa-chevron-right"></i></button></div></section>` : "";
-
-    const mainBodyWrapClass = isCombinedCouple ? "pt-reveal-target relative z-10 space-y-9 px-6 pt-8 pb-20" : "relative z-10 space-y-9 px-6 pt-4 pb-20";
-
-    document.getElementById("gv-dynamic-root").innerHTML = `
-        ${coverHtml}
-        <div id="gv-main-body" class="hide relative">
-            ${ambientShadowHtml}${fixedBackdropHtml}${openingSectionHtml}${coupleSlidesHtml}
-            <div class="${mainBodyWrapClass}">
-                ${bodyInner}${closingHtml}${bankHtml}${wishHtml}${galHtml}
-                <footer class="text-center pt-6 border-t border-current/20 opacity-85 space-y-1">
-                    <p class="text-xs font-bold">${escHtml(brand.footerMain)}</p>
-                    <p class="text-[9px] uppercase tracking-widest">${escHtml(brand.footerSub)}</p>
-                    <p class="text-[10px] opacity-65 pt-2">Tarik ke bawah lagi untuk info buat berkasmu sendiri ✨</p>
-                </footer>
-            </div>
-        </div>
-    `;
-
-    renderPolaroidStack(); renderGuestWishes();
-    if (inv.showCountdown !== false) startCountdown(countdownTargetDate);
-    const ov = document.getElementById("guest-invitation-overlay");
-    ov.classList.remove("hide"); ov.style.overflowY = "hidden"; ov.scrollTo(0, 0);
-    if (!isDirectLink) pushBackGuard();
-    bindGuestScrollListeners();
+            let mime = (resp.headers.get("content-type") || "").split(";")[0].trim().toLowerCase();
+            if (!mime || mime === "application/octet-stream") {
+                const sig = new Uint8Array(buf.slice(0, 4));
+                if (sig[0] === 0x52 && sig[1] === 0x49 && sig[2] === 0x46 && sig[3] === 0x46) mime = "audio/wav";
+                else if (sig[0] === 0x4F && sig[1] === 0x67 && sig[2] === 0x67 && sig[3] === 0x53) mime = "audio/ogg";
+                else mime = "audio/mpeg";
+            }
+            const blob = new Blob([buf], { type: mime });
+            const blobUrl = URL.createObjectURL(blob);
+            _audioBlobCache.set(cacheKey, blobUrl);
+            return blobUrl;
+        } catch {}
+    }
+    return "";
 }
 
-function updateGuestScrollInteractiveEffects() {
-    const ov = document.getElementById("guest-invitation-overlay");
-    if (!ov || ov.classList.contains("hide")) return;
-    const vh = ov.clientHeight || window.innerHeight;
-    const maxScroll = Math.max(1, ov.scrollHeight - vh);
-    const bar = document.getElementById("gv-reading-progress");
-    if (bar) bar.style.width = `${Math.min(100, Math.max(0, (ov.scrollTop / maxScroll) * 100))}%`;
+async function resolveAudioUrl(url) {
+    const list = getAudioUrlCandidates(url);
+    const blobUrl = await fetchAudioAsBlobUrl(url, list);
+    return blobUrl || list[0] || "";
+}
 
-    ov.querySelectorAll(".pt-stage").forEach(stage => {
-        const rect = stage.getBoundingClientRect();
-        const travel = Math.max(1, stage.offsetHeight - vh);
-        const p = Math.max(0, Math.min(1, -rect.top / travel));
-        const leaf = stage.querySelector(".pt-leaf"), shade = stage.querySelector(".pt-paper-shade"), hint = stage.querySelector(".pt-edge-hint");
-        if (leaf) {
-            const op = p > 0.84 ? Math.max(0, 1 - (p - 0.84) / 0.16) : 1;
-            leaf.style.transform = `rotateY(${-p * 112}deg) scale(${1 - p * 0.04})`;
-            leaf.style.opacity = op;
-            leaf.style.pointerEvents = p > 0.65 ? "none" : "auto";
+let _cropperInst = null, _cropCfg = { outW: 600, outH: 600, onDone: null };
+function openImageCropper(file, ratio = 1, title = "Atur Rasio Foto", outW = 600, outH = 600, onDone = null) {
+    _cropCfg = { outW, outH, onDone };
+    document.getElementById("crop-modal-title").innerHTML = `<i class="fa-solid fa-crop-simple app-accent mr-1.5"></i>${escHtml(title)}`;
+    const reader = new FileReader();
+    reader.onload = (e) => {
+        const img = document.getElementById("crop-source-img");
+        img.src = e.target.result;
+        document.getElementById("modal-image-cropper").classList.remove("hide");
+        if (_cropperInst) { _cropperInst.destroy(); _cropperInst = null; }
+        if (window.Cropper) {
+            _cropperInst = new window.Cropper(img, { aspectRatio: ratio, viewMode: 1, dragMode: "move", autoCropArea: 0.92, background: false });
         }
-        if (shade) shade.style.opacity = Math.sin(p * Math.PI) * 0.9;
-        if (hint) hint.style.opacity = Math.max(0, 1 - p * 4);
-    });
-
-    ov.querySelectorAll(".scrub-el").forEach(el => {
-        const rect = el.getBoundingClientRect();
-        const startY = vh * 0.96, endY = vh * 0.56;
-        let t = Math.max(0, Math.min(1, (startY - rect.top) / Math.max(1, startY - endY)));
-        const ease = 1 - Math.pow(1 - t, 2.2), inv = 1 - ease, mode = el.dataset.scrub || "up";
-        el.style.opacity = String(0.08 + ease * 0.92);
-        if (mode === "up") { el.style.transform = `translate3d(0,${inv * 44}px,0)`; el.style.filter = ""; }
-        else if (mode === "left") { el.style.transform = `translate3d(${-inv * 46}px,${inv * 12}px,0)`; el.style.filter = ""; }
-        else if (mode === "right") { el.style.transform = `translate3d(${inv * 46}px,${inv * 12}px,0)`; el.style.filter = ""; }
-        else if (mode === "zoom") { el.style.transform = `scale(${0.86 + ease * 0.14})`; el.style.filter = ""; }
-        else if (mode === "tilt-l") { el.style.transform = `translate3d(${-inv * 24}px,${inv * 30}px,0) rotate(${-inv * 5.5}deg)`; el.style.filter = ""; }
-        else if (mode === "tilt-r") { el.style.transform = `translate3d(${inv * 24}px,${inv * 30}px,0) rotate(${inv * 5.5}deg)`; el.style.filter = ""; }
-        else if (mode === "flip-x") { el.style.transform = `perspective(900px) rotateX(${inv * 24}deg) translate3d(0,${inv * 28}px,0)`; el.style.filter = ""; }
-        else if (mode === "blur") { el.style.transform = `translate3d(0,${inv * 24}px,0) scale(${1.04 - ease * 0.04})`; el.style.filter = inv > 0.03 ? `blur(${(inv * 7).toFixed(1)}px)` : ""; }
-    });
-}
-
-function bindGuestScrollListeners() {
-    const ov = document.getElementById("guest-invitation-overlay");
-    if (!ov || ov.dataset.scrollBound) return;
-    ov.dataset.scrollBound = "1";
-    ov.addEventListener("scroll", () => {
-        if (scrollRafId) cancelAnimationFrame(scrollRafId);
-        scrollRafId = requestAnimationFrame(updateGuestScrollInteractiveEffects);
-    }, { passive: true });
-
-    const isAtBottom = () => (ov.scrollTop + ov.clientHeight >= ov.scrollHeight - 18) && ov.scrollHeight > ov.clientHeight + 40;
-    const maybeShowPromo = () => {
-        if (promoShownThisView) return;
-        const bodyEl = document.getElementById("gv-main-body");
-        if (!bodyEl || bodyEl.classList.contains("hide")) return;
-        promoShownThisView = true;
-        document.getElementById("gv-download-promo")?.classList.remove("hide");
     };
-    ov.addEventListener("touchstart", (e) => { promoTouchStartY = e.touches[0].clientY; }, { passive: true });
-    ov.addEventListener("touchmove", (e) => { if (isAtBottom() && (promoTouchStartY - e.touches[0].clientY) > 32) maybeShowPromo(); }, { passive: true });
-    ov.addEventListener("wheel", (e) => { if (e.deltaY > 15 && isAtBottom()) maybeShowPromo(); }, { passive: true });
+    reader.readAsDataURL(file);
 }
-function dismissDownloadPromo() { document.getElementById("gv-download-promo")?.classList.add("hide"); }
-
-function renderPolaroidStack() {
-    const stack = document.getElementById("polaroid-gallery-stack"); if (!stack || !polaroidPhotos.length) return;
-    const total = polaroidPhotos.length, showCount = Math.min(4, total);
-    let html = "";
-    for (let offset = showCount - 1; offset >= 0; offset--) {
-        const idx = (polaroidIndex + offset) % total, item = polaroidPhotos[idx];
-        const rot = offset === 0 ? -1.2 : offset === 1 ? 4.8 : offset === 2 ? -5.2 : 7.5;
-        const ty = offset * 7, tx = offset === 1 ? 6 : offset === 2 ? -6 : 0, sc = 1 - offset * 0.04;
-        html += `<div class="polaroid-card" data-top="${offset===0?1:0}" onclick="${offset===0?"flipPolaroidCard(1)":""}" style="z-index:${showCount-offset};transform:translate3d(${tx}px,${ty}px,0) scale(${sc}) rotate(${rot}deg);opacity:${offset===3?0.65:1};"><img src="${item.src}" ${imgFbAttr(item.fb)} loading="lazy" class="inv-photo"><div class="polaroid-cap">${escHtml(activeGuestInv.title)} • #${idx+1}</div></div>`;
-    }
-    stack.innerHTML = html;
-    const cnt = document.getElementById("polaroid-counter"); if (cnt) cnt.innerText = `${polaroidIndex + 1} / ${total}`;
-    if (!stack.dataset.swipeBound) {
-        stack.dataset.swipeBound = "1";
-        let sx = 0;
-        stack.addEventListener("touchstart", (e) => { sx = e.touches[0].clientX; }, { passive: true });
-        stack.addEventListener("touchend", (e) => { const dx = e.changedTouches[0].clientX - sx; if (Math.abs(dx) > 36) flipPolaroidCard(dx < 0 ? 1 : -1); }, { passive: true });
-    }
+function cropperZoom(d) { if (_cropperInst) _cropperInst.zoom(d); }
+function closeImageCropper() {
+    if (_cropperInst) { _cropperInst.destroy(); _cropperInst = null; }
+    document.getElementById("modal-image-cropper")?.classList.add("hide");
 }
-function flipPolaroidCard(dir) {
-    const stack = document.getElementById("polaroid-gallery-stack"); if (!stack || polaroidPhotos.length < 2) return;
-    const topCard = stack.querySelector('.polaroid-card[data-top="1"]');
-    if (topCard) topCard.classList.add(dir > 0 ? "paper-flip-next" : "paper-flip-prev");
-    setTimeout(() => { polaroidIndex = (polaroidIndex + dir + polaroidPhotos.length) % polaroidPhotos.length; renderPolaroidStack(); }, 460);
-}
-function startWishHorizontalAutoScroll() {
-    if (wishAutoTimer) clearInterval(wishAutoTimer);
-    const el = document.getElementById("gv-wishes-feed"); if (!el) return;
-    if (!el.dataset.pauseBound) {
-        el.dataset.pauseBound = "1";
-        el.addEventListener("touchstart", () => { wishScrollPaused = true; }, { passive: true });
-        el.addEventListener("touchend", () => { setTimeout(() => { wishScrollPaused = false; }, 2800); }, { passive: true });
-        el.addEventListener("mouseenter", () => { wishScrollPaused = true; });
-        el.addEventListener("mouseleave", () => { wishScrollPaused = false; });
-        el.addEventListener("focusin", () => { wishScrollPaused = true; });
-        el.addEventListener("focusout", () => { wishScrollPaused = false; });
+function applyImageCrop() {
+    let dataUrl = "";
+    if (_cropperInst) {
+        const c = _cropperInst.getCroppedCanvas({ width: _cropCfg.outW, height: _cropCfg.outH, imageSmoothingQuality: "high" });
+        dataUrl = c ? c.toDataURL("image/jpeg", 0.85) : "";
+    } else {
+        dataUrl = document.getElementById("crop-source-img")?.src || "";
     }
-    wishAutoTimer = setInterval(() => {
-        if (wishScrollPaused || !el || el.scrollWidth <= el.clientWidth + 4) return;
-        if (el.scrollLeft + el.clientWidth >= el.scrollWidth - 2) el.scrollLeft = 0;
-        else el.scrollLeft += 0.9;
-    }, 28);
+    const cb = _cropCfg.onDone;
+    closeImageCropper();
+    if (cb && dataUrl) cb(dataUrl);
 }
 
-function buildCountdownOnly(dp, label = "Menuju Hari Acara") {
-    return `<section class="scrub-el th-card p-5 text-center space-y-3" data-scrub="zoom"><span class="text-[10px] uppercase tracking-[0.2em] th-accent font-bold">${label}</span><div class="grid grid-cols-4 gap-2"><div class="bg-black/15 border border-white/15 p-2 rounded-xl"><span id="cd-days" class="text-xl font-bold th-accent">00</span><span class="block text-[9px] uppercase">Hari</span></div><div class="bg-black/15 border border-white/15 p-2 rounded-xl"><span id="cd-hours" class="text-xl font-bold th-accent">00</span><span class="block text-[9px] uppercase">Jam</span></div><div class="bg-black/15 border border-white/15 p-2 rounded-xl"><span id="cd-mins" class="text-xl font-bold th-accent">00</span><span class="block text-[9px] uppercase">Menit</span></div><div class="bg-black/15 border border-white/15 p-2 rounded-xl"><span id="cd-secs" class="text-xl font-bold th-accent">00</span><span class="block text-[9px] uppercase">Detik</span></div></div></section>`;
-}
-function buildCountdownAndLoc(inv, dp, isJawa = false, dpRes = null) {
-    const cdLbl = (inv.category === "Pernikahan" && inv.resepsiDate) ? "Menuju Hari Resepsi" : "Menuju Hari Acara";
-    const cd = inv.showCountdown !== false ? buildCountdownOnly(dpRes || dp, cdLbl) : "";
-    const res = (inv.resepsiVenue || inv.resepsiDate) ? `<div class="scrub-el th-card p-5 space-y-2 text-center" data-scrub="${randScrubType()}"><h3 class="th-heading text-3xl">Resepsi</h3>${inv.resepsiVenue ? `<h4 class="font-bold text-sm">${escHtml(inv.resepsiVenue)}</h4>` : ""}<p class="text-xs opacity-80">${escHtml(inv.resepsiAddress)}</p><p class="text-xs font-bold">${(dpRes||dp).full} • ${escHtml(inv.resepsiTime)}</p>${inv.resepsiMap?`<button onclick="openEventMap('resepsi')" class="w-full th-btn-primary py-2.5 text-xs uppercase mt-2">Buka Map Resepsi</button>`:""}</div>` : "";
-    const jawaBar = isJawa ? `<div class="w-full h-1 rounded-full bg-gradient-to-r from-transparent via-amber-400 to-transparent my-1"></div>` : "";
-    return `${cd}<section class="space-y-4">${jawaBar}<div class="scrub-el th-card p-5 space-y-2 text-center" data-scrub="${randScrubType()}"><h3 class="th-heading text-3xl">${inv.category==="Pernikahan"?"Akad Nikah":"Lokasi Acara"}</h3>${inv.akadVenue ? `<h4 class="font-bold text-sm">${escHtml(inv.akadVenue)}</h4>` : ""}<p class="text-xs opacity-80">${escHtml(inv.akadAddress)}</p><p class="text-xs font-bold">${dp.full} • ${escHtml(inv.akadTime)}</p><div class="flex gap-2 pt-2">${inv.akadMap?`<button onclick="openEventMap('akad')" class="flex-1 th-btn-primary py-2.5 text-xs uppercase">MAP</button>`:""}<button onclick="saveEventToGoogleCalendar()" class="flex-1 th-btn-outline py-2.5 text-xs uppercase">CALENDAR</button></div></div>${res}</section>`;
+// ================= AUDIO CROPPER INTERAKTIF (MP3 RINGAN ANTI GAGAL UPLOAD) =================
+let _acFile = null, _acBlobUrl = "", _acDuration = 45, _acTotalDur = 60, _acStartSec = 0, _acAudio = null, _acPlayTimer = null;
+
+function _fmtSec(s) {
+    const n = Math.max(0, Math.floor(s || 0));
+    return `${String(Math.floor(n / 60)).padStart(2, "0")}:${String(n % 60).padStart(2, "0")}`;
 }
 
-function unlockInvitationWithRandomFx() {
-    const cover = document.getElementById("gv-cover-stage"), body = document.getElementById("gv-main-body"), ov = document.getElementById("guest-invitation-overlay");
-    if (!cover || !body) return;
-    body.classList.remove("hide");
-    requestAnimationFrame(() => {
-        body.classList.add("body-ready");
-        const map = { pageturn:"fx-flipfade", curtain:"fx-curtain", lift:"fx-lift", zoomblur:"fx-zoomblur" };
-        const effects = ["fx-flipfade", "fx-curtain", "fx-lift", "fx-zoomblur"];
-        const chosen = map[activeThemeTransitionPref] || effects[Math.floor(Math.random() * effects.length)];
-        cover.classList.add(chosen);
+function _updateAcBoxUI() {
+    const win = document.getElementById("ac-select-window");
+    const lbl = document.getElementById("ac-clip-range-lbl");
+    const dur = Math.max(1, _acTotalDur);
+    const clipLen = Math.min(dur, _acDuration);
+    if (_acStartSec + clipLen > dur) _acStartSec = Math.max(0, dur - clipLen);
+
+    const leftPct = (_acStartSec / dur) * 100;
+    const widthPct = Math.max(12, (clipLen / dur) * 100);
+    if (win) {
+        win.style.left = `${leftPct}%`;
+        win.style.width = `${Math.min(100 - leftPct, widthPct)}%`;
+    }
+    if (lbl) lbl.innerText = `${_fmtSec(_acStartSec)} — ${_fmtSec(_acStartSec + clipLen)}`;
+}
+
+function _bindAcDrag() {
+    const track = document.getElementById("ac-wave-track");
+    const win = document.getElementById("ac-select-window");
+    if (!track || !win || track.dataset.dragBound) return;
+    track.dataset.dragBound = "1";
+
+    let dragging = false, startX = 0, origStartSec = 0;
+    const onDown = (clientX) => { dragging = true; startX = clientX; origStartSec = _acStartSec; };
+    const onMove = (clientX) => {
+        if (!dragging) return;
+        const rect = track.getBoundingClientRect();
+        const dx = clientX - startX;
+        const deltaSec = (dx / Math.max(1, rect.width)) * _acTotalDur;
+        const maxStart = Math.max(0, _acTotalDur - Math.min(_acTotalDur, _acDuration));
+        _acStartSec = Math.max(0, Math.min(maxStart, origStartSec + deltaSec));
+        _updateAcBoxUI();
+    };
+    const onUp = () => {
+        if (!dragging) return;
+        dragging = false;
+        if (_acAudio && !_acAudio.paused) _acAudio.currentTime = _acStartSec;
+    };
+
+    win.addEventListener("mousedown", (e) => { e.preventDefault(); onDown(e.clientX); });
+    window.addEventListener("mousemove", (e) => onMove(e.clientX));
+    window.addEventListener("mouseup", onUp);
+
+    win.addEventListener("touchstart", (e) => { onDown(e.touches[0].clientX); }, { passive: true });
+    window.addEventListener("touchmove", (e) => { if (dragging) onMove(e.touches[0].clientX); }, { passive: true });
+    window.addEventListener("touchend", onUp);
+}
+
+function openAudioCropperFromInput(inp) {
+    const file = inp.files && inp.files[0]; if (!file) return; inp.value = "";
+    if (file.size > 25 * 1024 * 1024) return showToast("Ukuran lagu maksimal 25 MB.", "error");
+    _acFile = file;
+    _acStartSec = 0;
+    document.getElementById("ac-song-title").value = file.name.replace(/\.[^/.]+$/, "");
+    if (_acBlobUrl) { try { URL.revokeObjectURL(_acBlobUrl); } catch {} _acBlobUrl = ""; }
+    _acBlobUrl = URL.createObjectURL(file);
+    if (_acAudio) { _acAudio.pause(); _acAudio = null; }
+    _acAudio = new Audio(_acBlobUrl);
+    _acAudio.onloadedmetadata = () => {
+        _acTotalDur = Math.max(10, Math.floor(_acAudio.duration || 60));
+        document.getElementById("ac-total-dur").innerText = _fmtSec(_acTotalDur);
+        _updateAcBoxUI();
+    };
+    const bars = document.getElementById("ac-wave-bars");
+    if (bars) bars.innerHTML = Array.from({ length: 40 }, () => `<span class="w-1 bg-blue-400/75 rounded-full" style="height:${20 + Math.floor(Math.random()*70)}%"></span>`).join("");
+    _bindAcDrag();
+    _updateAcBoxUI();
+    document.getElementById("modal-audio-cropper").classList.remove("hide");
+    if (typeof pushBackGuard === "function") pushBackGuard();
+}
+
+function setAudioClipDuration(sec) {
+    _acDuration = sec;
+    document.querySelectorAll(".ac-dur-btn").forEach(b => {
+        b.className = `ac-dur-btn px-2.5 py-1 rounded-lg text-[11px] font-bold ${Number(b.dataset.dur) === sec ? "gold-pill-btn" : "app-btn-sec"}`;
     });
-
-    if (guestAudio && guestAudioCandidates.length) {
-        guestAudio.muted = false;
-        guestAudio.volume = 1;
-        guestAudioStarted = true;
-        playAudioElementWithFallback(guestAudio, guestAudioCandidates, () => {
-            syncGuestMusicBtnState(false);
-        }, guestAudioRawUrl);
-    }
-
-    setTimeout(() => {
-        cover.classList.add("hide"); ov.style.overflowY = "auto"; ov.scrollTo(0, 0);
-        updateGuestScrollInteractiveEffects(); startWishHorizontalAutoScroll();
-    }, 950);
+    _updateAcBoxUI();
 }
-function toggleGuestMusic() {
-    if (!guestAudio || !guestAudioCandidates.length) return showToast("Musik belum diatur untuk undangan ini.", "info");
-    if (guestAudio.paused) {
-        guestAudio.muted = false;
-        guestAudio.volume = 1;
-        if (!guestAudioStarted || guestAudio.error) {
-            guestAudioStarted = true;
-            playAudioElementWithFallback(guestAudio, guestAudioCandidates, () => {
-                syncGuestMusicBtnState(false);
-                showToast("Audio gagal diputar dari sumber lagu ini.", "error");
-            }, guestAudioRawUrl);
-        } else {
-            guestAudio.play().catch(() => {
-                playAudioElementWithFallback(guestAudio, guestAudioCandidates, () => {
-                    syncGuestMusicBtnState(false);
-                    showToast("Audio gagal diputar dari sumber lagu ini.", "error");
-                }, guestAudioRawUrl);
+
+function toggleAudioCropPreview() {
+    if (!_acAudio) return;
+    if (_acAudio.paused) {
+        _acAudio.currentTime = _acStartSec;
+        _acAudio.play().catch(() => {});
+        clearInterval(_acPlayTimer);
+        _acPlayTimer = setInterval(() => {
+            if (!_acAudio || _acAudio.paused) return;
+            const clipLen = Math.min(_acTotalDur, _acDuration);
+            const rel = _acAudio.currentTime - _acStartSec;
+            if (rel >= clipLen) _acAudio.currentTime = _acStartSec;
+            const ph = document.getElementById("ac-playhead");
+            if (ph) ph.style.left = `${Math.max(0, Math.min(100, (rel / Math.max(1, clipLen)) * 100))}%`;
+        }, 120);
+    } else {
+        _acAudio.pause();
+        clearInterval(_acPlayTimer);
+    }
+}
+
+function closeAudioCropper() {
+    clearInterval(_acPlayTimer);
+    if (_acAudio) { _acAudio.pause(); _acAudio = null; }
+    if (_acBlobUrl) { try { URL.revokeObjectURL(_acBlobUrl); } catch {} _acBlobUrl = ""; }
+    document.getElementById("modal-audio-cropper")?.classList.add("hide");
+}
+
+async function _ensureLameJsReady() {
+    if (window.lamejs && window.lamejs.Mp3Encoder) return true;
+    const cdns = [
+        "https://cdn.jsdelivr.net/npm/lamejs@1.2.1/lame.min.js",
+        "https://unpkg.com/lamejs@1.2.1/lame.min.js"
+    ];
+    for (const url of cdns) {
+        try {
+            await loadScriptOnce(url);
+            if (window.lamejs && window.lamejs.Mp3Encoder) return true;
+        } catch {}
+    }
+    return false;
+}
+
+async function _sliceAudioFileDataUrl(file, startSec, clipSec) {
+    try {
+        await _ensureLameJsReady();
+        const AudioCtx = window.AudioContext || window.webkitAudioContext;
+        if (!AudioCtx) throw new Error("No AudioContext");
+        const arrBuf = await file.arrayBuffer();
+        const ctx = new AudioCtx();
+        const decoded = await ctx.decodeAudioData(arrBuf);
+        const origSr = decoded.sampleRate;
+        const hasMp3 = !!(window.lamejs && window.lamejs.Mp3Encoder);
+        const targetSr = hasMp3 ? 22050 : 11025;
+        const ratio = origSr / targetSr;
+        const startIdx = Math.max(0, Math.min(decoded.length - 1, Math.floor(startSec * origSr)));
+        const endIdx = Math.max(startIdx + origSr, Math.min(decoded.length, Math.floor((startSec + clipSec) * origSr)));
+        const outLen = Math.max(1, Math.floor((endIdx - startIdx) / ratio));
+
+        const ch0 = decoded.getChannelData(0);
+        const ch1 = decoded.numberOfChannels > 1 ? decoded.getChannelData(1) : ch0;
+        const monoSamples = new Int16Array(outLen);
+        for (let i = 0; i < outLen; i++) {
+            const srcIdx = Math.min(decoded.length - 1, startIdx + Math.floor(i * ratio));
+            const mixed = ((ch0[srcIdx] || 0) + (ch1[srcIdx] || 0)) * 0.5;
+            const s = Math.max(-1, Math.min(1, mixed));
+            monoSamples[i] = s < 0 ? s * 0x8000 : s * 0x7FFF;
+        }
+        if (ctx.close) ctx.close().catch(() => {});
+
+        if (hasMp3) {
+            const mp3enc = new window.lamejs.Mp3Encoder(1, targetSr, 80);
+            const mp3Data = [];
+            const sampleBlockSize = 1152;
+            for (let i = 0; i < monoSamples.length; i += sampleBlockSize) {
+                const chunk = monoSamples.subarray(i, i + sampleBlockSize);
+                const mp3buf = mp3enc.encodeBuffer(chunk);
+                if (mp3buf.length > 0) mp3Data.push(mp3buf);
+            }
+            const endBuf = mp3enc.flush();
+            if (endBuf.length > 0) mp3Data.push(endBuf);
+
+            let totalBytes = 0;
+            mp3Data.forEach(b => totalBytes += b.length);
+            const merged = new Uint8Array(totalBytes);
+            let pos = 0;
+            mp3Data.forEach(b => { merged.set(b, pos); pos += b.length; });
+
+            let bin = "";
+            const step = 0x8000;
+            for (let i = 0; i < merged.length; i += step) {
+                bin += String.fromCharCode.apply(null, merged.subarray(i, i + step));
+            }
+            return "data:audio/mpeg;base64," + btoa(bin);
+        }
+
+        const wavLen = 44 + monoSamples.length * 2;
+        const outBuf = new ArrayBuffer(wavLen);
+        const view = new DataView(outBuf);
+        const writeStr = (off, str) => { for (let i = 0; i < str.length; i++) view.setUint8(off + i, str.charCodeAt(i)); };
+        writeStr(0, "RIFF");
+        view.setUint32(4, 36 + monoSamples.length * 2, true);
+        writeStr(8, "WAVE");
+        writeStr(12, "fmt ");
+        view.setUint32(16, 16, true);
+        view.setUint16(20, 1, true);
+        view.setUint16(22, 1, true);
+        view.setUint32(24, targetSr, true);
+        view.setUint32(28, targetSr * 2, true);
+        view.setUint16(32, 2, true);
+        view.setUint16(34, 16, true);
+        writeStr(36, "data");
+        view.setUint32(40, monoSamples.length * 2, true);
+        let offset = 44;
+        for (let i = 0; i < monoSamples.length; i++) {
+            view.setInt16(offset, monoSamples[i], true);
+            offset += 2;
+        }
+        const bytes = new Uint8Array(outBuf);
+        let bin = "";
+        const chunk = 0x8000;
+        for (let i = 0; i < bytes.length; i += chunk) {
+            bin += String.fromCharCode.apply(null, bytes.subarray(i, i + chunk));
+        }
+        return "data:audio/wav;base64," + btoa(bin);
+    } catch {
+        return await new Promise((resolve) => {
+            const reader = new FileReader();
+            reader.onload = (e) => resolve(e.target.result);
+            reader.readAsDataURL(file);
+        });
+    }
+}
+
+async function processAndUploadCroppedAudio() {
+    if (!_acFile) return;
+    setBtnLoading("btn-save-audio-crop", true, "Memotong & Kompresi MP3...");
+    const clipLen = Math.min(_acTotalDur, _acDuration);
+    const songTitle = (document.getElementById("ac-song-title")?.value || "").trim() || _acFile.name.replace(/\.[^/.]+$/, "");
+    const audioDataUrl = await _sliceAudioFileDataUrl(_acFile, _acStartSec, clipLen);
+    setBtnLoading("btn-save-audio-crop", true, "Mengunggah Lagu...");
+    const up = await apiAction({ action: "upload_media", dataUrl: audioDataUrl, prefix: "audio_clip" });
+    setBtnLoading("btn-save-audio-crop", false);
+    if (up && up.ok && up.url) {
+        const localBlobUrl = dataUrlToBlobUrl(audioDataUrl) || audioDataUrl;
+        _audioBlobCache.set(up.url, localBlobUrl);
+        if (typeof wizardState !== "undefined") {
+            wizardState.customAudioUrl = up.url;
+            wizardState.customAudioTitle = songTitle;
+        }
+        if (!Array.isArray(db.musicLibrary)) db.musicLibrary = [];
+        if (!db.musicLibrary.some(m => m.url === up.url)) {
+            db.musicLibrary.unshift({
+                id: Date.now(),
+                title: songTitle,
+                category: (typeof wizardState !== "undefined" && wizardState.category) || "Pernikahan",
+                url: up.url
             });
+            apiAction({ action: "update_section", section: "musicLibrary", value: db.musicLibrary });
+            if (typeof populateMusicDropdown === "function") populateMusicDropdown(up.url);
         }
+        const st = document.getElementById("audio-upload-status");
+        if (st) {
+            st.innerText = `✓ Lagu "${songTitle}" (${_fmtSec(_acStartSec)}–${_fmtSec(_acStartSec + clipLen)}) siap & masuk stok lagu!`;
+            st.classList.remove("hide");
+        }
+        closeAudioCropper();
+        showToast("Potongan lagu MP3 tersimpan & otomatis masuk Stok Lagu!");
     } else {
-        guestAudio.dataset.wantPlay = "0";
-        guestAudio.pause();
+        showToast("Gagal mengunggah lagu. Pastikan koneksi stabil atau pilih durasi lebih singkat.", "error");
     }
-}
-function closeGuestInvitation() {
-    const ov = document.getElementById("guest-invitation-overlay");
-    ov.classList.add("hide"); ov.style.overflowY = "auto"; dismissDownloadPromo();
-    if (guestAudio) {
-        guestAudio.dataset.wantPlay = "0";
-        guestAudio.onerror = null;
-        guestAudio.onplay = null;
-        guestAudio.onpause = null;
-        try { guestAudio.pause(); } catch {}
-        guestAudio = null;
-    }
-    guestAudioCandidates = [];
-    guestAudioRawUrl = "";
-    guestAudioStarted = false;
-    syncGuestMusicBtnState(false);
-    document.getElementById("gv-hidden-audio-el")?.remove();
-    if (cdInterval) clearInterval(cdInterval);
-    if (wishAutoTimer) { clearInterval(wishAutoTimer); wishAutoTimer = null; }
-    if (scrollRafId) { cancelAnimationFrame(scrollRafId); scrollRafId = null; }
-    previewOpenCount++;
-    if (previewOpenCount >= 2 && !currentSessionUser && typeof maybeShowLoginReminder === "function") setTimeout(maybeShowLoginReminder, 600);
-}
-function openEventMap(t) { window.open((t === "resepsi" ? activeGuestInv.resepsiMap : activeGuestInv.akadMap) || "https://maps.google.com", "_blank"); }
-function saveEventToGoogleCalendar() {
-    const targetD = (activeGuestInv.category === "Pernikahan" && activeGuestInv.resepsiDate) ? activeGuestInv.resepsiDate : activeGuestInv.akadDate;
-    const d = (targetD || "2027-02-21").replace(/-/g, "");
-    window.open(`https://calendar.google.com/calendar/render?action=TEMPLATE&text=${encodeURIComponent(activeGuestInv.title)}&dates=${d}T020000Z/${d}T060000Z&location=${encodeURIComponent(activeGuestInv.resepsiVenue || activeGuestInv.akadVenue || "")}`, "_blank");
-}
-function startCountdown(ds) {
-    if (cdInterval) clearInterval(cdInterval);
-    const target = new Date((ds || "2027-02-21") + "T09:00:00").getTime();
-    const tick = () => {
-        const el = document.getElementById("cd-days"); if (!el) return;
-        const diff = Math.max(0, target - Date.now());
-        el.innerText = String(Math.floor(diff/86400000)).padStart(2,"0");
-        document.getElementById("cd-hours").innerText = String(Math.floor((diff/3600000)%24)).padStart(2,"0");
-        document.getElementById("cd-mins").innerText = String(Math.floor((diff/60000)%60)).padStart(2,"0");
-        document.getElementById("cd-secs").innerText = String(Math.floor((diff/1000)%60)).padStart(2,"0");
-    };
-    tick(); cdInterval = setInterval(tick, 1000);
-}
-async function previewGuestWishPhoto(inp) {
-    if (!inp.files[0]) return; showLoading("Memproses foto...");
-    const b64 = await quickResizeImage(inp.files[0], 640, 0.80);
-    if (activeGuestInv.id !== "demo") { const up = await apiAction({ action:"upload_media", dataUrl:b64, prefix:"wish" }); tempWishPhoto = (up && up.ok && up.url) ? up.url : b64; }
-    else tempWishPhoto = b64;
-    hideLoading();
-    const img = document.getElementById("w-photo-preview"); img.src = tempWishPhoto; img.classList.remove("hide");
-}
-async function submitGuestWish(e) {
-    e.preventDefault(); setBtnLoading("btn-send-wish", true, "Mengirim...");
-    const wish = { id:Date.now(), name:document.getElementById("w-sender-name").value.trim(), rsvp:document.getElementById("w-sender-rsvp").value, msg:document.getElementById("w-sender-msg").value.trim(), photo:tempWishPhoto||null, time:new Date().toLocaleTimeString("id-ID",{hour:"2-digit",minute:"2-digit"}), replies:[] };
-    document.getElementById("w-sender-msg").value = ""; document.getElementById("w-photo-preview").classList.add("hide"); tempWishPhoto = "";
-    if (activeGuestInv.id === "demo") { activeGuestInv.wishes.unshift(wish); setBtnLoading("btn-send-wish", false); renderGuestWishes(); return showToast("Ucapan ditambahkan di mode preview!"); }
-    const res = await apiAction({ action:"add_wish", invId:activeGuestInv.id, wish });
-    setBtnLoading("btn-send-wish", false);
-    if (res && res.invitation) activeGuestInv = res.invitation;
-    else { if (!activeGuestInv.wishes) activeGuestInv.wishes = []; activeGuestInv.wishes.unshift(wish); }
-    renderGuestWishes(); showToast("Terima kasih atas ucapan & doa Anda!");
-}
-function renderGuestWishes() {
-    const el = document.getElementById("gv-wishes-feed"); if (!el) return;
-
-    const savedReplyDrafts = {};
-    const prevScrollLeft = el.scrollLeft || 0;
-    el.querySelectorAll('input[id^="rep-inp-"]').forEach((inp) => {
-        if (inp.value) savedReplyDrafts[inp.id] = inp.value;
-    });
-
-    const list = activeGuestInv.wishes || [];
-    el.innerHTML = !list.length ? `<p class="text-xs opacity-60 text-center w-full py-4">Jadilah yang pertama mengirim ucapan &amp; doa.</p>` : list.map(w => `
-        <div class="wish-card-h text-left">
-            <div class="space-y-2">
-                <div class="flex justify-between items-start gap-2">
-                    <div class="min-w-0"><span class="font-bold text-xs th-accent block truncate">${escHtml(w.name)}</span><span class="text-[9px] opacity-60">${escHtml(w.time||"")}</span></div>
-                    <span class="text-[9px] px-2 py-0.5 rounded-full border border-current/25 font-bold whitespace-nowrap">${escHtml(w.rsvp)}</span>
-                </div>
-                <p class="text-xs opacity-90 leading-relaxed whitespace-normal break-words">${escHtml(w.msg)}</p>
-                ${w.photo ? `<div class="wish-photo-box"><img src="${w.photo}" loading="lazy"></div>` : ""}
-                ${(w.replies||[]).length ? `<div class="space-y-1 pl-2.5 border-l border-current/25">${w.replies.map(r=>`<div class="text-[10px] opacity-85"><strong>${escHtml(r.author)}:</strong> ${escHtml(r.text)}</div>`).join("")}</div>` : ""}
-            </div>
-            <div class="flex gap-1.5 pt-1">
-                <input type="text" id="rep-inp-${w.id}" placeholder="Balas..." class="flex-1 px-2.5 py-1.5 bg-white/10 border border-white/15 rounded-lg text-[11px]">
-                <button onclick="replyWish(${w.id},this)" class="th-btn-primary px-2.5 py-1 text-[10px]">Balas</button>
-            </div>
-        </div>
-    `).join("");
-
-    Object.keys(savedReplyDrafts).forEach((inpId) => {
-        const target = document.getElementById(inpId);
-        if (target) target.value = savedReplyDrafts[inpId];
-    });
-    if (prevScrollLeft > 0) el.scrollLeft = prevScrollLeft;
-    startWishHorizontalAutoScroll();
-}
-async function replyWish(wishId, btn) {
-    const inp = document.getElementById(`rep-inp-${wishId}`); if (!inp || !inp.value.trim()) return;
-    setBtnLoading(btn, true, "...");
-    const u = getCurrentUserObj(), reply = { author:(u&&u.name)||document.getElementById("w-sender-name").value||"Tamu", text:inp.value.trim() };
-    inp.value = "";
-    if (activeGuestInv.id === "demo") { const w = activeGuestInv.wishes.find(x => x.id === wishId); if (w) { if (!w.replies) w.replies = []; w.replies.push(reply); } return renderGuestWishes(); }
-    const res = await apiAction({ action:"reply_wish", invId:activeGuestInv.id, wishId, reply });
-    if (res && res.invitation) activeGuestInv = res.invitation;
-    renderGuestWishes();
 }
