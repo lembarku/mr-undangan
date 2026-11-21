@@ -8,7 +8,7 @@ let wizardState = {
     customAudioUrl: "", customAudioTitle: "", hiddenFields: [],
     sections: { sesi2: true, story: true, bank: true, music: true, closing: true }
 };
-let previewAudio = null, invDraftSaveTimer = null;
+let previewAudio = null, previewAudioToken = 0, invDraftSaveTimer = null;
 
 function getDefaultOpeningText(cat, tObj = null) {
     if (cat === "Pernikahan") return {
@@ -42,23 +42,45 @@ function getDefaultClosingText(cat) {
     return { title: "Terima Kasih", text: "Demikian undangan ini kami sampaikan. Besar harapan kami atas kehadiran Bapak/Ibu/Saudara/i demi kelancaran dan kebersamaan acara ini." };
 }
 
-// Helper pemutar audio multi-jalur cadangan (tahan blokir Google Drive di iPhone/Chrome terbaru)
 function getSafeAudioCandidates(rawUrl) {
     if (typeof getAudioUrlCandidates === "function") return getAudioUrlCandidates(rawUrl);
     return rawUrl ? [String(rawUrl).trim()] : [];
 }
 
-function playAudioElementWithFallback(audioEl, candidates, onAllFail) {
+function playAudioElementWithFallback(audioEl, candidates, onAllFail, rawUrl = "") {
     if (!audioEl || !candidates || !candidates.length) {
         if (onAllFail) onAllFail();
         return;
     }
     let idx = 0;
+    let blobTried = false;
     audioEl.dataset.wantPlay = "1";
+
+    const tryBlobFallback = async () => {
+        if (blobTried || typeof fetchAudioAsBlobUrl !== "function") {
+            if (audioEl.dataset.wantPlay === "1" && onAllFail) onAllFail();
+            return;
+        }
+        blobTried = true;
+        const blobUrl = await fetchAudioAsBlobUrl(rawUrl, candidates);
+        if (audioEl.dataset.wantPlay !== "1") return;
+        if (blobUrl) {
+            audioEl.src = blobUrl;
+            try { audioEl.load(); } catch {}
+            const p = audioEl.play();
+            if (p && typeof p.catch === "function") {
+                p.catch((err) => {
+                    if (err && err.name !== "NotAllowedError" && onAllFail) onAllFail();
+                });
+            }
+        } else if (onAllFail) {
+            onAllFail();
+        }
+    };
 
     const tryCurrent = () => {
         if (idx >= candidates.length) {
-            if (onAllFail) onAllFail();
+            tryBlobFallback();
             return;
         }
         audioEl.src = candidates[idx];
@@ -66,10 +88,12 @@ function playAudioElementWithFallback(audioEl, candidates, onAllFail) {
         const p = audioEl.play();
         if (p && typeof p.catch === "function") {
             p.catch((err) => {
-                // Jika error bukan karena kebijakan klik autoplay browser, coba jalur cadangan berikutnya
-                if (err && err.name !== "NotAllowedError" && idx + 1 < candidates.length) {
+                if (err && err.name === "NotAllowedError") return;
+                if (idx + 1 < candidates.length) {
                     idx++;
                     tryCurrent();
+                } else {
+                    tryBlobFallback();
                 }
             });
         }
@@ -83,8 +107,8 @@ function playAudioElementWithFallback(audioEl, candidates, onAllFail) {
                 audioEl.src = candidates[idx];
                 try { audioEl.load(); } catch {}
             }
-        } else if (audioEl.dataset.wantPlay === "1" && onAllFail) {
-            onAllFail();
+        } else if (audioEl.dataset.wantPlay === "1") {
+            tryBlobFallback();
         }
     };
 
@@ -94,6 +118,7 @@ function playAudioElementWithFallback(audioEl, candidates, onAllFail) {
 // ================= 1. WIZARD UNDANGAN =================
 function getSelectedThemeObj() { return findThemeObject(wizardState.category, wizardState.theme); }
 function stopPreviewAudio() {
+    previewAudioToken++;
     if (previewAudio) {
         previewAudio.dataset.wantPlay = "0";
         previewAudio.onerror = null;
@@ -108,17 +133,30 @@ async function togglePreviewSelectedSong() {
     if (!rawUrl) return showToast("Pilih stok lagu atau upload & potong lagu terlebih dahulu.", "info");
     if (previewAudio && !previewAudio.paused) return stopPreviewAudio();
     stopPreviewAudio();
+    const myToken = previewAudioToken;
     const candidates = getSafeAudioCandidates(rawUrl);
     if (!candidates.length) return showToast("Lagu gagal dimuat.", "error");
 
-    previewAudio = new Audio();
-    previewAudio.preload = "auto";
-    document.getElementById("btn-preview-song").innerHTML = `<i class="fa-solid fa-stop mr-1"></i> Stop`;
-    previewAudio.onended = stopPreviewAudio;
-    playAudioElementWithFallback(previewAudio, candidates, () => {
+    const b = document.getElementById("btn-preview-song");
+    if (b) b.innerHTML = `<i class="fa-solid fa-circle-notch fa-spin mr-1"></i> Memuat...`;
+
+    const el = new Audio();
+    el.preload = "auto";
+    el.onplaying = () => {
+        if (myToken !== previewAudioToken) return;
+        const btn = document.getElementById("btn-preview-song");
+        if (btn) btn.innerHTML = `<i class="fa-solid fa-stop mr-1"></i> Stop`;
+    };
+    el.onended = () => {
+        if (myToken === previewAudioToken) stopPreviewAudio();
+    };
+    previewAudio = el;
+
+    playAudioElementWithFallback(el, candidates, () => {
+        if (myToken !== previewAudioToken) return;
         stopPreviewAudio();
-        showToast("Gagal memutar audio. Pastikan link lagu bersifat publik.", "error");
-    });
+        showToast("Gagal memutar audio. Pastikan file lagu valid & dapat diakses publik.", "error");
+    }, rawUrl);
 }
 function populateMusicDropdown(selUrl = "") {
     const sel = document.getElementById("f-preset-audio"); if (!sel) return;
@@ -753,7 +791,7 @@ function launchSocialShare(p) {
 }
 
 // ================= 3. GUEST VIEW =================
-let activeGuestInv = null, guestAudio = null, guestAudioCandidates = [], guestAudioStarted = false;
+let activeGuestInv = null, guestAudio = null, guestAudioCandidates = [], guestAudioRawUrl = "", guestAudioStarted = false;
 let cdInterval = null, tempWishPhoto = "";
 let polaroidPhotos = [], polaroidIndex = 0, wishAutoTimer = null, wishScrollPaused = false;
 let promoShownThisView = false, promoTouchStartY = 0, activeThemeTransitionPref = "random", scrollRafId = null;
@@ -868,7 +906,6 @@ function syncGuestMusicBtnState(isPlaying) {
     if (btn) btn.style.opacity = isPlaying ? "1" : "0.65";
 }
 
-// Pemutar audio undangan sinkron + 3 jalur cadangan (aman untuk kebijakan autoplay iPhone & Chrome terbaru)
 function setupGuestInvitationAudio(audioUrl) {
     if (guestAudio) {
         guestAudio.dataset.wantPlay = "0";
@@ -879,7 +916,8 @@ function setupGuestInvitationAudio(audioUrl) {
         guestAudio = null;
     }
     document.getElementById("gv-hidden-audio-el")?.remove();
-    guestAudioCandidates = getSafeAudioCandidates(audioUrl);
+    guestAudioRawUrl = String(audioUrl || "").trim();
+    guestAudioCandidates = getSafeAudioCandidates(guestAudioRawUrl);
     guestAudioStarted = false;
     syncGuestMusicBtnState(false);
 
@@ -1254,7 +1292,6 @@ function buildCountdownAndLoc(inv, dp, isJawa = false, dpRes = null) {
     return `${cd}<section class="space-y-4">${jawaBar}<div class="scrub-el th-card p-5 space-y-2 text-center" data-scrub="${randScrubType()}"><h3 class="th-heading text-3xl">${inv.category==="Pernikahan"?"Akad Nikah":"Lokasi Acara"}</h3>${inv.akadVenue ? `<h4 class="font-bold text-sm">${escHtml(inv.akadVenue)}</h4>` : ""}<p class="text-xs opacity-80">${escHtml(inv.akadAddress)}</p><p class="text-xs font-bold">${dp.full} • ${escHtml(inv.akadTime)}</p><div class="flex gap-2 pt-2">${inv.akadMap?`<button onclick="openEventMap('akad')" class="flex-1 th-btn-primary py-2.5 text-xs uppercase">MAP</button>`:""}<button onclick="saveEventToGoogleCalendar()" class="flex-1 th-btn-outline py-2.5 text-xs uppercase">CALENDAR</button></div></div>${res}</section>`;
 }
 
-// Langsung putar lagu dalam satu tarikan klik (memenuhi kebijakan audio iOS Safari & Chrome)
 function unlockInvitationWithRandomFx() {
     const cover = document.getElementById("gv-cover-stage"), body = document.getElementById("gv-main-body"), ov = document.getElementById("guest-invitation-overlay");
     if (!cover || !body) return;
@@ -1273,7 +1310,7 @@ function unlockInvitationWithRandomFx() {
         guestAudioStarted = true;
         playAudioElementWithFallback(guestAudio, guestAudioCandidates, () => {
             syncGuestMusicBtnState(false);
-        });
+        }, guestAudioRawUrl);
     }
 
     setTimeout(() => {
@@ -1291,9 +1328,14 @@ function toggleGuestMusic() {
             playAudioElementWithFallback(guestAudio, guestAudioCandidates, () => {
                 syncGuestMusicBtnState(false);
                 showToast("Audio gagal diputar dari sumber lagu ini.", "error");
-            });
+            }, guestAudioRawUrl);
         } else {
-            guestAudio.play().catch(() => showToast("Ketuk tombol musik sekali lagi untuk memutar suara.", "info"));
+            guestAudio.play().catch(() => {
+                playAudioElementWithFallback(guestAudio, guestAudioCandidates, () => {
+                    syncGuestMusicBtnState(false);
+                    showToast("Audio gagal diputar dari sumber lagu ini.", "error");
+                }, guestAudioRawUrl);
+            });
         }
     } else {
         guestAudio.dataset.wantPlay = "0";
@@ -1312,6 +1354,7 @@ function closeGuestInvitation() {
         guestAudio = null;
     }
     guestAudioCandidates = [];
+    guestAudioRawUrl = "";
     guestAudioStarted = false;
     syncGuestMusicBtnState(false);
     document.getElementById("gv-hidden-audio-el")?.remove();
@@ -1362,7 +1405,6 @@ async function submitGuestWish(e) {
 function renderGuestWishes() {
     const el = document.getElementById("gv-wishes-feed"); if (!el) return;
 
-    // Amankan sementara ketikan balasan tamu yang belum terkirim agar tidak ikut terhapus
     const savedReplyDrafts = {};
     const prevScrollLeft = el.scrollLeft || 0;
     el.querySelectorAll('input[id^="rep-inp-"]').forEach((inp) => {
