@@ -1009,6 +1009,7 @@ function setupGuestInvitationAudio(audioUrl) {
     el.src = guestAudioCandidates[0];
     el.loop = true;
     el.preload = "auto";
+    el.autoplay = false;
     el.setAttribute("playsinline", "");
     el.style.display = "none";
     el.onplay = () => syncGuestMusicBtnState(true);
@@ -1397,7 +1398,7 @@ function unlockInvitationWithRandomFx() {
     setTimeout(() => {
         cover.classList.add("hide"); ov.style.overflowY = "auto"; ov.scrollTo(0, 0);
         updateGuestScrollInteractiveEffects(); startWishHorizontalAutoScroll();
-    }, 950);
+    }, 2450);
 }
 function toggleGuestMusic() {
     if (!guestAudio || !guestAudioCandidates.length) return showToast("Musik belum diatur untuk undangan ini.", "info");
