@@ -2,15 +2,21 @@
 <html lang="id" data-app-theme="light">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Mr Undangan — Powered by Kausar.pictures</title>
     <meta property="og:title" content="Mr Undangan — Undangan Digital & Berkas Profesional">
     <meta property="og:description" content="Buat undangan digital elegan, CV, dan surat lamaran kerja siap PDF langsung dari HP.">
-    <meta property="og:image" content="https://mr-undangan.netlify.app/logo.png">
+    <!-- GitHub Pages: ganti ./logo.png dengan URL lengkap https://username.github.io/nama-repo/logo.png jika ingin thumbnail logo muncul di preview WA -->
+    <meta property="og:image" content="./logo.png">
     <meta name="theme-color" content="#f2f2f7">
     <link rel="icon" type="image/png" href="./logo.png">
     <link rel="apple-touch-icon" href="./logo.png">
     <link rel="manifest" href="./manifest.json">
+
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link rel="preconnect" href="https://cdnjs.cloudflare.com" crossorigin>
+    <link rel="preconnect" href="https://cdn.jsdelivr.net" crossorigin>
 
     <script src="https://cdn.tailwindcss.com"></script>
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
@@ -20,7 +26,7 @@
     <link href="https://fonts.googleapis.com/css2?family=Alex+Brush&family=Amiri:wght@700&family=Cormorant+Garamond:ital,wght@0,600;0,700;1,500&family=Fredoka:wght@500;700&family=Great+Vibes&family=Montserrat:wght@400;600;700;800&family=Playfair+Display:ital,wght@0,600;0,700;1,500&family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="./css/styles.css">
     <style>
-        /* Bug 13: Kunci layar loading "Halo" seketika sebelum styles.css eksternal selesai dimuat */
+        /* Kunci layar loading "Halo" seketika sebelum styles.css eksternal selesai dimuat */
         #ios-hello-splash {
             position: fixed;
             inset: 0;
@@ -43,7 +49,7 @@
 </head>
 <body class="min-h-screen flex flex-col">
 
-    <!-- 1. LAYAR LOADING "HALO" BERGAYA iOS (LANGSUNG TAMPIL TANPA KOTAK HITAM - BUG 13) -->
+    <!-- 1. LAYAR LOADING "HALO" BERGAYA iOS -->
     <div id="ios-hello-splash">
         <svg viewBox="0 0 360 110" class="w-64 sm:w-80 h-auto overflow-visible">
             <text x="50%" y="76" text-anchor="middle" class="ios-hello-text">Halo</text>
@@ -233,7 +239,7 @@
     <main class="w-full max-w-6xl mx-auto flex-1 px-4 md:px-6 pt-3 pb-24">
 
         <!-- ========================================================= -->
-        <!-- 1. BERANDA / LANDING PAGE (REVISI 5: TANPA TOMBOL DI KARTU)-->
+        <!-- 1. BERANDA / LANDING PAGE                                 -->
         <!-- ========================================================= -->
         <section id="view-landing" class="space-y-5">
             <div class="promo-banner-frame">
@@ -275,7 +281,7 @@
                 <div id="landing-pf-shelf" class="h-shelf-track no-scrollbar"></div>
             </div>
 
-            <!-- ETALASE 3: SERTIFIKAT & PIAGAM (PAJANGAN / NEXT PROJECT - REVISI 16) -->
+            <!-- ETALASE 3: SERTIFIKAT & PIAGAM (PAJANGAN / NEXT PROJECT) -->
             <div id="sec-sertifikat" class="space-y-3 pt-1">
                 <div class="flex items-center justify-between gap-2">
                     <div>
@@ -344,7 +350,7 @@
         </section>
 
         <!-- ========================================================= -->
-        <!-- 2. PROFIL PENGGUNA (REVISI 15: JARAK RAPAT PROPORSIONAL)   -->
+        <!-- 2. PROFIL PENGGUNA                                        -->
         <!-- ========================================================= -->
         <section id="view-profile" class="hide space-y-2.5">
             <div class="app-card rounded-3xl border overflow-hidden shadow-sm relative">
@@ -400,7 +406,7 @@
         </section>
 
         <!-- ========================================================= -->
-        <!-- 3. PROFIL ADMIN CABANG (REVISI 15: JARAK RAPAT PROPORSIONAL)-->
+        <!-- 3. PROFIL ADMIN CABANG                                    -->
         <!-- ========================================================= -->
         <section id="view-cabang-admin" class="hide space-y-2.5">
             <div class="app-card rounded-3xl border overflow-hidden shadow-sm relative">
@@ -503,7 +509,7 @@
         </section>
 
         <!-- ========================================================= -->
-        <!-- 5. PROFIL ROLE ADMINISTRASI (BUG 21: CHAT & PROJECT MASUK)-->
+        <!-- 5. PROFIL ROLE ADMINISTRASI                               -->
         <!-- ========================================================= -->
         <section id="view-staff-admin" class="hide space-y-4">
             <div class="app-card rounded-3xl border p-5 shadow-md flex flex-wrap items-center justify-between gap-4">
@@ -804,7 +810,7 @@
         </section>
 
         <!-- ========================================================= -->
-        <!-- 9. DAFTAR TAMU & PORTAL MANDIRI CLIENT (BUG 17 APPLIED)   -->
+        <!-- 9. DAFTAR TAMU & PORTAL MANDIRI CLIENT                    -->
         <!-- ========================================================= -->
         <section id="view-guestlist" class="hide app-card border rounded-3xl p-5 md:p-7 shadow-xl space-y-5">
             <div id="gl-client-portal-banner" class="hide app-card-soft border-2 gold-border rounded-2xl p-4 space-y-3">
@@ -879,7 +885,7 @@
         </section>
     </main>
 
-<!-- ========================================================= -->
+    <!-- ========================================================= -->
     <!-- OVERLAY 1: GUEST VIEW UNDANGAN DIGITAL                    -->
     <!-- ========================================================= -->
     <div id="guest-invitation-overlay" class="hide fixed inset-0 z-50 bg-black/95 overflow-y-auto">
@@ -920,7 +926,7 @@
     </div>
 
     <!-- ========================================================= -->
-    <!-- OVERLAY 2: MENU TITIK 3 POPUP PENUH (BUG 3 & REVISI 4)    -->
+    <!-- OVERLAY 2: MENU TITIK 3 POPUP PENUH                       -->
     <!-- ========================================================= -->
     <div id="drawer-main" class="slide-drawer-backdrop" onclick="if(event.target===this)toggleSlideMenu(false)">
         <div class="slide-drawer-panel p-5 space-y-4">
@@ -931,7 +937,7 @@
 
             <div id="drawer-main-list" class="space-y-2.5 pb-10"></div>
 
-            <!-- Sub-Panel: Pengaturan Tema Warna iOS & Klasik (Revisi 4) -->
+            <!-- Sub-Panel: Pengaturan Tema Warna iOS & Klasik -->
             <div id="drawer-sub-theme" class="hide space-y-3 pb-10">
                 <button onclick="backToMainSlideMenu()" class="text-xs app-accent font-bold"><i class="fa-solid fa-chevron-left mr-1"></i>Pengaturan</button>
                 <p class="text-xs app-muted">Pilih tampilan warna aplikasi (default gaya Pengaturan iOS):</p>
@@ -1062,7 +1068,29 @@
         </div>
     </div>
 
-    <!-- Modal Form Tambah / Edit Album & Verifikasi Sandi/PIN Lama (Revisi 12) -->
+    <!-- Modal Pilihan Aksi Album Google Drive (Buka / Pengaturan & Hapus) -->
+    <div id="modal-drive-album-actions" class="hide fixed inset-0 z-[82] bg-black/75 backdrop-blur-sm flex items-center justify-center p-4">
+        <div class="app-card border rounded-3xl max-w-xs w-full p-5 space-y-4 shadow-2xl">
+            <div class="flex items-center gap-3 border-b gold-border pb-3">
+                <img id="da-modal-cover" src="./logo.png" class="w-11 h-11 rounded-xl object-cover border gold-border bg-black shrink-0">
+                <div class="flex-1 min-w-0">
+                    <span class="text-[9px] uppercase font-extrabold text-emerald-600 block">Album Google Drive</span>
+                    <h4 id="da-modal-title" class="font-extrabold text-sm truncate">Folder Drive</h4>
+                </div>
+                <button type="button" onclick="document.getElementById('modal-drive-album-actions').classList.add('hide')" class="w-8 h-8 rounded-full app-btn-sec flex items-center justify-center text-xs shrink-0"><i class="fa-solid fa-xmark"></i></button>
+            </div>
+            <div class="space-y-2">
+                <button type="button" onclick="openSelectedDriveAlbumUrl()" class="w-full gold-pill-btn py-2.5 rounded-xl text-xs flex items-center justify-center gap-1.5">
+                    <i class="fa-brands fa-google-drive"></i> Buka Folder Google Drive
+                </button>
+                <button type="button" id="da-modal-edit-btn" onclick="editSelectedDriveAlbum()" class="w-full app-btn-sec py-2.5 rounded-xl text-xs font-bold flex items-center justify-center gap-1.5">
+                    <i class="fa-solid fa-gear"></i> Pengaturan / Hapus Album
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Modal Form Tambah / Edit Album & Verifikasi Sandi/PIN Lama -->
     <div id="modal-album-form" class="hide fixed inset-0 z-[94] bg-black/80 backdrop-blur-sm flex items-center justify-center p-4">
         <form onsubmit="submitVaultAlbumForm(event)" autocomplete="off" class="app-card border rounded-3xl max-w-sm w-full p-6 space-y-3.5 shadow-2xl">
             <div class="flex justify-between items-center border-b gold-border pb-2.5">
@@ -1116,7 +1144,7 @@
         </div>
     </div>
 
-    <!-- Modal Isi Album Rahasia LAYAR PENUH ALA GALERI iPHONE (Revisi 11 & 12) -->
+    <!-- Modal Isi Album Rahasia LAYAR PENUH ALA GALERI iPHONE -->
     <div id="modal-secret-album" class="hide fixed inset-0 z-[88] bg-[var(--app-bg)] flex flex-col overflow-hidden">
         <div class="px-4 py-3 app-header border-b flex items-center justify-between gap-2 shrink-0 backdrop-blur-md">
             <div class="flex items-center gap-2.5 min-w-0">
@@ -1128,7 +1156,6 @@
                     <p id="sa-sub" class="text-[10px] app-muted truncate"></p>
                 </div>
             </div>
-            <!-- Revisi 12: Ikon Pengaturan saja di pojok kanan atas di dalam album -->
             <button id="sa-btn-settings" onclick="editActiveSecretAlbum()" class="w-9 h-9 rounded-full app-card border gold-border app-accent flex items-center justify-center text-sm shrink-0 shadow-sm" title="Pengaturan Album & Sandi">
                 <i class="fa-solid fa-gear"></i>
             </button>
@@ -1191,7 +1218,7 @@
         </div>
     </div>
 
-    <!-- Modal Pratinjau A4 CV / Surat Lamaran FULL PAS LAYAR HP TANPA TOMBOL X DI ATAS (Bug 14) -->
+    <!-- Modal Pratinjau A4 CV / Surat Lamaran FULL PAS LAYAR HP (Mendukung Cubit Zoom) -->
     <div id="modal-portfolio-preview" class="hide fixed inset-0 z-[95] bg-black/95 flex flex-col overflow-hidden">
         <div id="pfp-scroll-body" class="flex-1 overflow-y-auto overflow-x-hidden p-2 flex flex-col items-center justify-start">
             <div id="pfp-a4-mount" class="mx-auto"></div>
@@ -1199,7 +1226,7 @@
                 <button id="pfp-use-btn" onclick="usePreviewedPortfolioTheme()" class="hide flex-1 gold-pill-btn py-3 rounded-2xl text-xs shadow-lg"><i class="fa-solid fa-wand-magic-sparkles mr-1.5"></i>Pakai Desain Ini</button>
                 <button id="pfp-sempurnakan-btn" onclick="openSempurnakanFromPreview()" class="hide flex-1 bg-emerald-600 hover:bg-emerald-500 text-white py-3 rounded-2xl text-xs font-bold shadow-lg"><i class="fa-solid fa-file-pdf mr-1.5"></i>Sempurnakan &amp; PDF</button>
             </div>
-            <p class="text-[10px] text-zinc-400 pb-4 text-center">Tekan tombol <strong>Kembali (Back)</strong> pada HP untuk menutup pratinjau</p>
+            <p class="text-[10px] text-zinc-400 pb-4 text-center">Cubit layar untuk memperbesar • Tekan tombol <strong>Kembali (Back)</strong> untuk menutup</p>
         </div>
     </div>
 
@@ -1360,7 +1387,7 @@
         </form>
     </div>
 
-    <!-- MODAL LIVE CHAT LAYAR PENUH + TOMBOL + KONTAK BARU & HAPUS HISTORY (Revisi 22) -->
+    <!-- MODAL LIVE CHAT LAYAR PENUH + TOMBOL + KONTAK BARU & HAPUS HISTORY -->
     <div id="full-chat-overlay" class="hide fixed inset-0 z-[75] bg-black/80 backdrop-blur-md flex items-center justify-center p-0 sm:p-4">
         <div class="app-card w-full max-w-3xl h-full sm:h-[88vh] sm:rounded-3xl border flex flex-col overflow-hidden shadow-2xl relative">
             <div class="gold-gradient px-5 py-3.5 flex items-center justify-between shrink-0">
@@ -1385,7 +1412,7 @@
         </div>
     </div>
 
-    <!-- MODAL KONTAK BARU ALA WHATSAPP UNTUK MASTER & TIM ADMINISTRASI (Revisi 22) -->
+    <!-- MODAL KONTAK BARU ALA WHATSAPP UNTUK MASTER & TIM ADMINISTRASI -->
     <div id="modal-chat-contacts" class="hide fixed inset-0 z-[86] bg-black/80 backdrop-blur-sm flex items-center justify-center p-4">
         <div class="app-card border rounded-3xl max-w-md w-full max-h-[82vh] flex flex-col overflow-hidden shadow-2xl">
             <div class="px-5 py-3.5 border-b gold-border flex items-center justify-between shrink-0">
@@ -1451,6 +1478,23 @@
             <div class="flex gap-2.5">
                 <button type="button" onclick="closeAudioCropper()" class="flex-1 py-2.5 rounded-xl app-btn-sec text-xs font-bold">Batal</button>
                 <button type="button" id="btn-save-audio-crop" onclick="processAndUploadCroppedAudio()" class="flex-1 gold-pill-btn py-2.5 rounded-xl text-xs">Simpan Potongan Lagu</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- MODAL PENAMPIL BUKTI TRANSFER / SCREENSHOT AMAN (PENGGANTI WINDOW.DOCUMENT.WRITE) -->
+    <div id="modal-proof-viewer" class="hide fixed inset-0 z-[97] bg-black/90 backdrop-blur-md flex items-center justify-center p-4" onclick="if(event.target===this)this.classList.add('hide')">
+        <div class="app-card border rounded-3xl max-w-lg w-full overflow-hidden shadow-2xl flex flex-col max-h-[90vh]">
+            <div class="px-5 py-3.5 border-b gold-border flex items-center justify-between gap-2 shrink-0">
+                <h3 id="proof-viewer-title" class="font-bold text-sm truncate"><i class="fa-solid fa-receipt app-accent mr-1.5"></i>Bukti Pembayaran</h3>
+                <button type="button" onclick="document.getElementById('modal-proof-viewer').classList.add('hide')" class="w-8 h-8 rounded-full app-btn-sec flex items-center justify-center text-xs shrink-0"><i class="fa-solid fa-xmark"></i></button>
+            </div>
+            <div class="p-4 bg-black/90 flex-1 overflow-auto flex items-center justify-center">
+                <img id="proof-viewer-img" src="" alt="Bukti Pembayaran" class="max-w-full max-h-[68vh] object-contain rounded-xl border border-amber-400/50">
+            </div>
+            <div class="px-5 py-3 border-t gold-border flex justify-end gap-2 shrink-0">
+                <a id="proof-viewer-open-link" href="#" target="_blank" rel="noopener noreferrer" class="px-4 py-2 rounded-xl app-btn-sec text-xs font-bold"><i class="fa-solid fa-arrow-up-right-from-square mr-1"></i>Buka Ukuran Penuh</a>
+                <button type="button" onclick="document.getElementById('modal-proof-viewer').classList.add('hide')" class="gold-pill-btn px-5 py-2 rounded-xl text-xs">Tutup</button>
             </div>
         </div>
     </div>
