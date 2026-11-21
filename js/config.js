@@ -4,6 +4,7 @@
 const CLOUD_API_URL = "https://script.google.com/macros/s/AKfycbyHsITJ02tiA59p0QIXkOQaO3VnBFQmDBp-7iUHcUkmrYjlOtRVwxhlGZCzL4RLKKNW/exec";
 
 const SESSION_KEY = "MR_UNDANGAN_SESSION";
+const SESSION_TOKEN_KEY = "MR_UNDANGAN_SESSION_TOKEN";
 const DISPLAY_NAME_KEY = "MR_UNDANGAN_DISPLAY_NAME";
 const APP_THEME_KEY = "MR_UNDANGAN_APP_THEME";
 const PWA_REMIND_KEY = "MR_PWA_REMIND_TS";
@@ -262,6 +263,7 @@ function getLocalFallbackDB() {
 
 let db = getLocalFallbackDB();
 let currentSessionUser = localStorage.getItem(SESSION_KEY) || null;
+let currentSessionToken = localStorage.getItem(SESSION_TOKEN_KEY) || "";
 let guestChatId = localStorage.getItem(GUEST_CHAT_KEY);
 if (!guestChatId) {
     guestChatId = "tamu_" + Math.random().toString(36).slice(2, 8);
@@ -285,7 +287,6 @@ const fmtBytes = (b) => {
     if (n >= 1048576) return (n / 1048576).toFixed(1) + " MB";
     return Math.max(1, Math.round(n / 1024)) + " KB";
 };
-// Otomatis mendukung domain utama maupun subfolder GitHub Pages (misal username.github.io/nama-repo/)
 const getCleanBaseUrl = () => {
     const cleanPath = (window.location.pathname || "/").replace(/\/index\.html$/i, "/");
     return window.location.origin + (cleanPath.endsWith("/") ? cleanPath : cleanPath + "/");
@@ -630,7 +631,8 @@ async function fetchPublicCloud() {
 }
 
 async function fetchFullCloud() {
-    const j = await fetchJsonWithTimeout(`${CLOUD_API_URL}?action=get_full&username=${encodeURIComponent(currentSessionUser || "")}&t=${Date.now()}`, {}, 18000);
+    const url = `${CLOUD_API_URL}?action=get_full&username=${encodeURIComponent(currentSessionUser || "")}&token=${encodeURIComponent(currentSessionToken || "")}&guestId=${encodeURIComponent(guestChatId || "")}&t=${Date.now()}`;
+    const j = await fetchJsonWithTimeout(url, {}, 18000);
     if (j && j.ok && j.data) {
         applyServerDb(j.data);
         return true;
@@ -649,7 +651,12 @@ async function fetchClientPortalData(invId, key) {
 
 async function apiAction(payload) {
     const u = getCurrentUserObj();
-    const enriched = Object.assign({ actor: currentSessionUser || "", actorRole: (u && u.role) || "user" }, payload);
+    const enriched = Object.assign({
+        actor: currentSessionUser || "",
+        actorRole: (u && u.role) || "user",
+        token: currentSessionToken || "",
+        guestId: guestChatId || ""
+    }, payload);
     const j = await fetchJsonWithTimeout(CLOUD_API_URL, {
         method: "POST",
         headers: { "Content-Type": "text/plain;charset=utf-8" },
@@ -711,7 +718,6 @@ function quickResizeImage(file, maxSide = 820, quality = 0.80) {
     });
 }
 
-// Daftar jalur cadangan pemutar audio (tahan blokir redirect Google Drive di iPhone/Chrome terbaru)
 function getAudioUrlCandidates(url) {
     if (!url) return [];
     const raw = String(url).trim();
@@ -898,7 +904,6 @@ async function _ensureLameJsReady() {
     return false;
 }
 
-// Potong & kompresi audio ke MP3 80kbps mono (klip 90 detik hanya ~900KB, super ringan & stabil)
 async function _sliceAudioFileDataUrl(file, startSec, clipSec) {
     try {
         await _ensureLameJsReady();
