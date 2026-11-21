@@ -43,8 +43,21 @@ function getDefaultClosingText(cat) {
 }
 
 function getSafeAudioCandidates(rawUrl) {
-    if (typeof getAudioUrlCandidates === "function") return getAudioUrlCandidates(rawUrl);
-    return rawUrl ? [String(rawUrl).trim()] : [];
+    const cleanRaw = String(rawUrl || "").trim();
+    if (!cleanRaw) return [];
+    const list = [];
+    if (typeof _audioBlobCache !== "undefined" && _audioBlobCache && _audioBlobCache.has(cleanRaw)) {
+        const cached = _audioBlobCache.get(cleanRaw);
+        if (cached) list.push(cached);
+    }
+    if (typeof getAudioUrlCandidates === "function") {
+        getAudioUrlCandidates(cleanRaw).forEach((u) => {
+            if (u && !list.includes(u)) list.push(u);
+        });
+    } else if (!list.includes(cleanRaw)) {
+        list.push(cleanRaw);
+    }
+    return list;
 }
 
 function playAudioElementWithFallback(audioEl, candidates, onAllFail, rawUrl = "") {
@@ -54,23 +67,31 @@ function playAudioElementWithFallback(audioEl, candidates, onAllFail, rawUrl = "
     }
     let idx = 0;
     let blobTried = false;
+    let settled = false;
+
     audioEl.dataset.wantPlay = "1";
 
+    const markPlayingSuccess = () => {
+        settled = true;
+    };
+
     const tryBlobFallback = async () => {
+        if (settled || audioEl.dataset.wantPlay !== "1") return;
         if (blobTried || typeof fetchAudioAsBlobUrl !== "function") {
-            if (audioEl.dataset.wantPlay === "1" && onAllFail) onAllFail();
+            if (onAllFail) onAllFail();
             return;
         }
         blobTried = true;
         const blobUrl = await fetchAudioAsBlobUrl(rawUrl, candidates);
-        if (audioEl.dataset.wantPlay !== "1") return;
+        if (settled || audioEl.dataset.wantPlay !== "1") return;
         if (blobUrl) {
             audioEl.src = blobUrl;
             try { audioEl.load(); } catch {}
             const p = audioEl.play();
             if (p && typeof p.catch === "function") {
                 p.catch((err) => {
-                    if (err && err.name !== "NotAllowedError" && onAllFail) onAllFail();
+                    if (err && err.name === "NotAllowedError") return;
+                    if (onAllFail) onAllFail();
                 });
             }
         } else if (onAllFail) {
@@ -79,6 +100,7 @@ function playAudioElementWithFallback(audioEl, candidates, onAllFail, rawUrl = "
     };
 
     const tryCurrent = () => {
+        if (settled || audioEl.dataset.wantPlay !== "1") return;
         if (idx >= candidates.length) {
             tryBlobFallback();
             return;
@@ -88,6 +110,7 @@ function playAudioElementWithFallback(audioEl, candidates, onAllFail, rawUrl = "
         const p = audioEl.play();
         if (p && typeof p.catch === "function") {
             p.catch((err) => {
+                if (settled || audioEl.dataset.wantPlay !== "1") return;
                 if (err && err.name === "NotAllowedError") return;
                 if (idx + 1 < candidates.length) {
                     idx++;
@@ -99,15 +122,18 @@ function playAudioElementWithFallback(audioEl, candidates, onAllFail, rawUrl = "
         }
     };
 
+    const prevOnPlaying = audioEl.onplaying;
+    audioEl.onplaying = (ev) => {
+        markPlayingSuccess();
+        if (typeof prevOnPlaying === "function") prevOnPlaying(ev);
+    };
+
     audioEl.onerror = () => {
+        if (settled || audioEl.dataset.wantPlay !== "1") return;
         if (idx + 1 < candidates.length) {
             idx++;
-            if (audioEl.dataset.wantPlay === "1") tryCurrent();
-            else {
-                audioEl.src = candidates[idx];
-                try { audioEl.load(); } catch {}
-            }
-        } else if (audioEl.dataset.wantPlay === "1") {
+            tryCurrent();
+        } else {
             tryBlobFallback();
         }
     };
@@ -122,6 +148,7 @@ function stopPreviewAudio() {
     if (previewAudio) {
         previewAudio.dataset.wantPlay = "0";
         previewAudio.onerror = null;
+        previewAudio.onplaying = null;
         try { previewAudio.pause(); } catch {}
         previewAudio = null;
     }
@@ -142,6 +169,7 @@ async function togglePreviewSelectedSong() {
 
     const el = new Audio();
     el.preload = "auto";
+    el.setAttribute("playsinline", "");
     el.onplaying = () => {
         if (myToken !== previewAudioToken) return;
         const btn = document.getElementById("btn-preview-song");
