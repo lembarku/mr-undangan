@@ -42,10 +42,64 @@ function getDefaultClosingText(cat) {
     return { title: "Terima Kasih", text: "Demikian undangan ini kami sampaikan. Besar harapan kami atas kehadiran Bapak/Ibu/Saudara/i demi kelancaran dan kebersamaan acara ini." };
 }
 
+// Helper pemutar audio multi-jalur cadangan (tahan blokir Google Drive di iPhone/Chrome terbaru)
+function getSafeAudioCandidates(rawUrl) {
+    if (typeof getAudioUrlCandidates === "function") return getAudioUrlCandidates(rawUrl);
+    return rawUrl ? [String(rawUrl).trim()] : [];
+}
+
+function playAudioElementWithFallback(audioEl, candidates, onAllFail) {
+    if (!audioEl || !candidates || !candidates.length) {
+        if (onAllFail) onAllFail();
+        return;
+    }
+    let idx = 0;
+    audioEl.dataset.wantPlay = "1";
+
+    const tryCurrent = () => {
+        if (idx >= candidates.length) {
+            if (onAllFail) onAllFail();
+            return;
+        }
+        audioEl.src = candidates[idx];
+        try { audioEl.load(); } catch {}
+        const p = audioEl.play();
+        if (p && typeof p.catch === "function") {
+            p.catch((err) => {
+                // Jika error bukan karena kebijakan klik autoplay browser, coba jalur cadangan berikutnya
+                if (err && err.name !== "NotAllowedError" && idx + 1 < candidates.length) {
+                    idx++;
+                    tryCurrent();
+                }
+            });
+        }
+    };
+
+    audioEl.onerror = () => {
+        if (idx + 1 < candidates.length) {
+            idx++;
+            if (audioEl.dataset.wantPlay === "1") tryCurrent();
+            else {
+                audioEl.src = candidates[idx];
+                try { audioEl.load(); } catch {}
+            }
+        } else if (audioEl.dataset.wantPlay === "1" && onAllFail) {
+            onAllFail();
+        }
+    };
+
+    tryCurrent();
+}
+
 // ================= 1. WIZARD UNDANGAN =================
 function getSelectedThemeObj() { return findThemeObject(wizardState.category, wizardState.theme); }
 function stopPreviewAudio() {
-    if (previewAudio) { previewAudio.pause(); previewAudio = null; }
+    if (previewAudio) {
+        previewAudio.dataset.wantPlay = "0";
+        previewAudio.onerror = null;
+        try { previewAudio.pause(); } catch {}
+        previewAudio = null;
+    }
     const b = document.getElementById("btn-preview-song");
     if (b) b.innerHTML = `<i class="fa-solid fa-play mr-1"></i> Putar Preview`;
 }
@@ -53,12 +107,18 @@ async function togglePreviewSelectedSong() {
     const rawUrl = wizardState.customAudioUrl || document.getElementById("f-preset-audio").value;
     if (!rawUrl) return showToast("Pilih stok lagu atau upload & potong lagu terlebih dahulu.", "info");
     if (previewAudio && !previewAudio.paused) return stopPreviewAudio();
-    stopPreviewAudio(); setBtnLoading("btn-preview-song", true, "Memuat...");
-    const src = await resolveAudioUrl(rawUrl); setBtnLoading("btn-preview-song", false);
-    if (!src) return showToast("Lagu gagal dimuat.", "error");
-    previewAudio = new Audio(src); previewAudio.play().catch(() => showToast("Gagal memutar audio.", "error"));
+    stopPreviewAudio();
+    const candidates = getSafeAudioCandidates(rawUrl);
+    if (!candidates.length) return showToast("Lagu gagal dimuat.", "error");
+
+    previewAudio = new Audio();
+    previewAudio.preload = "auto";
     document.getElementById("btn-preview-song").innerHTML = `<i class="fa-solid fa-stop mr-1"></i> Stop`;
     previewAudio.onended = stopPreviewAudio;
+    playAudioElementWithFallback(previewAudio, candidates, () => {
+        stopPreviewAudio();
+        showToast("Gagal memutar audio. Pastikan link lagu bersifat publik.", "error");
+    });
 }
 function populateMusicDropdown(selUrl = "") {
     const sel = document.getElementById("f-preset-audio"); if (!sel) return;
@@ -439,7 +499,7 @@ async function saveInvitationDraft(e) {
     openUnifiedPayment("inv", newInv.id);
 }
 
-// ================= 2. DAFTAR TAMU & PORTAL MANDIRI CLIENT CABANG (BUG 17) =================
+// ================= 2. DAFTAR TAMU & PORTAL MANDIRI CLIENT CABANG =================
 let activeGlId = null, guestFilterMode = "all", guestSyncTimer = null;
 let sharePayload = { invId: null, guestName: "", text: "", url: "", img: "", title: "", confirmedSent: false };
 let activeClientShare = { url: "", waText: "" };
@@ -472,7 +532,6 @@ function copyClientPortalLinkOnly() { navigator.clipboard.writeText(activeClient
 function openClientPortalDirect() { if (activeClientShare.url) window.open(activeClientShare.url, "_blank"); }
 function sendClientPortalViaWA() { window.open(`https://wa.me/?text=${encodeURIComponent(activeClientShare.waText)}`, "_blank"); document.getElementById("modal-client-portal").classList.add("hide"); }
 
-// Bug 17: Tampilan halaman portal client cabang yang terisolasi bersih dengan kop cabang Powered by Mr Undangan
 function openClientPortalView(inv, brandName) {
     const cleanBrand = String(brandName || inv.brandName || "Mitra Cabang").trim();
     clientPortalState = { active: true, invId: inv.id, key: inv.clientKey || "", brandName: cleanBrand, invitation: inv };
@@ -694,7 +753,8 @@ function launchSocialShare(p) {
 }
 
 // ================= 3. GUEST VIEW =================
-let activeGuestInv = null, guestAudio = null, cdInterval = null, tempWishPhoto = "";
+let activeGuestInv = null, guestAudio = null, guestAudioCandidates = [], guestAudioStarted = false;
+let cdInterval = null, tempWishPhoto = "";
 let polaroidPhotos = [], polaroidIndex = 0, wishAutoTimer = null, wishScrollPaused = false;
 let promoShownThisView = false, promoTouchStartY = 0, activeThemeTransitionPref = "random", scrollRafId = null;
 
@@ -760,7 +820,6 @@ function openThemeLivePreview(cat, themeName, isDirectDemoLink = false) {
     openGuestViewWithObject(buildDemoInvitation(cat, themeName), "Tamu Kehormatan", isDirectDemoLink);
 }
 
-// Bug 19: Memastikan undangan asli hasil input/edit user yang dibuka tamu, bukan contoh bawaan
 async function openGuestView(invId, guestName = "Tamu Kehormatan") {
     let inv = (clientPortalState.active && clientPortalState.invitation && String(clientPortalState.invitation.id) === String(invId))
         ? clientPortalState.invitation
@@ -802,29 +861,42 @@ function buildAmbientShadowLayer(tObj, preset) {
     return `<div class="ambient-bg-layer" style="color:var(--th-accent);"><div class="ambient-leaf-a">${SVG_LEAF_SHADOW}</div><div class="ambient-leaf-b">${SVG_LEAF_SHADOW}</div></div>`;
 }
 
-// Bug 18: Pemutar audio undangan tangguh (HTML5 Audio + fallback elemen audio DOM & tombol play langsung)
+function syncGuestMusicBtnState(isPlaying) {
+    const btn = document.getElementById("gv-music-btn");
+    const icon = btn ? btn.querySelector("i") : null;
+    if (icon) icon.classList.toggle("spin-slow", !!isPlaying);
+    if (btn) btn.style.opacity = isPlaying ? "1" : "0.65";
+}
+
+// Pemutar audio undangan sinkron + 3 jalur cadangan (aman untuk kebijakan autoplay iPhone & Chrome terbaru)
 function setupGuestInvitationAudio(audioUrl) {
     if (guestAudio) {
+        guestAudio.dataset.wantPlay = "0";
+        guestAudio.onerror = null;
+        guestAudio.onplay = null;
+        guestAudio.onpause = null;
         try { guestAudio.pause(); } catch {}
         guestAudio = null;
     }
-    const oldTag = document.getElementById("gv-hidden-audio-el");
-    if (oldTag) oldTag.remove();
-    if (!audioUrl) return;
+    document.getElementById("gv-hidden-audio-el")?.remove();
+    guestAudioCandidates = getSafeAudioCandidates(audioUrl);
+    guestAudioStarted = false;
+    syncGuestMusicBtnState(false);
 
-    resolveAudioUrl(audioUrl).then(src => {
-        if (!src || !activeGuestInv) return;
-        const el = document.createElement("audio");
-        el.id = "gv-hidden-audio-el";
-        el.src = src;
-        el.loop = true;
-        el.preload = "auto";
-        el.setAttribute("playsinline", "");
-        el.style.display = "none";
-        document.body.appendChild(el);
-        guestAudio = el;
-        try { el.load(); } catch {}
-    });
+    if (!guestAudioCandidates.length) return;
+
+    const el = document.createElement("audio");
+    el.id = "gv-hidden-audio-el";
+    el.src = guestAudioCandidates[0];
+    el.loop = true;
+    el.preload = "auto";
+    el.setAttribute("playsinline", "");
+    el.style.display = "none";
+    el.onplay = () => syncGuestMusicBtnState(true);
+    el.onpause = () => syncGuestMusicBtnState(false);
+    document.body.appendChild(el);
+    guestAudio = el;
+    try { el.load(); } catch {}
 }
 
 function openGuestViewWithObject(inv, guestName, isDirectLink = false) {
@@ -878,23 +950,25 @@ function openGuestViewWithObject(inv, guestName, isDirectLink = false) {
     document.getElementById("gv-music-btn").classList.toggle("hide", !effectiveAudio);
     document.getElementById("gv-use-theme-btn").classList.toggle("hide", inv.id !== "demo");
 
+    const safeTitle = escHtml(inv.title || "");
+    const safeAge = escHtml(inv.age || "");
     let coverDecor = "", coverTitleHtml = "", coverBtnLabel = `<i class="fa-solid fa-envelope-open-text"></i> Buka Undangan`;
     if (isPremiumBlack || tObj.ornament === "floral_mono") {
         coverDecor = `<div class="absolute top-0 inset-x-0 z-20">${SVG_ROSES_MONO}</div><div class="absolute bottom-0 inset-x-0 z-20 rotate-180">${SVG_ROSES_MONO}</div>`;
-        coverTitleHtml = `<h1 class="font-script text-6xl text-white mt-2 drop-shadow-lg leading-tight">${inv.title.replace("&", "<br>&amp;")}</h1>`;
+        coverTitleHtml = `<h1 class="font-script text-6xl text-white mt-2 drop-shadow-lg leading-tight">${safeTitle.replace(/&amp;/, "<br>&amp;")}</h1>`;
         coverBtnLabel = `<i class="fa-solid fa-chevron-right text-[10px]"></i> BUKA UNDANGAN`;
     } else if (styleKey === "jawa" || tObj.ornament === "jawa") {
         coverDecor = `<div class="pt-4 relative z-20">${SVG_GUNUNGAN_JAWA}</div>`;
-        coverTitleHtml = `<span class="text-[11px] uppercase tracking-[0.3em] text-amber-300 font-bold">The Wedding Of</span><h1 class="th-heading text-5xl text-amber-300 mt-1">${inv.title}</h1>`;
+        coverTitleHtml = `<span class="text-[11px] uppercase tracking-[0.3em] text-amber-300 font-bold">The Wedding Of</span><h1 class="th-heading text-5xl text-amber-300 mt-1">${safeTitle}</h1>`;
     } else if (styleKey === "sulawesi" || tObj.ornament === "sulawesi") {
         coverDecor = `<div class="absolute inset-y-0 left-0 w-3 sulawesi-border z-20"></div><div class="absolute inset-y-0 right-0 w-3 sulawesi-border z-20"></div><div class="pt-4 relative z-20">${SVG_RUMAH_SULAWESI}</div>`;
-        coverTitleHtml = `<span class="text-[10px] uppercase tracking-[0.3em] text-yellow-300 font-bold">The Wedding Of</span><h1 class="th-heading text-5xl text-yellow-300 mt-1">${inv.title}</h1>`;
+        coverTitleHtml = `<span class="text-[10px] uppercase tracking-[0.3em] text-yellow-300 font-bold">The Wedding Of</span><h1 class="th-heading text-5xl text-yellow-300 mt-1">${safeTitle}</h1>`;
     } else if (styleKey === "batik") {
         coverDecor = `<div class="absolute top-0 inset-x-0 h-20 batik-pattern border-b-2 border-amber-400/60 rounded-b-[45%] z-10"></div><div class="absolute bottom-0 inset-x-0 h-20 batik-pattern border-t-2 border-amber-400/60 rounded-t-[45%] z-10"></div>`;
-        coverTitleHtml = `<span class="text-[10px] uppercase tracking-[0.35em] text-amber-300 font-bold">HAPPY WEDDING • SAVE THE DATE</span><h1 class="th-heading text-5xl text-amber-300 mt-2">${inv.title}</h1>`;
+        coverTitleHtml = `<span class="text-[10px] uppercase tracking-[0.35em] text-amber-300 font-bold">HAPPY WEDDING • SAVE THE DATE</span><h1 class="th-heading text-5xl text-amber-300 mt-2">${safeTitle}</h1>`;
     } else {
         const badgeTxt = inv.category === "Pernikahan" ? "THE WEDDING OF" : inv.category === "Ulang Tahun" ? "BIRTHDAY INVITATION" : inv.category === "Aqiqah" ? "TASYAKURAN AQIQAH" : inv.category === "Syukuran" ? (tObj.isKhitan ? "WALIMATUL KHITAN" : "UNDANGAN SYUKURAN") : "UNDANGAN RESMI";
-        coverTitleHtml = `<span class="text-[10px] uppercase tracking-[0.32em] text-amber-200 font-semibold">${badgeTxt}</span><h1 class="th-heading text-5xl md:text-6xl text-white mt-2 drop-shadow-lg">${inv.title}</h1>${inv.age?`<span class="inline-block mt-1 px-4 py-1 rounded-full bg-white/20 backdrop-blur text-white text-xs font-bold">${inv.category==="Ulang Tahun"?"Ke - "+inv.age:inv.age}</span>`:""}`;
+        coverTitleHtml = `<span class="text-[10px] uppercase tracking-[0.32em] text-amber-200 font-semibold">${badgeTxt}</span><h1 class="th-heading text-5xl md:text-6xl text-white mt-2 drop-shadow-lg">${safeTitle}</h1>${inv.age?`<span class="inline-block mt-1 px-4 py-1 rounded-full bg-white/20 backdrop-blur text-white text-xs font-bold">${inv.category==="Ulang Tahun"?"Ke - "+safeAge:safeAge}</span>`:""}`;
     }
 
     const coverHtml = `
@@ -904,7 +978,7 @@ function openGuestViewWithObject(inv, guestName, isDirectLink = false) {
             ${coverDecor}
             <div class="cover-inner relative z-20 flex-1 flex flex-col justify-between p-7 text-center text-white">
                 <div class="pt-4"><span class="text-[9px] uppercase tracking-[0.35em] text-white/80 font-semibold">${escHtml(brand.topLabel)}</span></div>
-                <div class="my-auto py-4 space-y-2">${coverTitleHtml}<p class="text-xs tracking-[0.2em] uppercase text-white/90 font-semibold pt-1">${coverDateFull}</p></div>
+                <div class="my-auto py-4 space-y-2">${coverTitleHtml}<p class="text-xs tracking-[0.2em] uppercase text-white/90 font-semibold pt-1">${escHtml(coverDateFull)}</p></div>
                 <div class="space-y-4 pb-8">
                     <div class="bg-black/45 backdrop-blur-md border border-white/25 rounded-2xl p-4 space-y-1">
                         <p class="text-[10px] text-white/75 uppercase tracking-wider">Kepada Yth. Bapak/Ibu/Saudara/i</p>
@@ -1180,8 +1254,8 @@ function buildCountdownAndLoc(inv, dp, isJawa = false, dpRes = null) {
     return `${cd}<section class="space-y-4">${jawaBar}<div class="scrub-el th-card p-5 space-y-2 text-center" data-scrub="${randScrubType()}"><h3 class="th-heading text-3xl">${inv.category==="Pernikahan"?"Akad Nikah":"Lokasi Acara"}</h3>${inv.akadVenue ? `<h4 class="font-bold text-sm">${escHtml(inv.akadVenue)}</h4>` : ""}<p class="text-xs opacity-80">${escHtml(inv.akadAddress)}</p><p class="text-xs font-bold">${dp.full} • ${escHtml(inv.akadTime)}</p><div class="flex gap-2 pt-2">${inv.akadMap?`<button onclick="openEventMap('akad')" class="flex-1 th-btn-primary py-2.5 text-xs uppercase">MAP</button>`:""}<button onclick="saveEventToGoogleCalendar()" class="flex-1 th-btn-outline py-2.5 text-xs uppercase">CALENDAR</button></div></div>${res}</section>`;
 }
 
-// Bug 18: Langsung putar lagu begitu tombol Buka Undangan diklik
-async function unlockInvitationWithRandomFx() {
+// Langsung putar lagu dalam satu tarikan klik (memenuhi kebijakan audio iOS Safari & Chrome)
+function unlockInvitationWithRandomFx() {
     const cover = document.getElementById("gv-cover-stage"), body = document.getElementById("gv-main-body"), ov = document.getElementById("guest-invitation-overlay");
     if (!cover || !body) return;
     body.classList.remove("hide");
@@ -1193,26 +1267,13 @@ async function unlockInvitationWithRandomFx() {
         cover.classList.add(chosen);
     });
 
-    if (guestAudio) {
+    if (guestAudio && guestAudioCandidates.length) {
         guestAudio.muted = false;
         guestAudio.volume = 1;
-        guestAudio.play().catch(() => {});
-    } else if (activeGuestInv) {
-        const effUrl = activeGuestInv.audioUrl || (db.musicLibrary && db.musicLibrary[0] && db.musicLibrary[0].url) || "";
-        if (effUrl) {
-            resolveAudioUrl(effUrl).then(src => {
-                if (!src) return;
-                const el = document.createElement("audio");
-                el.id = "gv-hidden-audio-el";
-                el.src = src;
-                el.loop = true;
-                el.setAttribute("playsinline", "");
-                el.style.display = "none";
-                document.body.appendChild(el);
-                guestAudio = el;
-                el.play().catch(() => {});
-            });
-        }
+        guestAudioStarted = true;
+        playAudioElementWithFallback(guestAudio, guestAudioCandidates, () => {
+            syncGuestMusicBtnState(false);
+        });
     }
 
     setTimeout(() => {
@@ -1221,14 +1282,38 @@ async function unlockInvitationWithRandomFx() {
     }, 950);
 }
 function toggleGuestMusic() {
-    if (!guestAudio) return showToast("Musik sedang dimuat atau belum diatur.", "info");
-    if (guestAudio.paused) guestAudio.play().catch(() => showToast("Ketuk layar sekali untuk mengaktifkan suara.", "info"));
-    else guestAudio.pause();
+    if (!guestAudio || !guestAudioCandidates.length) return showToast("Musik belum diatur untuk undangan ini.", "info");
+    if (guestAudio.paused) {
+        guestAudio.muted = false;
+        guestAudio.volume = 1;
+        if (!guestAudioStarted || guestAudio.error) {
+            guestAudioStarted = true;
+            playAudioElementWithFallback(guestAudio, guestAudioCandidates, () => {
+                syncGuestMusicBtnState(false);
+                showToast("Audio gagal diputar dari sumber lagu ini.", "error");
+            });
+        } else {
+            guestAudio.play().catch(() => showToast("Ketuk tombol musik sekali lagi untuk memutar suara.", "info"));
+        }
+    } else {
+        guestAudio.dataset.wantPlay = "0";
+        guestAudio.pause();
+    }
 }
 function closeGuestInvitation() {
     const ov = document.getElementById("guest-invitation-overlay");
     ov.classList.add("hide"); ov.style.overflowY = "auto"; dismissDownloadPromo();
-    if (guestAudio) { try { guestAudio.pause(); } catch {} guestAudio = null; }
+    if (guestAudio) {
+        guestAudio.dataset.wantPlay = "0";
+        guestAudio.onerror = null;
+        guestAudio.onplay = null;
+        guestAudio.onpause = null;
+        try { guestAudio.pause(); } catch {}
+        guestAudio = null;
+    }
+    guestAudioCandidates = [];
+    guestAudioStarted = false;
+    syncGuestMusicBtnState(false);
     document.getElementById("gv-hidden-audio-el")?.remove();
     if (cdInterval) clearInterval(cdInterval);
     if (wishAutoTimer) { clearInterval(wishAutoTimer); wishAutoTimer = null; }
@@ -1276,12 +1361,20 @@ async function submitGuestWish(e) {
 }
 function renderGuestWishes() {
     const el = document.getElementById("gv-wishes-feed"); if (!el) return;
+
+    // Amankan sementara ketikan balasan tamu yang belum terkirim agar tidak ikut terhapus
+    const savedReplyDrafts = {};
+    const prevScrollLeft = el.scrollLeft || 0;
+    el.querySelectorAll('input[id^="rep-inp-"]').forEach((inp) => {
+        if (inp.value) savedReplyDrafts[inp.id] = inp.value;
+    });
+
     const list = activeGuestInv.wishes || [];
     el.innerHTML = !list.length ? `<p class="text-xs opacity-60 text-center w-full py-4">Jadilah yang pertama mengirim ucapan &amp; doa.</p>` : list.map(w => `
         <div class="wish-card-h text-left">
             <div class="space-y-2">
                 <div class="flex justify-between items-start gap-2">
-                    <div class="min-w-0"><span class="font-bold text-xs th-accent block truncate">${escHtml(w.name)}</span><span class="text-[9px] opacity-60">${w.time||""}</span></div>
+                    <div class="min-w-0"><span class="font-bold text-xs th-accent block truncate">${escHtml(w.name)}</span><span class="text-[9px] opacity-60">${escHtml(w.time||"")}</span></div>
                     <span class="text-[9px] px-2 py-0.5 rounded-full border border-current/25 font-bold whitespace-nowrap">${escHtml(w.rsvp)}</span>
                 </div>
                 <p class="text-xs opacity-90 leading-relaxed whitespace-normal break-words">${escHtml(w.msg)}</p>
@@ -1294,6 +1387,12 @@ function renderGuestWishes() {
             </div>
         </div>
     `).join("");
+
+    Object.keys(savedReplyDrafts).forEach((inpId) => {
+        const target = document.getElementById(inpId);
+        if (target) target.value = savedReplyDrafts[inpId];
+    });
+    if (prevScrollLeft > 0) el.scrollLeft = prevScrollLeft;
     startWishHorizontalAutoScroll();
 }
 async function replyWish(wishId, btn) {
