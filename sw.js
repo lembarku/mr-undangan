@@ -1,24 +1,53 @@
-const CACHE_NAME = 'mr-undangan-cache-v3';
+// =========================================================================
+// MR UNDANGAN — SERVICE WORKER (PWA CACHE & OFFLINE RESILIENCE)
+// File: sw.js
+// =========================================================================
+const CACHE_NAME = 'mr-undangan-cache-v4';
 const STATIC_ASSETS = [
   './',
-  './index.html',
   './manifest.json',
   './logo.png',
-  './css/styles.css'
+  './css/styles.css',
+  './js/config.js',
+  './js/qris.js',
+  './js/vault.js',
+  './js/chat.js',
+  './js/portfolio.js',
+  './js/invitation.js',
+  './js/admin.js',
+  './js/app.js'
 ];
 
 self.addEventListener('install', (event) => {
   self.skipWaiting();
   event.waitUntil(
-    caches.open(CACHE_NAME).then((cache) => cache.addAll(STATIC_ASSETS)).catch(() => {})
+    caches.open(CACHE_NAME).then((cache) =>
+      Promise.allSettled(
+        STATIC_ASSETS.map((assetUrl) =>
+          fetch(assetUrl, { cache: 'no-cache' })
+            .then((res) => {
+              if (res && res.ok && !res.redirected) {
+                return cache.put(assetUrl, res);
+              }
+            })
+            .catch(() => {})
+        )
+      )
+    )
   );
 });
 
 self.addEventListener('activate', (event) => {
   event.waitUntil(
-    caches.keys().then((keys) =>
-      Promise.all(keys.filter((k) => k !== CACHE_NAME).map((k) => caches.delete(k)))
-    ).then(() => self.clients.claim())
+    caches.keys()
+      .then((keys) =>
+        Promise.all(
+          keys
+            .filter((k) => k !== CACHE_NAME)
+            .map((k) => caches.delete(k))
+        )
+      )
+      .then(() => self.clients.claim())
   );
 });
 
@@ -29,34 +58,51 @@ self.addEventListener('fetch', (event) => {
   const url = new URL(req.url);
   if (url.origin !== self.location.origin) return;
 
-  // Network-First untuk file kode agar update dari GitHub langsung masuk
-  const isCode = req.mode === 'navigate' || /\.(html|css|js|json)$/i.test(url.pathname);
-  if (isCode) {
+  // Jangan simpan sw.js ke dalam cache agar pembaruan Service Worker langsung terdeteksi
+  if (url.pathname.endsWith('/sw.js')) return;
+
+  const isNavigation = req.mode === 'navigate';
+  const isCode = /\.(html|css|js|json)$/i.test(url.pathname);
+
+  // Network-First untuk halaman utama & file kode agar update GitHub/Netlify langsung aktif
+  if (isNavigation || isCode) {
     event.respondWith(
       fetch(req)
         .then((res) => {
-          if (res && res.status === 200) {
-            const copy = res.clone();
-            caches.open(CACHE_NAME).then((cache) => cache.put(req, copy));
+          if (res && res.ok && res.type === 'basic' && !res.redirected) {
+            // Hindari menumpuk cache untuk URL tamu berparameter (?inv=, ?client=, ?demo=)
+            if (!isNavigation || !url.search) {
+              const copy = res.clone();
+              caches.open(CACHE_NAME).then((cache) => cache.put(req, copy)).catch(() => {});
+            }
           }
           return res;
         })
-        .catch(() => caches.match(req).then((r) => r || caches.match('./index.html')))
+        .catch(() =>
+          caches.match(req).then((cached) => {
+            if (cached) return cached;
+            if (isNavigation) return caches.match('./');
+            return new Response('', { status: 503, statusText: 'Offline' });
+          })
+        )
     );
     return;
   }
 
-  // Cache-First untuk gambar & aset statis
+  // Cache-First untuk logo, gambar & aset statis lokal
   event.respondWith(
     caches.match(req).then((cached) => {
-      if (cached) return cached;
-      return fetch(req).then((res) => {
-        if (res && res.status === 200) {
-          const copy = res.clone();
-          caches.open(CACHE_NAME).then((cache) => cache.put(req, copy));
-        }
-        return res;
-      });
+      const networkFetch = fetch(req)
+        .then((res) => {
+          if (res && res.ok && res.type === 'basic' && !res.redirected) {
+            const copy = res.clone();
+            caches.open(CACHE_NAME).then((cache) => cache.put(req, copy)).catch(() => {});
+          }
+          return res;
+        })
+        .catch(() => cached || new Response('', { status: 503, statusText: 'Offline' }));
+
+      return cached || networkFetch;
     })
   );
 });
