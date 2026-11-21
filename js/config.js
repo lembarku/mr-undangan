@@ -133,7 +133,7 @@ const PORTFOLIO_CATALOG = {
     ]
 };
 
-// ================= ETALASE 3: 6 DESAIN SERTIFIKAT PROFESIONAL (REVISI 16) =================
+// ================= ETALASE 3: 6 DESAIN SERTIFIKAT PROFESIONAL =================
 const CERT_SHOWCASE = [
     {
         id: "cert_formal_qr",
@@ -285,7 +285,11 @@ const fmtBytes = (b) => {
     if (n >= 1048576) return (n / 1048576).toFixed(1) + " MB";
     return Math.max(1, Math.round(n / 1024)) + " KB";
 };
-const getCleanBaseUrl = () => window.location.origin + "/";
+// Otomatis mendukung domain utama maupun subfolder GitHub Pages (misal username.github.io/nama-repo/)
+const getCleanBaseUrl = () => {
+    const cleanPath = (window.location.pathname || "/").replace(/\/index\.html$/i, "/");
+    return window.location.origin + (cleanPath.endsWith("/") ? cleanPath : cleanPath + "/");
+};
 const imgFbAttr = (fb) => `onerror="if(this.dataset.fb&&this.src!==this.dataset.fb){this.src=this.dataset.fb;this.dataset.fb='';}" data-fb="${esc(fb || IMG("1519741497674-611481863552"))}"`;
 
 function getDeterministicUniqueCode(docId) {
@@ -300,7 +304,10 @@ function loadScriptOnce(url) {
         const s = document.createElement("script");
         s.src = url; s.async = true;
         s.onload = () => resolve(true);
-        s.onerror = () => reject(new Error("Gagal memuat " + url));
+        s.onerror = () => {
+            delete _loadedScripts[url];
+            reject(new Error("Gagal memuat " + url));
+        };
         document.head.appendChild(s);
     });
     return _loadedScripts[url];
@@ -395,7 +402,7 @@ function cycleAppThemeQuick() {
     applyAppTheme(order[(order.indexOf(cur) + 1) % order.length], true);
 }
 
-// ================= HELPER USER, TEMA (PER-PRODUK - BUG 6), HARGA, FAVORIT =================
+// ================= HELPER USER, TEMA, HARGA, FAVORIT =================
 function getCurrentUserObj() {
     if (!currentSessionUser) return null;
     return (db.users || []).find(u => String(u.username || "").toLowerCase() === String(currentSessionUser).toLowerCase()) || null;
@@ -418,7 +425,6 @@ function deepCloneSafe(obj) {
     try { return JSON.parse(JSON.stringify(obj)); } catch { return Object.assign({}, obj); }
 }
 
-// Bug 6: Pastikan tiap tema memiliki objek demoPhotos & demoData terisolasi (tidak saling menimpa)
 function getMergedThemes(cat, includeHidden = false) {
     const builtIn = (THEME_CATALOG[cat] || []).map(t => {
         const baseT = deepCloneSafe(t);
@@ -678,7 +684,7 @@ function scheduleAdaptivePoll() {
     }, delay);
 }
 
-// ================= IMAGE RESIZER & CROPPER =================
+// ================= IMAGE RESIZER, AUDIO FALLBACK & CROPPER =================
 function quickResizeImage(file, maxSide = 820, quality = 0.80) {
     return new Promise((resolve) => {
         const reader = new FileReader();
@@ -705,15 +711,28 @@ function quickResizeImage(file, maxSide = 820, quality = 0.80) {
     });
 }
 
-// Bug 18: Normalisasi URL audio Drive/MP3 agar langsung terputar di browser HP
-async function resolveAudioUrl(url) {
-    if (!url) return "";
+// Daftar jalur cadangan pemutar audio (tahan blokir redirect Google Drive di iPhone/Chrome terbaru)
+function getAudioUrlCandidates(url) {
+    if (!url) return [];
     const raw = String(url).trim();
-    const m = raw.match(/drive\.google\.com\/(?:file\/d\/|uc\?(?:.*&)?id=|open\?id=)([a-zA-Z0-9_-]{15,})/);
+    if (!raw) return [];
+    if (raw.startsWith("data:audio/")) return [raw];
+    const m = raw.match(/(?:drive|docs)\.google\.com\/(?:file\/d\/|uc\?(?:.*&)?id=|open\?id=|download\?(?:.*&)?id=)([a-zA-Z0-9_-]{15,})/)
+        || raw.match(/drive\.usercontent\.google\.com\/download\?(?:.*&)?id=([a-zA-Z0-9_-]{15,})/);
     if (m) {
-        return `https://docs.google.com/uc?export=download&id=${m[1]}`;
+        const id = m[1];
+        return [
+            `https://drive.usercontent.google.com/download?id=${id}&export=download&confirm=t`,
+            `https://docs.google.com/uc?export=open&id=${id}`,
+            `https://drive.google.com/uc?export=download&id=${id}`
+        ];
     }
-    return raw;
+    return [raw];
+}
+
+async function resolveAudioUrl(url) {
+    const list = getAudioUrlCandidates(url);
+    return list[0] || "";
 }
 
 let _cropperInst = null, _cropCfg = { outW: 600, outH: 600, onDone: null };
@@ -750,8 +769,8 @@ function applyImageCrop() {
     if (cb && dataUrl) cb(dataUrl);
 }
 
-// ================= AUDIO CROPPER INTERAKTIF (BUG 8 & BUG 18 FIXED) =================
-let _acFile = null, _acDuration = 45, _acTotalDur = 60, _acStartSec = 0, _acAudio = null, _acPlayTimer = null;
+// ================= AUDIO CROPPER INTERAKTIF (MP3 RINGAN ANTI GAGAL UPLOAD) =================
+let _acFile = null, _acBlobUrl = "", _acDuration = 45, _acTotalDur = 60, _acStartSec = 0, _acAudio = null, _acPlayTimer = null;
 
 function _fmtSec(s) {
     const n = Math.max(0, Math.floor(s || 0));
@@ -812,9 +831,10 @@ function openAudioCropperFromInput(inp) {
     _acFile = file;
     _acStartSec = 0;
     document.getElementById("ac-song-title").value = file.name.replace(/\.[^/.]+$/, "");
-    const url = URL.createObjectURL(file);
+    if (_acBlobUrl) { try { URL.revokeObjectURL(_acBlobUrl); } catch {} _acBlobUrl = ""; }
+    _acBlobUrl = URL.createObjectURL(file);
     if (_acAudio) { _acAudio.pause(); _acAudio = null; }
-    _acAudio = new Audio(url);
+    _acAudio = new Audio(_acBlobUrl);
     _acAudio.onloadedmetadata = () => {
         _acTotalDur = Math.max(10, Math.floor(_acAudio.duration || 60));
         document.getElementById("ac-total-dur").innerText = _fmtSec(_acTotalDur);
@@ -825,6 +845,7 @@ function openAudioCropperFromInput(inp) {
     _bindAcDrag();
     _updateAcBoxUI();
     document.getElementById("modal-audio-cropper").classList.remove("hide");
+    if (typeof pushBackGuard === "function") pushBackGuard();
 }
 
 function setAudioClipDuration(sec) {
@@ -858,19 +879,37 @@ function toggleAudioCropPreview() {
 function closeAudioCropper() {
     clearInterval(_acPlayTimer);
     if (_acAudio) { _acAudio.pause(); _acAudio = null; }
+    if (_acBlobUrl) { try { URL.revokeObjectURL(_acBlobUrl); } catch {} _acBlobUrl = ""; }
     document.getElementById("modal-audio-cropper")?.classList.add("hide");
 }
 
-// Bug 8: Potong & kompresi audio menjadi MP3 ringan agar klip 90 detik selalu sukses diupload
+async function _ensureLameJsReady() {
+    if (window.lamejs && window.lamejs.Mp3Encoder) return true;
+    const cdns = [
+        "https://cdn.jsdelivr.net/npm/lamejs@1.2.1/lame.min.js",
+        "https://unpkg.com/lamejs@1.2.1/lame.min.js"
+    ];
+    for (const url of cdns) {
+        try {
+            await loadScriptOnce(url);
+            if (window.lamejs && window.lamejs.Mp3Encoder) return true;
+        } catch {}
+    }
+    return false;
+}
+
+// Potong & kompresi audio ke MP3 80kbps mono (klip 90 detik hanya ~900KB, super ringan & stabil)
 async function _sliceAudioFileDataUrl(file, startSec, clipSec) {
     try {
+        await _ensureLameJsReady();
         const AudioCtx = window.AudioContext || window.webkitAudioContext;
         if (!AudioCtx) throw new Error("No AudioContext");
         const arrBuf = await file.arrayBuffer();
         const ctx = new AudioCtx();
         const decoded = await ctx.decodeAudioData(arrBuf);
         const origSr = decoded.sampleRate;
-        const targetSr = 22050;
+        const hasMp3 = !!(window.lamejs && window.lamejs.Mp3Encoder);
+        const targetSr = hasMp3 ? 22050 : 11025;
         const ratio = origSr / targetSr;
         const startIdx = Math.max(0, Math.min(decoded.length - 1, Math.floor(startSec * origSr)));
         const endIdx = Math.max(startIdx + origSr, Math.min(decoded.length, Math.floor((startSec + clipSec) * origSr)));
@@ -887,8 +926,8 @@ async function _sliceAudioFileDataUrl(file, startSec, clipSec) {
         }
         if (ctx.close) ctx.close().catch(() => {});
 
-        if (window.lamejs && window.lamejs.Mp3Encoder) {
-            const mp3enc = new window.lamejs.Mp3Encoder(1, targetSr, 96);
+        if (hasMp3) {
+            const mp3enc = new window.lamejs.Mp3Encoder(1, targetSr, 80);
             const mp3Data = [];
             const sampleBlockSize = 1152;
             for (let i = 0; i < monoSamples.length; i += sampleBlockSize) {
@@ -953,10 +992,11 @@ async function _sliceAudioFileDataUrl(file, startSec, clipSec) {
 
 async function processAndUploadCroppedAudio() {
     if (!_acFile) return;
-    setBtnLoading("btn-save-audio-crop", true, "Memotong & Mengunggah...");
+    setBtnLoading("btn-save-audio-crop", true, "Memotong & Kompresi MP3...");
     const clipLen = Math.min(_acTotalDur, _acDuration);
     const songTitle = (document.getElementById("ac-song-title")?.value || "").trim() || _acFile.name.replace(/\.[^/.]+$/, "");
     const audioDataUrl = await _sliceAudioFileDataUrl(_acFile, _acStartSec, clipLen);
+    setBtnLoading("btn-save-audio-crop", true, "Mengunggah Lagu...");
     const up = await apiAction({ action: "upload_media", dataUrl: audioDataUrl, prefix: "audio_clip" });
     setBtnLoading("btn-save-audio-crop", false);
     if (up && up.ok && up.url) {
@@ -981,8 +1021,8 @@ async function processAndUploadCroppedAudio() {
             st.classList.remove("hide");
         }
         closeAudioCropper();
-        showToast("Potongan lagu tersimpan & otomatis masuk Stok Lagu!");
+        showToast("Potongan lagu MP3 tersimpan & otomatis masuk Stok Lagu!");
     } else {
-        showToast("Gagal mengunggah lagu. Pastikan koneksi stabil.", "error");
+        showToast("Gagal mengunggah lagu. Pastikan koneksi stabil atau pilih durasi lebih singkat.", "error");
     }
 }
