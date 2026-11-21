@@ -24,7 +24,8 @@ async function loadUserVault(username, force = false) {
     if (!uname) return null;
     if (!force && vaultCache[uname]) return vaultCache[uname];
     try {
-        const res = await fetch(`${CLOUD_API_URL}?action=get_vault&username=${encodeURIComponent(uname)}&t=${Date.now()}`, { cache: "no-store" });
+        const tok = (typeof currentSessionToken !== "undefined" && currentSessionToken) ? currentSessionToken : "";
+        const res = await fetch(`${CLOUD_API_URL}?action=get_vault&username=${encodeURIComponent(uname)}&token=${encodeURIComponent(tok)}&t=${Date.now()}`, { cache: "no-store" });
         const json = await res.json();
         if (json && json.ok && json.vault) {
             vaultCache[uname] = {
@@ -56,12 +57,13 @@ async function renderProfileAlbumHighlights(containerId, countLblId, username) {
 
     box.innerHTML = buildAddHighlightTileHtml() + albums.map(alb => {
         const isSecret = alb.type === "secret";
+        const isLocked = !!(alb.pinEnabled && (alb.pin || alb.hasPin));
         const cov = alb.cover || (alb.photos && alb.photos[0] && alb.photos[0].url) || "";
         const inner = cov
             ? `<img src="${cov}" class="w-full h-full object-cover rounded-[0.95rem]">`
             : `<div class="w-full h-full rounded-[0.95rem] app-card-soft flex items-center justify-center text-2xl app-accent"><i class="fa-${isSecret ? "solid fa-vault" : "brands fa-google-drive"}"></i></div>`;
         const badgeIcon = isSecret
-            ? (alb.pinEnabled ? `<span class="absolute bottom-1 right-1 w-5 h-5 rounded-md bg-black/75 text-amber-300 text-[9px] flex items-center justify-center"><i class="fa-solid fa-lock"></i></span>` : `<span class="absolute bottom-1 right-1 w-5 h-5 rounded-md bg-black/70 text-white text-[9px] flex items-center justify-center"><i class="fa-solid fa-images"></i></span>`)
+            ? (isLocked ? `<span class="absolute bottom-1 right-1 w-5 h-5 rounded-md bg-black/75 text-amber-300 text-[9px] flex items-center justify-center"><i class="fa-solid fa-lock"></i></span>` : `<span class="absolute bottom-1 right-1 w-5 h-5 rounded-md bg-black/70 text-white text-[9px] flex items-center justify-center"><i class="fa-solid fa-images"></i></span>`)
             : `<span class="absolute bottom-1 right-1 w-5 h-5 rounded-md bg-white/90 text-emerald-600 text-[9px] flex items-center justify-center shadow"><i class="fa-brands fa-google-drive"></i></span>`;
 
         return `
@@ -98,7 +100,7 @@ function openAlbumFormModal(type, editAlb = null) {
     const isSecret = type === "secret";
     const curU = getCurrentUserObj();
     const isMaster = curU && curU.role === "master";
-    const hasExistingPin = !!(isSecret && editAlb && editAlb.pinEnabled && editAlb.pin && !isMaster);
+    const hasExistingPin = !!(isSecret && editAlb && editAlb.pinEnabled && (editAlb.pin || editAlb.hasPin) && !isMaster);
 
     afTempCoverUrl = editAlb ? (editAlb.cover || "") : "";
     document.getElementById("af-title-head").innerText = editAlb
@@ -114,7 +116,6 @@ function openAlbumFormModal(type, editAlb = null) {
     document.getElementById("af-drive-url").required = !isSecret;
     document.getElementById("af-pin-wrap").classList.toggle("hide", !isSecret);
 
-    // Jika album rahasia sudah ber-PIN, wajib masukkan sandi/PIN lama saat membuka pengaturan album
     const oldPinWrap = document.getElementById("af-old-pin-wrap");
     const oldPinInp = document.getElementById("af-old-pin-val");
     if (oldPinWrap && oldPinInp) {
@@ -126,7 +127,7 @@ function openAlbumFormModal(type, editAlb = null) {
     const pinOn = !!(isSecret && editAlb && editAlb.pinEnabled);
     document.getElementById("af-pin-toggle").checked = pinOn;
     document.getElementById("af-pin-input-box").classList.toggle("hide", !pinOn);
-    document.getElementById("af-pin-val").value = (pinOn && editAlb && editAlb.pin) ? editAlb.pin : "";
+    document.getElementById("af-pin-val").value = (pinOn && isMaster && editAlb && editAlb.pin) ? editAlb.pin : "";
 
     const delBtn = document.getElementById("btn-af-delete");
     if (delBtn) delBtn.classList.toggle("hide", !editAlb);
@@ -170,20 +171,10 @@ async function submitVaultAlbumForm(e) {
 
     if (!title) return showToast("Nama album wajib diisi.", "error");
     if (type === "drive" && !/^https?:\/\//i.test(driveUrl)) return showToast("Masukkan link folder Google Drive yang valid (diawali https://).", "error");
-    if (pinEnabled && !/^\d{4}$/.test(pin)) return showToast("PIN baru wajib terdiri dari 4 angka.", "error");
+    if (pinEnabled && id && pin && !/^\d{4}$/.test(pin)) return showToast("PIN baru wajib terdiri dari 4 angka.", "error");
+    if (pinEnabled && !id && !/^\d{4}$/.test(pin)) return showToast("PIN wajib terdiri dari 4 angka.", "error");
 
     const owner = (activeVaultOwner || currentSessionUser || "").toLowerCase();
-    const v = vaultCache[owner];
-    const curU = getCurrentUserObj();
-    const isMaster = curU && curU.role === "master";
-
-    if (id && v && !isMaster && type === "secret") {
-        const existing = (v.albums || []).find(a => String(a.id) === String(id));
-        if (existing && existing.pinEnabled && existing.pin && oldPin !== String(existing.pin)) {
-            return showToast("Sandi/PIN lama salah! Masukkan 4 angka PIN lama terlebih dahulu.", "error");
-        }
-    }
-
     setBtnLoading("btn-af-save", true, "Menyimpan...");
     const res = await apiAction({
         action: "upsert_vault_album",
@@ -219,7 +210,6 @@ function handleHighlightClick(uname, albId) {
     const isOwner = curU && String(curU.username || "").toLowerCase() === ownerKey;
     const isMaster = curU && curU.role === "master";
 
-    // Album Google Drive: tampilkan popup aksi agar bisa dibuka ATAU diedit/dihapus
     if (alb.type === "drive") {
         const modal = document.getElementById("modal-drive-album-actions");
         if (modal && (isOwner || isMaster)) {
@@ -239,7 +229,8 @@ function handleHighlightClick(uname, albId) {
         return;
     }
 
-    if (alb.pinEnabled && alb.pin && !isMaster) {
+    const isLocked = !!(alb.pinEnabled && (alb.pin || alb.hasPin));
+    if (isLocked && !isMaster) {
         pendingPinAlbum = { uname: ownerKey, alb };
         document.getElementById("pg-album-name").innerText = alb.title;
         const pinInp = document.getElementById("pg-pin-input");
@@ -271,18 +262,25 @@ function editSelectedDriveAlbum() {
     openEditAlbumById(pendingDriveAlbum.uname, pendingDriveAlbum.alb.id);
 }
 
-function verifySecretAlbumPin() {
+// Verifikasi PIN dilakukan langsung di server Google
+async function verifySecretAlbumPin() {
     if (!pendingPinAlbum) return;
     const pinInp = document.getElementById("pg-pin-input");
     const inp = (pinInp?.value || "").trim();
-    if (inp === String(pendingPinAlbum.alb.pin)) {
-        const { uname, alb } = pendingPinAlbum;
+    if (!inp) return showToast("Masukkan 4 angka PIN.", "error");
+
+    const { uname, alb } = pendingPinAlbum;
+    showLoading("Memverifikasi PIN...");
+    const res = await apiAction({ action: "verify_vault_pin", username: uname, albumId: alb.id, pin: inp });
+    hideLoading();
+
+    if (res && res.ok) {
         pendingPinAlbum = null;
         if (pinInp) { pinInp.value = ""; pinInp.blur(); }
         document.getElementById("modal-pin-gate").classList.add("hide");
         openSecretAlbumViewer(uname, alb.id);
     } else {
-        showToast("PIN salah! Coba lagi atau ajukan bantuan lupa PIN.", "error");
+        showToast((res && res.message) || "PIN salah! Coba lagi atau ajukan bantuan ke Master Admin.", "error");
         if (pinInp) pinInp.value = "";
     }
 }
@@ -326,9 +324,10 @@ function openSecretAlbumViewer(uname, albId) {
     const photos = alb.photos || [];
     const notes = alb.notes || [];
     lightboxPhotos = photos;
+    const lockLabel = alb.pinEnabled ? (isMaster && alb.pin ? `PIN: ${alb.pin}` : "Terkunci PIN") : "Tanpa PIN";
 
     document.getElementById("sa-title").innerText = alb.title;
-    document.getElementById("sa-sub").innerText = `${photos.length} foto • ${notes.length} catatan • ${alb.pinEnabled ? (isMaster ? `PIN: ${alb.pin}` : "Terkunci PIN") : "Tanpa PIN"}`;
+    document.getElementById("sa-sub").innerText = `${photos.length} foto • ${notes.length} catatan • ${lockLabel}`;
     document.getElementById("sa-notes-count").innerText = notes.length;
     document.getElementById("sa-gallery-delete-tip").classList.add("hide");
     document.getElementById("sa-upload-progress").classList.add("hide");
