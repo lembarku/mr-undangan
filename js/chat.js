@@ -10,6 +10,7 @@ const QUICK_REPLIES_STAFF = [
 
 let tempChatAttachment = "";
 let _lastKnownChatCount = -1;
+let _waPopstateBound = false;
 
 function isStaffUserObj(u) {
     return !!(u && (u.role === "master" || u.role === "administrasi"));
@@ -157,38 +158,110 @@ async function deleteChatThreadHistory(targetUser) {
     }
 }
 
-// Pindahkan logo Mr Undangan ke header atas & sembunyikan footer bawah saat overlay chat dibuka
-function _syncWaChatTopLogo(titleText, subText) {
+// Sinkronkan header atas (logo aplikasi saja / nama profil saat chat dibuka), hilangkan X & bar bawah
+function _syncWaChatLayout(mode = "list", titleText = "", subText = "", avatarUrl = "") {
     const ov = document.getElementById("full-chat-overlay");
     if (!ov) return;
+
+    const shell = ov.querySelector(".app-card");
+    if (shell) {
+        shell.classList.toggle("!max-w-none", mode === "thread");
+        shell.classList.toggle("!w-full", mode === "thread");
+        shell.classList.toggle("!h-full", mode === "thread");
+        shell.classList.toggle("!sm:h-screen", mode === "thread");
+        shell.classList.toggle("!rounded-none", mode === "thread");
+        shell.classList.toggle("!sm:rounded-none", mode === "thread");
+        shell.classList.toggle("!border-0", mode === "thread");
+    }
+
+    const topBar = ov.querySelector(".gold-gradient");
+    if (topBar) {
+        const closeBtn = topBar.querySelector("button[onclick*='closeFullChatOverlay']");
+        if (closeBtn) closeBtn.style.display = "none";
+
+        const headIcon = topBar.querySelector(".fa-headset");
+        if (headIcon) headIcon.style.display = "none";
+
+        let appLogo = topBar.querySelector("#wa-app-logo-only");
+        if (!appLogo) {
+            appLogo = document.createElement("img");
+            appLogo.id = "wa-app-logo-only";
+            appLogo.src = "./logo.png";
+            appLogo.alt = "Logo";
+            appLogo.className = "w-8 h-8 rounded-lg bg-white p-1 object-contain border border-black/10 shrink-0";
+            appLogo.onerror = function () { this.style.display = "none"; };
+            topBar.insertBefore(appLogo, topBar.firstChild);
+        }
+
+        let threadAvatar = topBar.querySelector("#wa-thread-avatar");
+        if (!threadAvatar) {
+            threadAvatar = document.createElement("img");
+            threadAvatar.id = "wa-thread-avatar";
+            threadAvatar.alt = "Profil";
+            threadAvatar.className = "w-8 h-8 rounded-full object-cover border border-white/60 bg-zinc-800 shrink-0 hide";
+            threadAvatar.onerror = function () { this.src = DEFAULT_AVATAR; };
+            if (appLogo.nextSibling) topBar.insertBefore(threadAvatar, appLogo.nextSibling);
+        }
+
+        if (mode === "thread") {
+            appLogo.classList.add("hide");
+            threadAvatar.src = avatarUrl || DEFAULT_AVATAR;
+            threadAvatar.classList.remove("hide");
+        } else {
+            threadAvatar.classList.add("hide");
+            appLogo.classList.remove("hide");
+        }
+    }
+
     const titleEl = document.getElementById("fchat-title");
     const subEl = document.getElementById("fchat-subtitle");
     if (titleEl && titleText) titleEl.innerText = titleText;
     if (subEl && subText) subEl.innerText = subText;
 
-    const topBar = ov.querySelector(".gold-gradient");
-    if (topBar) {
-        let logoBox = topBar.querySelector("#wa-chat-top-logo");
-        if (!logoBox) {
-            logoBox = document.createElement("div");
-            logoBox.id = "wa-chat-top-logo";
-            logoBox.className = "w-9 h-9 rounded-full bg-white p-1 flex items-center justify-center shadow shrink-0 border border-black/10";
-            logoBox.innerHTML = `<img src="./logo.png" alt="Mr Undangan" class="w-full h-full object-contain rounded-full" onerror="this.style.display='none'">`;
-            topBar.insertBefore(logoBox, topBar.firstChild);
+    // Hilangkan tulisan/bar logo di bagian bawah overlay chat
+    const body = document.getElementById("fchat-body");
+    Array.from(ov.children).forEach(child => {
+        if (child !== topBar && child !== body) {
+            child.style.display = "none";
         }
+    });
+    if (body) {
+        Array.from(body.children).forEach(bChild => {
+            if (bChild.tagName !== "FORM" && !bChild.id && bChild.innerText && bChild.innerText.includes("Mr Undangan")) {
+                bChild.style.display = "none";
+            }
+        });
     }
+}
 
-    const bottomFooters = Array.from(ov.querySelectorAll("div")).filter(d => d.innerText && d.innerText.includes("Layanan Resmi Kausar.pictures"));
-    bottomFooters.forEach(d => d.classList.add("hide"));
+function _bindWaHardwareBack() {
+    if (_waPopstateBound) return;
+    _waPopstateBound = true;
+    window.addEventListener("popstate", () => {
+        const ov = document.getElementById("full-chat-overlay");
+        if (!ov || ov.classList.contains("hide")) return;
+        const u = getCurrentUserObj();
+        if (isStaffUserObj(u) && activeMasterChatThread) {
+            activeMasterChatThread = null;
+            renderFullChatOverlay();
+            pushBackGuard();
+        } else {
+            ov.classList.add("hide");
+            document.body.style.overflow = "";
+            tempChatAttachment = "";
+            if (typeof scheduleAdaptivePoll === "function") scheduleAdaptivePoll();
+        }
+    });
 }
 
 async function openFullChatOverlay(targetThread = null) {
     const ov = document.getElementById("full-chat-overlay"); if (!ov) return;
+    _bindWaHardwareBack();
     if (targetThread) activeMasterChatThread = String(targetThread).toLowerCase();
     tempChatAttachment = "";
     document.body.style.overflow = "hidden";
     ov.classList.remove("hide");
-    _syncWaChatTopLogo();
+    _syncWaChatLayout(activeMasterChatThread ? "thread" : "list");
     pushBackGuard();
 
     const u = getCurrentUserObj();
@@ -259,7 +332,7 @@ function renderFullChatOverlay() {
         const roleTag = isMaster ? "Master Admin" : "Tim Administrasi";
         const threads = getChatThreads();
         if (!activeMasterChatThread) {
-            _syncWaChatTopLogo(`Live Chat • ${roleTag}`, `${threads.length} percakapan aktif`);
+            _syncWaChatLayout("list", `Live Chat • ${roleTag}`, `${threads.length} percakapan aktif`);
             body.innerHTML = `
                 <div class="flex-1 overflow-y-auto divide-y divide-black/10 pb-20">${threads.length ? threads.map(th => {
                     const last = th.messages[th.messages.length - 1];
@@ -294,20 +367,13 @@ function renderFullChatOverlay() {
                 displayName: (uObj && uObj.name) || activeMasterChatThread,
                 avatar: (uObj && uObj.avatar) || DEFAULT_AVATAR
             };
-            _syncWaChatTopLogo(th.displayName, `@${th.threadUser}`);
+            _syncWaChatLayout("thread", th.displayName, `@${th.threadUser}`, th.avatar);
             const quickBar = `<div class="px-3 py-1.5 app-card border-t gold-border flex gap-1.5 overflow-x-auto no-scrollbar shrink-0">${QUICK_REPLIES_STAFF.map(txt => `<button type="button" onclick="fillQuickReply('${esc(txt)}')" class="px-2.5 py-1 rounded-full app-card-soft border text-[10px] font-semibold whitespace-nowrap hover:brightness-95">${escHtml(txt.slice(0, 34))}...</button>`).join("")}</div>`;
             body.innerHTML = `
-                <div class="app-card px-3.5 py-2 border-b gold-border flex items-center justify-between gap-2 shrink-0">
-                    <div class="flex items-center gap-2 min-w-0">
-                        <button onclick="activeMasterChatThread=null;renderFullChatOverlay();" class="px-2.5 py-1.5 rounded-xl app-btn-sec text-xs font-bold shrink-0"><i class="fa-solid fa-arrow-left mr-1"></i>Daftar</button>
-                        <img src="${th.avatar}" class="w-8 h-8 rounded-full object-cover bg-zinc-800 shrink-0">
-                        <strong class="text-xs truncate">${escHtml(th.displayName)}</strong>
-                    </div>
-                    <div class="flex items-center gap-1.5 shrink-0">
-                        <button type="button" onclick="openChatContactsModal()" class="w-8 h-8 rounded-full gold-pill-btn flex items-center justify-center text-xs shadow" title="Kontak Baru (+)"><i class="fa-solid fa-plus"></i></button>
-                        ${isMaster ? `<button onclick="closeFullChatOverlay();viewUserProfileModal('${esc(th.threadUser)}');" class="px-2.5 py-1.5 rounded-lg app-accent-bg app-accent text-[10px] font-bold">Profil &amp; PIN</button>` : ""}
-                        ${isMaster ? `<button onclick="deleteChatThreadHistory('${esc(th.threadUser)}')" class="px-2.5 py-1.5 rounded-lg bg-red-600/15 text-red-500 text-[10px] font-bold" title="Hapus Riwayat Chat"><i class="fa-solid fa-trash"></i></button>` : ""}
-                    </div>
+                <div class="app-card px-3.5 py-2 border-b gold-border flex items-center justify-end gap-1.5 shrink-0">
+                    <button type="button" onclick="openChatContactsModal()" class="w-8 h-8 rounded-full gold-pill-btn flex items-center justify-center text-xs shadow" title="Kontak Baru (+)"><i class="fa-solid fa-plus"></i></button>
+                    ${isMaster ? `<button onclick="closeFullChatOverlay();viewUserProfileModal('${esc(th.threadUser)}');" class="px-2.5 py-1.5 rounded-lg app-accent-bg app-accent text-[10px] font-bold">Profil &amp; PIN</button>` : ""}
+                    ${isMaster ? `<button onclick="deleteChatThreadHistory('${esc(th.threadUser)}')" class="px-2.5 py-1.5 rounded-lg bg-red-600/15 text-red-500 text-[10px] font-bold" title="Hapus Riwayat Chat"><i class="fa-solid fa-trash mr-1"></i>Hapus</button>` : ""}
                 </div>
                 <div id="fchat-messages-scroll" class="flex-1 overflow-y-auto p-3.5 space-y-2.5"></div>
                 ${quickBar}
@@ -316,7 +382,7 @@ function renderFullChatOverlay() {
             renderFullChatMessagesOnly();
         }
     } else {
-        _syncWaChatTopLogo("Mr Undangan Chat", "Admin • Respon cepat");
+        _syncWaChatLayout("thread", "Admin Mr Undangan", "Respon cepat");
         body.innerHTML = `
             <div id="fchat-messages-scroll" class="flex-1 overflow-y-auto p-3.5 space-y-2.5"></div>
             ${buildChatComposerHtml("sendUserChatMessage(event)", "chat-input-text", "btn-chat-send", "Ketik pesan...")}
@@ -386,6 +452,7 @@ function renderFullChatContentSmart() {
 async function openMasterChatThread(tUser) {
     activeMasterChatThread = tUser;
     renderFullChatOverlay();
+    pushBackGuard();
     const u = getCurrentUserObj();
     await apiAction({ action: "mark_chat_read", threadUser: tUser, by: (u && u.role) || "master" });
     updateChatBadges();
