@@ -38,9 +38,11 @@ function playSoftChatNotification() {
     } catch {}
 }
 
-function _addHistoryAnchor(tag) {
+function _pushChatStack(steps = 1, tag = "chat") {
     try {
-        history.pushState({ mrChatAnchor: tag, id: Date.now() + "_" + Math.random() }, "", window.location.href);
+        for (let i = 0; i < steps; i++) {
+            history.pushState({ mrChat: tag, idx: i, r: Math.random() }, "", window.location.href);
+        }
     } catch {}
 }
 
@@ -81,8 +83,7 @@ function _bindChatBackCapture() {
         if (chatVisible) {
             e.stopImmediatePropagation();
             closeFullChatOverlay();
-            _addHistoryAnchor("post_chat_exit_a");
-            _addHistoryAnchor("post_chat_exit_b");
+            _pushChatStack(3, "keep_alive");
         }
     }, true);
 }
@@ -144,7 +145,7 @@ function openChatContactsModal() {
     if (inp) inp.value = "";
     renderChatContactsModalList();
     document.getElementById("modal-chat-contacts").classList.remove("hide");
-    _addHistoryAnchor("contacts");
+    _pushChatStack(1, "contacts");
 }
 
 function renderChatContactsModalList() {
@@ -267,7 +268,7 @@ function _openUserProfileFromChat(threadUser) {
     }
 
     if (handled) {
-        _addHistoryAnchor("profile");
+        _pushChatStack(1, "profile");
     } else {
         window.openedFromChatThread = null;
         showToast("Profil pengguna tidak ditemukan.", "info");
@@ -334,12 +335,8 @@ async function openFullChatOverlay(targetThread = null) {
     document.body.style.overflow = "hidden";
     ov.classList.remove("hide");
 
-    _addHistoryAnchor("chat_list_1");
-    _addHistoryAnchor("chat_list_2");
-    if (activeMasterChatThread) {
-        _addHistoryAnchor("chat_thread_1");
-        _addHistoryAnchor("chat_thread_2");
-    }
+    _pushChatStack(1, "chat_list");
+    if (activeMasterChatThread) _pushChatStack(1, "chat_thread");
 
     const u = getCurrentUserObj();
     if (isStaffUserObj(u) && typeof fetchFullCloud === "function") {
@@ -547,8 +544,7 @@ function renderFullChatContentSmart() {
 async function openMasterChatThread(tUser) {
     _bindChatBackCapture();
     activeMasterChatThread = tUser;
-    _addHistoryAnchor("chat_thread_1");
-    _addHistoryAnchor("chat_thread_2");
+    _pushChatStack(1, "chat_thread");
     renderFullChatOverlay();
     const u = getCurrentUserObj();
     await apiAction({ action: "mark_chat_read", threadUser: tUser, by: (u && u.role) || "master" });
