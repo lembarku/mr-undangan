@@ -159,13 +159,41 @@ async function deleteChatThreadHistory(targetUser) {
     }
 }
 
-function _findProfileModalEl() {
-    const ids = ["modal-view-user-profile", "modal-user-profile", "modal-profile-detail", "modal-master-user"];
-    for (const id of ids) {
-        const el = document.getElementById(id);
-        if (el) return el;
+function _buildQuickUserProfileModalIfNeeded(uObj) {
+    let mod = document.getElementById("modal-view-user-profile");
+    if (!mod) {
+        mod = document.createElement("div");
+        mod.id = "modal-view-user-profile";
+        mod.className = "hide fixed inset-0 z-[130] bg-black/75 flex items-center justify-center p-4";
+        mod.innerHTML = `
+            <div class="app-card border gold-border rounded-3xl w-full max-w-md p-5 space-y-4 shadow-2xl">
+                <div class="flex items-center justify-between border-b gold-border pb-3">
+                    <h3 class="font-extrabold text-sm">Profil Pengguna</h3>
+                    <button type="button" onclick="document.getElementById('modal-view-user-profile').classList.add('hide');window.openedFromChatThread=null;" class="w-8 h-8 rounded-full app-btn-sec text-xs"><i class="fa-solid fa-xmark"></i></button>
+                </div>
+                <div id="mvup-body" class="space-y-2 text-xs"></div>
+            </div>
+        `;
+        document.body.appendChild(mod);
     }
-    return null;
+    const body = mod.querySelector("#mvup-body");
+    if (body && uObj) {
+        body.innerHTML = `
+            <div class="flex items-center gap-3">
+                <img src="${uObj.avatar || DEFAULT_AVATAR}" class="w-14 h-14 rounded-full object-cover border gold-border bg-zinc-800 shrink-0">
+                <div class="min-w-0">
+                    <strong class="text-sm block truncate">${escHtml(uObj.name || uObj.username)}</strong>
+                    <span class="app-muted block truncate">@${escHtml(uObj.username)} • Role: ${escHtml(uObj.role || "user")}</span>
+                </div>
+            </div>
+            ${uObj.bio ? `<p class="app-card-soft border rounded-xl p-3">${escHtml(uObj.bio)}</p>` : ""}
+            <div class="app-card-soft border rounded-xl p-3 space-y-1">
+                ${uObj.phone ? `<div><strong>No. HP/WA:</strong> ${escHtml(uObj.phone)}</div>` : ""}
+                ${uObj.address ? `<div><strong>Alamat:</strong> ${escHtml(uObj.address)}</div>` : ""}
+            </div>
+        `;
+    }
+    return mod;
 }
 
 function _openUserProfileFromChat(threadUser) {
@@ -175,44 +203,39 @@ function _openUserProfileFromChat(threadUser) {
         return;
     }
 
+    window.openedFromChatThread = activeMasterChatThread || cleanUser;
+
     const candidateFns = [
         "viewUserProfileModal",
         "inspectUserProfile",
         "openUserProfileModal",
         "openUserProfile",
         "showUserProfileModal",
-        "openMasterUserModal"
+        "openMasterUserModal",
+        "openEditMasterUser"
     ];
 
-    let opened = false;
     for (const fnName of candidateFns) {
         if (typeof window[fnName] === "function") {
             try {
-                window.openedFromChatThread = activeMasterChatThread || cleanUser;
                 window[fnName](cleanUser);
-                opened = true;
                 break;
             } catch {}
         }
     }
 
-    const modEl = _findProfileModalEl();
-    if (modEl && !modEl.classList.contains("hide")) {
-        opened = true;
-    } else if (modEl && !opened) {
-        const uObj = (db.users || []).find(x => String(x.username || "").toLowerCase() === cleanUser);
-        if (uObj) {
-            window.openedFromChatThread = activeMasterChatThread || cleanUser;
-            modEl.classList.remove("hide");
-            opened = true;
-        }
-    }
+    const uObj = (db.users || []).find(x => String(x.username || "").toLowerCase() === cleanUser);
+    const modEl = document.getElementById("modal-view-user-profile")
+        || document.getElementById("modal-master-user")
+        || (uObj ? _buildQuickUserProfileModalIfNeeded(uObj) : null);
 
-    if (opened) {
+    if (modEl) {
+        modEl.classList.remove("hide");
+        modEl.style.zIndex = "130";
         if (typeof pushStepBackGuard === "function") pushStepBackGuard("chat_profile");
     } else {
         window.openedFromChatThread = null;
-        showToast("Data profil pengguna belum tersedia.", "info");
+        showToast("Data profil pengguna tidak ditemukan.", "info");
     }
 }
 
@@ -304,7 +327,7 @@ function closeFullChatOverlay() {
     window.openedFromChatThread = null;
     const origin = window._chatOriginView;
     window._chatOriginView = null;
-    if (origin && typeof currentViewName !== "undefined" && currentViewName !== origin && typeof hideAllViews === "function") {
+    if (origin && typeof currentViewName !== "undefined" && typeof hideAllViews === "function") {
         currentViewName = origin;
         hideAllViews();
         const mapView = {
