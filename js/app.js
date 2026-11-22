@@ -219,19 +219,11 @@ function pushBackGuard() {
 
 function pushStepBackGuard(stepTag) {
     try {
-        history.pushState({ mrActive: true, stepTag, s: ++_backStepSeq }, "");
+        history.pushState({ mrActive: true, stepTag: stepTag, s: ++_backStepSeq }, "");
     } catch {}
 }
 
-function _ensureSafeHistoryFloor() {
-    try {
-        if (!history.state || !history.state.mrActive) {
-            history.pushState({ mrActive: true, s: ++_backStepSeq }, "");
-        }
-    } catch {}
-}
-
-window.addEventListener("popstate", () => {
+window.addEventListener("popstate", (e) => {
     const isVis = (id) => { const el = document.getElementById(id); return el && !el.classList.contains("hide"); };
     const drawerOpen = document.getElementById("drawer-main")?.classList.contains("open");
 
@@ -243,7 +235,7 @@ window.addEventListener("popstate", () => {
     if (isVis("app-confirm-modal")) { document.getElementById("app-confirm-cancel")?.click(); pushBackGuard(); return; }
     if (isVis("modal-install-welcome")) { dismissWelcomeInstall(); pushBackGuard(); return; }
     if (isVis("modal-auth")) { closeAuthModal(); pushBackGuard(); return; }
-    if (isVis("modal-chat-contacts")) { document.getElementById("modal-chat-contacts").classList.add("hide"); pushStepBackGuard("chat_list"); return; }
+    if (isVis("modal-chat-contacts")) { document.getElementById("modal-chat-contacts").classList.add("hide"); pushBackGuard(); return; }
     if (isVis("modal-sempurnakan")) { document.getElementById("modal-sempurnakan").classList.add("hide"); pushBackGuard(); return; }
     if (isVis("modal-portfolio-preview")) { document.getElementById("modal-portfolio-preview").classList.add("hide"); pushBackGuard(); return; }
     if (isVis("modal-drive-album-actions")) { document.getElementById("modal-drive-album-actions").classList.add("hide"); pushBackGuard(); return; }
@@ -254,7 +246,7 @@ window.addEventListener("popstate", () => {
     if (isVis("modal-create-choice")) { document.getElementById("modal-create-choice").classList.add("hide"); pushBackGuard(); return; }
     if (isVis("modal-client-portal")) { document.getElementById("modal-client-portal").classList.add("hide"); pushBackGuard(); return; }
 
-    // 1. TAHAP 1: PROFIL USER -> KEMBALI KE ISI OBROLAN CHAT
+    // 1. TAHAP 1: KELUAR DARI PROFIL USER -> KEMBALI KE ISI OBROLAN
     if (isVis("modal-view-user-profile") || isVis("modal-master-user")) {
         document.getElementById("modal-view-user-profile")?.classList.add("hide");
         document.getElementById("modal-master-user")?.classList.add("hide");
@@ -266,25 +258,23 @@ window.addEventListener("popstate", () => {
             const ov = document.getElementById("full-chat-overlay");
             if (ov) ov.classList.remove("hide");
             if (typeof renderFullChatOverlay === "function") renderFullChatOverlay();
-            pushStepBackGuard("chat_thread");
-        } else {
-            pushBackGuard();
         }
+        pushBackGuard();
         return;
     }
 
-    // 2. TAHAP 2: ISI OBROLAN -> DAFTAR SELURUH CHAT
-    // 3. TAHAP 3: DAFTAR SELURUH CHAT -> KEMBALI KE HALAMAN ASAL TANPA KELUAR APLIKASI
+    // 2. TAHAP 2: KELUAR DARI ISI OBROLAN -> KEMBALI KE DAFTAR SEMUA CHAT
+    // 3. TAHAP 3: KELUAR DARI DAFTAR SEMUA CHAT -> KEMBALI KE HALAMAN ASAL (TIDAK KELUAR APLIKASI)
     if (isVis("full-chat-overlay")) {
         if (typeof activeMasterChatThread !== "undefined" && activeMasterChatThread) {
             activeMasterChatThread = null;
             if (typeof renderFullChatOverlay === "function") renderFullChatOverlay();
-            pushStepBackGuard("chat_list");
+            pushBackGuard();
             return;
         }
         closeFullChatOverlay();
         lastBackPressTs = 0;
-        _ensureSafeHistoryFloor();
+        pushBackGuard();
         pushBackGuard();
         return;
     }
@@ -1161,46 +1151,4 @@ async function bootMrUndanganApp() {
             } else {
                 goToLanding(true);
             }
-            finishSplash(1150);
-
-            fetchFullCloud().then((synced) => {
-                if (!synced) return;
-                const uNow = getCurrentUserObj();
-                if (uNow) {
-                    ensureUserInLocalDb(uNow);
-                    if (currentViewName === "landing") renderLandingPage();
-                    else refreshActiveViewSmart();
-                }
-                updateChatBadges();
-            });
-        } else {
-            const pubCached = await idbGet("public_snapshot");
-            if (pubCached) applyPublicDb(pubCached);
-            goToLanding(true);
-            finishSplash(1100);
-
-            fetchPublicCloud().then((syncedPub) => {
-                if (syncedPub) refreshActiveViewSmart();
-                updateChatBadges();
-            });
-
-            setTimeout(() => {
-                if (!currentSessionUser && currentViewName === "landing") openWelcomeInstallModal(false);
-            }, 1900);
-            setTimeout(() => maybeShowLoginReminder(), 35000);
-        }
-
-        updateChatBadges();
-        scheduleAdaptivePoll();
-    } catch (err) {
-        console.error("Boot error:", err);
-        hideHelloSplash();
-        try { goToLanding(true); } catch {}
-    }
-}
-
-if (document.readyState === "loading") {
-    document.addEventListener("DOMContentLoaded", bootMrUndanganApp);
-} else {
-    bootMrUndanganApp();
-}
+            finishSplash(1150
