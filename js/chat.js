@@ -38,9 +38,9 @@ function playSoftChatNotification() {
     } catch {}
 }
 
-function _pushChatGuard(tag) {
+function _addHistoryAnchor(tag) {
     try {
-        history.pushState({ mrChatStep: tag, nonce: Date.now() + Math.random() }, "", window.location.href);
+        history.pushState({ mrChatAnchor: tag, id: Date.now() + "_" + Math.random() }, "", window.location.href);
     } catch {}
 }
 
@@ -66,7 +66,6 @@ function _bindChatBackCapture() {
                 if (ov) ov.classList.remove("hide");
                 renderFullChatOverlay();
             }
-            _pushChatGuard("chat_thread");
             return;
         }
 
@@ -75,7 +74,6 @@ function _bindChatBackCapture() {
             e.stopImmediatePropagation();
             activeMasterChatThread = null;
             renderFullChatOverlay();
-            _pushChatGuard("chat_list");
             return;
         }
 
@@ -83,8 +81,8 @@ function _bindChatBackCapture() {
         if (chatVisible) {
             e.stopImmediatePropagation();
             closeFullChatOverlay();
-            _pushChatGuard("chat_exit_1");
-            _pushChatGuard("chat_exit_2");
+            _addHistoryAnchor("post_chat_exit_a");
+            _addHistoryAnchor("post_chat_exit_b");
         }
     }, true);
 }
@@ -146,7 +144,7 @@ function openChatContactsModal() {
     if (inp) inp.value = "";
     renderChatContactsModalList();
     document.getElementById("modal-chat-contacts").classList.remove("hide");
-    _pushChatGuard("chat_contacts");
+    _addHistoryAnchor("contacts");
 }
 
 function renderChatContactsModalList() {
@@ -269,7 +267,7 @@ function _openUserProfileFromChat(threadUser) {
     }
 
     if (handled) {
-        _pushChatGuard("chat_profile");
+        _addHistoryAnchor("profile");
     } else {
         window.openedFromChatThread = null;
         showToast("Profil pengguna tidak ditemukan.", "info");
@@ -336,8 +334,12 @@ async function openFullChatOverlay(targetThread = null) {
     document.body.style.overflow = "hidden";
     ov.classList.remove("hide");
 
-    _pushChatGuard("chat_list");
-    if (activeMasterChatThread) _pushChatGuard("chat_thread");
+    _addHistoryAnchor("chat_list_1");
+    _addHistoryAnchor("chat_list_2");
+    if (activeMasterChatThread) {
+        _addHistoryAnchor("chat_thread_1");
+        _addHistoryAnchor("chat_thread_2");
+    }
 
     const u = getCurrentUserObj();
     if (isStaffUserObj(u) && typeof fetchFullCloud === "function") {
@@ -545,7 +547,8 @@ function renderFullChatContentSmart() {
 async function openMasterChatThread(tUser) {
     _bindChatBackCapture();
     activeMasterChatThread = tUser;
-    _pushChatGuard("chat_thread");
+    _addHistoryAnchor("chat_thread_1");
+    _addHistoryAnchor("chat_thread_2");
     renderFullChatOverlay();
     const u = getCurrentUserObj();
     await apiAction({ action: "mark_chat_read", threadUser: tUser, by: (u && u.role) || "master" });
