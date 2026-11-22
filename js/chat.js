@@ -117,31 +117,42 @@ function getChatThreads() {
 
 function getAccessibleChatContacts() {
     const curU = getCurrentUserObj();
-    if (!curU) return [];
-    const all = (db.users || []).filter(u => String(u.username || "").toLowerCase() !== String(curU.username || "").toLowerCase());
-    if (curU.role === "master") {
+    if (!curU || !curU.username) return [];
+    const myKey = String(curU.username).toLowerCase();
+    const all = (db.users || []).filter(u => u && u.username && String(u.username).toLowerCase() !== myKey);
+
+    if (curU.role === "master" || curU.role === "administrasi") {
         return all;
     }
-    if (curU.role === "administrasi") {
-        return all.filter(u => u.role === "user");
+    if (curU.role === "cabang") {
+        return all.filter(u => u.role === "master" || u.role === "administrasi");
     }
-    return [];
+    // User biasa: bisa chat semua user/akun lain kecuali cabang
+    return all.filter(u => u.role !== "cabang");
 }
 
 function openChatContactsModal() {
     const curU = getCurrentUserObj();
-    if (!isStaffUserObj(curU)) return;
+    if (!curU) return showToast("Silakan masuk akun terlebih dahulu untuk melihat daftar kontak.", "info");
     _ensureChatBackCapture();
     const sub = document.getElementById("cc-access-sub");
     if (sub) {
-        sub.innerText = curU.role === "master"
-            ? "Akses Master: Semua User, Akun Pro, Cabang & Tim Administrasi"
-            : "Akses Tim Administrasi: Daftar Kontak User Terdaftar";
+        if (curU.role === "master" || curU.role === "administrasi") {
+            sub.innerText = "Semua Kontak Pengguna & Admin";
+        } else if (curU.role === "cabang") {
+            sub.innerText = "Kontak Admin (Master Admin & Tim Administrasi)";
+        } else {
+            sub.innerText = "Daftar Kontak Pengguna & Admin";
+        }
     }
     const inp = document.getElementById("cc-search-inp");
     if (inp) inp.value = "";
     renderChatContactsModalList();
-    document.getElementById("modal-chat-contacts").classList.remove("hide");
+    const mod = document.getElementById("modal-chat-contacts");
+    if (mod) {
+        mod.style.zIndex = "135";
+        mod.classList.remove("hide");
+    }
     _pushChatNavState("contacts");
 }
 
@@ -155,28 +166,41 @@ function renderChatContactsModalList() {
     );
 
     if (!contacts.length) {
-        box.innerHTML = `<p class="p-8 text-center text-xs app-muted">Tidak ada kontak yang sesuai.</p>`;
+        box.innerHTML = `<p class="p-8 text-center text-xs app-muted">Tidak ada kontak yang tersedia.</p>`;
         return;
     }
 
+    // Tampilan list kontak bergaya daftar obrolan WhatsApp
     box.innerHTML = contacts.map(u => {
-        const roleTag = u.role === "cabang"
-            ? `<span class="text-[9px] px-1.5 py-0.5 rounded bg-blue-500/15 text-blue-600 font-bold">CABANG</span>`
+        const isAdminRole = u.role === "master" || u.role === "administrasi";
+        const roleBadge = u.role === "master"
+            ? `<span class="text-[9px] px-1.5 py-0.5 rounded-full bg-amber-500/20 text-amber-600 font-extrabold">MASTER</span>`
             : u.role === "administrasi"
-                ? `<span class="text-[9px] px-1.5 py-0.5 rounded bg-emerald-500/15 text-emerald-600 font-bold">ADMINISTRASI</span>`
-                : `<span class="text-[9px] px-1.5 py-0.5 rounded app-btn-sec font-bold">USER</span>`;
+                ? `<span class="text-[9px] px-1.5 py-0.5 rounded-full bg-emerald-500/20 text-emerald-600 font-extrabold">ADMIN</span>`
+                : u.role === "cabang"
+                    ? `<span class="text-[9px] px-1.5 py-0.5 rounded-full bg-blue-500/20 text-blue-600 font-extrabold">CABANG</span>`
+                    : "";
+        const subLine = u.bio
+            ? escHtml(u.bio)
+            : (isAdminRole ? "Layanan Resmi Mr Undangan" : `@${escHtml(u.username)}`);
+
         return `
-            <div onclick="startDirectChatWithContact('${esc(u.username)}')" class="p-3.5 hover:bg-black/5 cursor-pointer flex items-center gap-3">
-                <img src="${u.avatar || DEFAULT_AVATAR}" class="w-10 h-10 rounded-full object-cover bg-zinc-800 border gold-border shrink-0">
-                <div class="flex-1 min-w-0">
-                    <div class="flex items-center gap-1.5">
-                        <strong class="text-xs truncate">${escHtml(u.name || u.username)}</strong>
-                        ${u.isPro ? '<i class="fa-solid fa-circle-check text-blue-500 text-xs"></i>' : ""}
-                        ${roleTag}
-                    </div>
-                    <p class="text-[11px] app-muted truncate">@${escHtml(u.username)} ${u.phone ? `• ${escHtml(u.phone)}` : ""}</p>
+            <div onclick="startDirectChatWithContact('${esc(u.username)}')" class="px-4 py-3 hover:bg-black/5 active:bg-black/10 cursor-pointer flex items-center gap-3.5 transition">
+                <div class="relative shrink-0">
+                    <img src="${u.avatar || DEFAULT_AVATAR}" class="w-12 h-12 rounded-full object-cover bg-zinc-800 border gold-border">
+                    ${isAdminRole ? `<span class="w-3.5 h-3.5 rounded-full bg-emerald-500 border-2 border-white absolute bottom-0 right-0"></span>` : ""}
                 </div>
-                <i class="fa-solid fa-paper-plane app-accent text-xs shrink-0"></i>
+                <div class="flex-1 min-w-0 border-b border-black/5 pb-3 -mb-3">
+                    <div class="flex items-center justify-between gap-2">
+                        <div class="flex items-center gap-1.5 min-w-0">
+                            <strong class="text-sm font-bold truncate">${escHtml(u.name || u.username)}</strong>
+                            ${u.isPro ? '<i class="fa-solid fa-circle-check text-blue-500 text-xs shrink-0"></i>' : ""}
+                            ${roleBadge}
+                        </div>
+                        <span class="text-[10px] app-muted shrink-0">@${escHtml(u.username)}</span>
+                    </div>
+                    <p class="text-xs app-muted truncate mt-0.5">${subLine}</p>
+                </div>
             </div>
         `;
     }).join("");
@@ -309,7 +333,7 @@ function _syncWaChatHeader(mode = "list", title = "", avatarUrl = "", threadUser
 
     const body = document.getElementById("fchat-body");
     if (body) {
-        body.style.cssText = "display:flex !important;flex-direction:column !important;flex:1 1 auto !important;min-height:0 !important;background:var(--app-bg,#f8fafc) !important;";
+        body.style.cssText = "display:flex !important;flex-direction:column !important;flex:1 1 auto !important;min-height:0 !important;background:var(--app-bg,#f8fafc) !important;position:relative !important;";
     }
 
     if (cardBox) {
@@ -418,6 +442,14 @@ function buildChatComposerHtml(onSubmitFn, inputId, btnId, placeholderText) {
     `;
 }
 
+function _buildPlusContactButtonHtml() {
+    return `
+        <button type="button" id="btn-chat-plus-contact" onclick="event.preventDefault();event.stopPropagation();openChatContactsModal();" style="position:fixed;bottom:24px;right:24px;z-index:125;width:52px;height:52px;border-radius:9999px;" class="gold-gradient shadow-2xl flex items-center justify-center text-xl font-extrabold active:scale-95 transition" title="Mulai Chat Baru (Daftar Kontak)">
+            <i class="fa-solid fa-plus"></i>
+        </button>
+    `;
+}
+
 function renderFullChatOverlay() {
     const body = document.getElementById("fchat-body"); if (!body) return;
     const u = getCurrentUserObj();
@@ -427,7 +459,7 @@ function renderFullChatOverlay() {
         if (!activeMasterChatThread) {
             _syncWaChatHeader("list", "Mr Undangan");
             body.innerHTML = `
-                <div class="flex-1 overflow-y-auto divide-y divide-black/10 pb-20">${threads.length ? threads.map(th => {
+                <div class="flex-1 overflow-y-auto divide-y divide-black/10 pb-24">${threads.length ? threads.map(th => {
                     const last = th.messages[th.messages.length - 1];
                     const lastStaff = last.role === "master" || last.role === "administrasi";
                     const roleBadge = th.role === "cabang" ? `<span class="text-[9px] px-1.5 py-0.5 rounded bg-blue-500/15 text-blue-600 font-bold">CABANG</span>`
@@ -448,10 +480,8 @@ function renderFullChatOverlay() {
                             </div>
                         </div>
                     </div>`;
-                }).join("") : '<p class="p-12 text-center text-xs app-muted">Belum ada percakapan. Ketuk tombol <strong>+</strong> untuk memulai chat dengan user.</p>'}</div>
-                <button type="button" onclick="openChatContactsModal()" class="absolute bottom-4 right-4 z-20 w-12 h-12 rounded-full gold-gradient shadow-xl flex items-center justify-center text-lg font-extrabold hover:scale-105 transition" title="Mulai Chat Baru (Daftar Kontak)">
-                    <i class="fa-solid fa-plus"></i>
-                </button>
+                }).join("") : '<p class="p-12 text-center text-xs app-muted">Belum ada percakapan. Ketuk tombol <strong>+</strong> untuk memulai chat.</p>'}</div>
+                ${_buildPlusContactButtonHtml()}
             `;
         } else {
             const uObj = (db.users || []).find(x => String(x.username || "").toLowerCase() === activeMasterChatThread);
@@ -472,8 +502,10 @@ function renderFullChatOverlay() {
         }
     } else {
         _syncWaChatHeader("thread", "Admin Mr Undangan", "./logo.png", "");
+        const plusHtml = u ? _buildPlusContactButtonHtml() : "";
         body.innerHTML = `
             <div id="fchat-messages-scroll" class="flex-1 overflow-y-auto p-3.5 space-y-2.5"></div>
+            ${plusHtml}
             ${buildChatComposerHtml("sendUserChatMessage(event)", "chat-input-text", "btn-chat-send", "Ketik pesan...")}
         `;
         renderFullChatMessagesOnly();
