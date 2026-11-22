@@ -10,7 +10,7 @@ const QUICK_REPLIES_STAFF = [
 
 let tempChatAttachment = "";
 let _lastKnownChatCount = -1;
-let _waChatBackHooked = false;
+window.openedFromChatThread = null; // Penanda bahwa profil dibuka dari obrolan aktif
 
 function isStaffUserObj(u) {
     return !!(u && (u.role === "master" || u.role === "administrasi"));
@@ -92,7 +92,7 @@ function openChatContactsModal() {
     if (inp) inp.value = "";
     renderChatContactsModalList();
     document.getElementById("modal-chat-contacts").classList.remove("hide");
-    _pushWaHistoryState();
+    if (typeof pushBackGuard === "function") pushBackGuard();
 }
 
 function renderChatContactsModalList() {
@@ -158,24 +158,12 @@ async function deleteChatThreadHistory(targetUser) {
     }
 }
 
-function _pushWaHistoryState() {
-    try {
-        history.pushState({ waChatOverlay: true, n: Math.random() }, "", window.location.href);
-    } catch {}
-}
-
+// Buka profil user dari dalam chat: JANGAN sembunyikan overlay chat agar bisa kembali bertahap
 function _openUserProfileFromChat(threadUser) {
     const cleanUser = String(threadUser || "").trim().toLowerCase();
     if (!cleanUser || cleanUser.startsWith("tamu_")) return;
 
-    const ov = document.getElementById("full-chat-overlay");
-    if (ov) {
-        ov.style.cssText = "";
-        ov.classList.add("hide");
-    }
-    document.body.style.overflow = "";
-    tempChatAttachment = "";
-    if (typeof scheduleAdaptivePoll === "function") scheduleAdaptivePoll();
+    window.openedFromChatThread = activeMasterChatThread || cleanUser;
 
     if (typeof viewUserProfileModal === "function") {
         viewUserProfileModal(cleanUser);
@@ -244,28 +232,6 @@ function _syncWaChatHeader(mode = "list", title = "", avatarUrl = "", threadUser
     }
 }
 
-if (!_waChatBackHooked) {
-    _waChatBackHooked = true;
-    window.addEventListener("popstate", () => {
-        const ov = document.getElementById("full-chat-overlay");
-        if (!ov || ov.classList.contains("hide")) return;
-
-        const contactsMod = document.getElementById("modal-chat-contacts");
-        if (contactsMod && !contactsMod.classList.contains("hide")) {
-            contactsMod.classList.add("hide");
-            _pushWaHistoryState();
-            return;
-        }
-
-        const u = getCurrentUserObj();
-        if (isStaffUserObj(u) && activeMasterChatThread) {
-            activeMasterChatThread = null;
-            renderFullChatOverlay();
-            _pushWaHistoryState();
-        }
-    });
-}
-
 async function openFullChatOverlay(targetThread = null) {
     const ov = document.getElementById("full-chat-overlay"); if (!ov) return;
     if (targetThread) activeMasterChatThread = String(targetThread).toLowerCase();
@@ -273,10 +239,7 @@ async function openFullChatOverlay(targetThread = null) {
     document.body.style.overflow = "hidden";
     ov.classList.remove("hide");
 
-    _pushWaHistoryState();
-    if (activeMasterChatThread) {
-        _pushWaHistoryState();
-    }
+    if (typeof pushBackGuard === "function") pushBackGuard();
 
     const u = getCurrentUserObj();
     if (isStaffUserObj(u) && typeof fetchFullCloud === "function") {
@@ -299,6 +262,7 @@ function closeFullChatOverlay() {
     document.body.style.overflow = "";
     tempChatAttachment = "";
     activeMasterChatThread = null;
+    window.openedFromChatThread = null;
     if (typeof scheduleAdaptivePoll === "function") scheduleAdaptivePoll();
 }
 
@@ -462,8 +426,8 @@ function renderFullChatContentSmart() {
 
 async function openMasterChatThread(tUser) {
     activeMasterChatThread = tUser;
-    _pushWaHistoryState();
     renderFullChatOverlay();
+    if (typeof pushBackGuard === "function") pushBackGuard();
     const u = getCurrentUserObj();
     await apiAction({ action: "mark_chat_read", threadUser: tUser, by: (u && u.role) || "master" });
     updateChatBadges();
