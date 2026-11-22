@@ -207,6 +207,7 @@ function initBackNavigationGuard() {
     try {
         history.replaceState({ mrBase: true, s: 0 }, "");
         history.pushState({ mrActive: true, s: ++_backStepSeq }, "");
+        history.pushState({ mrActive: true, s: ++_backStepSeq }, "");
     } catch {}
 }
 
@@ -219,6 +220,14 @@ function pushBackGuard() {
 function pushStepBackGuard(stepTag) {
     try {
         history.pushState({ mrActive: true, stepTag, s: ++_backStepSeq }, "");
+    } catch {}
+}
+
+function _ensureSafeHistoryFloor() {
+    try {
+        if (!history.state || !history.state.mrActive) {
+            history.pushState({ mrActive: true, s: ++_backStepSeq }, "");
+        }
     } catch {}
 }
 
@@ -245,7 +254,7 @@ window.addEventListener("popstate", () => {
     if (isVis("modal-create-choice")) { document.getElementById("modal-create-choice").classList.add("hide"); pushBackGuard(); return; }
     if (isVis("modal-client-portal")) { document.getElementById("modal-client-portal").classList.add("hide"); pushBackGuard(); return; }
 
-    // 1. TAHAP 1: KELUAR DARI PROFIL USER -> KEMBALI KE ISI OBROLAN CHAT
+    // 1. TAHAP 1: PROFIL USER -> KEMBALI KE ISI OBROLAN CHAT
     if (isVis("modal-view-user-profile") || isVis("modal-master-user")) {
         document.getElementById("modal-view-user-profile")?.classList.add("hide");
         document.getElementById("modal-master-user")?.classList.add("hide");
@@ -264,8 +273,8 @@ window.addEventListener("popstate", () => {
         return;
     }
 
-    // 2. TAHAP 2: KELUAR DARI ISI OBROLAN -> KEMBALI KE DAFTAR SELURUH CHAT
-    // 3. TAHAP 3: KELUAR DARI DAFTAR CHAT -> KEMBALI KE HALAMAN ASAL (BUKAN KELUAR APLIKASI)
+    // 2. TAHAP 2: ISI OBROLAN -> DAFTAR SELURUH CHAT
+    // 3. TAHAP 3: DAFTAR SELURUH CHAT -> KEMBALI KE HALAMAN ASAL TANPA KELUAR APLIKASI
     if (isVis("full-chat-overlay")) {
         if (typeof activeMasterChatThread !== "undefined" && activeMasterChatThread) {
             activeMasterChatThread = null;
@@ -274,6 +283,8 @@ window.addEventListener("popstate", () => {
             return;
         }
         closeFullChatOverlay();
+        lastBackPressTs = 0;
+        _ensureSafeHistoryFloor();
         pushBackGuard();
         return;
     }
