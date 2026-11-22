@@ -10,7 +10,7 @@ const QUICK_REPLIES_STAFF = [
 
 let tempChatAttachment = "";
 let _lastKnownChatCount = -1;
-let _chatBackBound = false;
+let _chatBackCaptureReady = false;
 window.openedFromChatThread = null;
 window._chatOriginView = null;
 
@@ -38,26 +38,24 @@ function playSoftChatNotification() {
     } catch {}
 }
 
-function _pushChatStack(steps = 1, tag = "chat") {
+function _pushChatNavState(stage) {
     try {
-        for (let i = 0; i < steps; i++) {
-            history.pushState({ mrChat: tag, idx: i, r: Math.random() }, "", window.location.href);
-        }
+        history.pushState({ mrChatStage: stage, ts: Date.now() }, "", window.location.href);
     } catch {}
 }
 
-function _bindChatBackCapture() {
-    if (_chatBackBound) return;
-    _chatBackBound = true;
+function _ensureChatBackCapture() {
+    if (_chatBackCaptureReady) return;
+    _chatBackCaptureReady = true;
 
     window.addEventListener("popstate", (e) => {
         const ov = document.getElementById("full-chat-overlay");
-        const chatVisible = ov && !ov.classList.contains("hide");
+        const chatOpen = !!(ov && !ov.classList.contains("hide"));
         const profMod = document.getElementById("modal-view-user-profile");
-        const profVisible = profMod && !profMod.classList.contains("hide");
+        const profOpen = !!(profMod && !profMod.classList.contains("hide"));
 
-        // Tahap 1: Dari Profil User -> kembali ke Isi Obrolan
-        if (profVisible) {
+        // 1. Dari Profil User -> kembali ke Isi Obrolan
+        if (profOpen) {
             e.stopImmediatePropagation();
             profMod.classList.add("hide");
             if (window.openedFromChatThread) {
@@ -71,19 +69,18 @@ function _bindChatBackCapture() {
             return;
         }
 
-        // Tahap 2: Dari Isi Obrolan -> kembali ke Daftar Seluruh Chat
-        if (chatVisible && typeof activeMasterChatThread !== "undefined" && activeMasterChatThread) {
+        // 2. Dari Isi Obrolan -> kembali ke Daftar Seluruh Chat
+        if (chatOpen && typeof activeMasterChatThread !== "undefined" && activeMasterChatThread) {
             e.stopImmediatePropagation();
             activeMasterChatThread = null;
             renderFullChatOverlay();
             return;
         }
 
-        // Tahap 3: Dari Daftar Seluruh Chat -> keluar ke halaman asal tanpa keluar aplikasi
-        if (chatVisible) {
+        // 3. Dari Daftar Seluruh Chat -> keluar ke halaman asal tanpa menutup aplikasi
+        if (chatOpen) {
             e.stopImmediatePropagation();
             closeFullChatOverlay();
-            _pushChatStack(3, "keep_alive");
         }
     }, true);
 }
@@ -134,7 +131,7 @@ function getAccessibleChatContacts() {
 function openChatContactsModal() {
     const curU = getCurrentUserObj();
     if (!isStaffUserObj(curU)) return;
-    _bindChatBackCapture();
+    _ensureChatBackCapture();
     const sub = document.getElementById("cc-access-sub");
     if (sub) {
         sub.innerText = curU.role === "master"
@@ -145,7 +142,7 @@ function openChatContactsModal() {
     if (inp) inp.value = "";
     renderChatContactsModalList();
     document.getElementById("modal-chat-contacts").classList.remove("hide");
-    _pushChatStack(1, "contacts");
+    _pushChatNavState("contacts");
 }
 
 function renderChatContactsModalList() {
@@ -247,7 +244,7 @@ function _openUserProfileFromChat(threadUser) {
         return;
     }
 
-    _bindChatBackCapture();
+    _ensureChatBackCapture();
     window.openedFromChatThread = activeMasterChatThread || cleanUser;
 
     let handled = false;
@@ -268,7 +265,7 @@ function _openUserProfileFromChat(threadUser) {
     }
 
     if (handled) {
-        _pushChatStack(1, "profile");
+        _pushChatNavState("profile");
     } else {
         window.openedFromChatThread = null;
         showToast("Profil pengguna tidak ditemukan.", "info");
@@ -326,7 +323,7 @@ function _syncWaChatHeader(mode = "list", title = "", avatarUrl = "", threadUser
 
 async function openFullChatOverlay(targetThread = null) {
     const ov = document.getElementById("full-chat-overlay"); if (!ov) return;
-    _bindChatBackCapture();
+    _ensureChatBackCapture();
     if (ov.classList.contains("hide") && typeof currentViewName !== "undefined") {
         window._chatOriginView = currentViewName;
     }
@@ -335,8 +332,8 @@ async function openFullChatOverlay(targetThread = null) {
     document.body.style.overflow = "hidden";
     ov.classList.remove("hide");
 
-    _pushChatStack(1, "chat_list");
-    if (activeMasterChatThread) _pushChatStack(1, "chat_thread");
+    _pushChatNavState("chat_list");
+    if (activeMasterChatThread) _pushChatNavState("chat_thread");
 
     const u = getCurrentUserObj();
     if (isStaffUserObj(u) && typeof fetchFullCloud === "function") {
@@ -542,9 +539,9 @@ function renderFullChatContentSmart() {
 }
 
 async function openMasterChatThread(tUser) {
-    _bindChatBackCapture();
+    _ensureChatBackCapture();
     activeMasterChatThread = tUser;
-    _pushChatStack(1, "chat_thread");
+    _pushChatNavState("chat_thread");
     renderFullChatOverlay();
     const u = getCurrentUserObj();
     await apiAction({ action: "mark_chat_read", threadUser: tUser, by: (u && u.role) || "master" });
