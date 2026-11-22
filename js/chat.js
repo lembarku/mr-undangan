@@ -10,7 +10,6 @@ const QUICK_REPLIES_STAFF = [
 
 let tempChatAttachment = "";
 let _lastKnownChatCount = -1;
-let _waPopstateBound = false;
 
 function isStaffUserObj(u) {
     return !!(u && (u.role === "master" || u.role === "administrasi"));
@@ -158,29 +157,19 @@ async function deleteChatThreadHistory(targetUser) {
     }
 }
 
-// Sinkronkan header atas (logo aplikasi saja / nama profil saat chat dibuka), hilangkan X & bar bawah
 function _syncWaChatLayout(mode = "list", titleText = "", subText = "", avatarUrl = "") {
     const ov = document.getElementById("full-chat-overlay");
     if (!ov) return;
 
-    const shell = ov.querySelector(".app-card");
-    if (shell) {
-        shell.classList.toggle("!max-w-none", mode === "thread");
-        shell.classList.toggle("!w-full", mode === "thread");
-        shell.classList.toggle("!h-full", mode === "thread");
-        shell.classList.toggle("!sm:h-screen", mode === "thread");
-        shell.classList.toggle("!rounded-none", mode === "thread");
-        shell.classList.toggle("!sm:rounded-none", mode === "thread");
-        shell.classList.toggle("!border-0", mode === "thread");
-    }
-
     const topBar = ov.querySelector(".gold-gradient");
+    const body = document.getElementById("fchat-body");
+
     if (topBar) {
         const closeBtn = topBar.querySelector("button[onclick*='closeFullChatOverlay']");
-        if (closeBtn) closeBtn.style.display = "none";
+        if (closeBtn) closeBtn.classList.add("hide");
 
         const headIcon = topBar.querySelector(".fa-headset");
-        if (headIcon) headIcon.style.display = "none";
+        if (headIcon) headIcon.classList.add("hide");
 
         let appLogo = topBar.querySelector("#wa-app-logo-only");
         if (!appLogo) {
@@ -218,45 +207,18 @@ function _syncWaChatLayout(mode = "list", titleText = "", subText = "", avatarUr
     if (titleEl && titleText) titleEl.innerText = titleText;
     if (subEl && subText) subEl.innerText = subText;
 
-    // Hilangkan tulisan/bar logo di bagian bawah overlay chat
-    const body = document.getElementById("fchat-body");
-    Array.from(ov.children).forEach(child => {
-        if (child !== topBar && child !== body) {
-            child.style.display = "none";
-        }
-    });
-    if (body) {
-        Array.from(body.children).forEach(bChild => {
-            if (bChild.tagName !== "FORM" && !bChild.id && bChild.innerText && bChild.innerText.includes("Mr Undangan")) {
-                bChild.style.display = "none";
+    const shell = topBar ? topBar.parentElement : null;
+    if (shell) {
+        Array.from(shell.children).forEach(child => {
+            if (child !== topBar && child !== body) {
+                child.classList.add("hide");
             }
         });
     }
 }
 
-function _bindWaHardwareBack() {
-    if (_waPopstateBound) return;
-    _waPopstateBound = true;
-    window.addEventListener("popstate", () => {
-        const ov = document.getElementById("full-chat-overlay");
-        if (!ov || ov.classList.contains("hide")) return;
-        const u = getCurrentUserObj();
-        if (isStaffUserObj(u) && activeMasterChatThread) {
-            activeMasterChatThread = null;
-            renderFullChatOverlay();
-            pushBackGuard();
-        } else {
-            ov.classList.add("hide");
-            document.body.style.overflow = "";
-            tempChatAttachment = "";
-            if (typeof scheduleAdaptivePoll === "function") scheduleAdaptivePoll();
-        }
-    });
-}
-
 async function openFullChatOverlay(targetThread = null) {
     const ov = document.getElementById("full-chat-overlay"); if (!ov) return;
-    _bindWaHardwareBack();
     if (targetThread) activeMasterChatThread = String(targetThread).toLowerCase();
     tempChatAttachment = "";
     document.body.style.overflow = "hidden";
