@@ -157,21 +157,30 @@ async function deleteChatThreadHistory(targetUser) {
     }
 }
 
-// Menyesuaikan tampilan header ala WA: logo di atas, tanpa tombol X, dan bar bawah bersih
 function _syncWaChatHeader(mode = "list", title = "", subtitle = "", avatarUrl = "") {
     const ov = document.getElementById("full-chat-overlay");
     if (!ov) return;
 
-    // 1. Sembunyikan tombol X merah di kanan atas
+    // Pastikan overlay dan kotak chat tampil jelas dan tidak tertutup backdrop hitam
+    ov.style.cssText = "display:flex !important;position:fixed !important;inset:0 !important;z-index:110 !important;background:rgba(0,0,0,0.65) !important;opacity:1 !important;visibility:visible !important;";
+
     const topBar = ov.querySelector(".gold-gradient");
+    const body = document.getElementById("fchat-body");
+    const cardBox = topBar ? topBar.parentElement : null;
+
+    if (cardBox) {
+        cardBox.style.cssText = "display:flex !important;flex-direction:column !important;width:100% !important;max-width:48rem !important;height:100% !important;max-height:92vh !important;opacity:1 !important;visibility:visible !important;background:var(--app-card,#ffffff) !important;color:var(--app-text,#0f172a) !important;";
+    }
+
     if (topBar) {
+        topBar.style.cssText = "display:flex !important;align-items:center !important;justify-content:space-between !important;opacity:1 !important;visibility:visible !important;";
+
         const xBtn = topBar.querySelector("button[onclick*='closeFullChatOverlay']");
-        if (xBtn) xBtn.style.display = "none";
+        if (xBtn) xBtn.style.setProperty("display", "none", "important");
 
         const headIcon = topBar.querySelector(".fa-headset");
-        if (headIcon) headIcon.style.display = "none";
+        if (headIcon) headIcon.style.setProperty("display", "none", "important");
 
-        // Logo aplikasi di kiri atas
         let appLogo = topBar.querySelector("#wa-header-logo");
         if (!appLogo) {
             appLogo = document.createElement("img");
@@ -183,7 +192,6 @@ function _syncWaChatHeader(mode = "list", title = "", subtitle = "", avatarUrl =
             topBar.insertBefore(appLogo, topBar.firstChild);
         }
 
-        // Avatar profil saat chat dibuka
         let profImg = topBar.querySelector("#wa-header-avatar");
         if (!profImg) {
             profImg = document.createElement("img");
@@ -204,19 +212,22 @@ function _syncWaChatHeader(mode = "list", title = "", subtitle = "", avatarUrl =
         }
     }
 
-    // 2. Set teks judul & subjudul
+    if (body) {
+        body.style.cssText = "display:flex !important;flex-direction:column !important;flex:1 1 auto !important;min-height:0 !important;opacity:1 !important;visibility:visible !important;";
+    }
+
     const elT = document.getElementById("fchat-title");
     const elS = document.getElementById("fchat-subtitle");
     if (elT && title) elT.innerText = title;
     if (elS && subtitle) elS.innerText = subtitle;
 
-    // 3. Sembunyikan bar tulisan Mr Undangan di bagian bawah modal
-    const bottomBars = ov.querySelectorAll(".border-t.gold-border");
-    bottomBars.forEach(b => {
-        if (b.innerText && b.innerText.includes("Kausar.pictures")) {
-            b.style.display = "none";
-        }
-    });
+    if (cardBox) {
+        Array.from(cardBox.children).forEach(child => {
+            if (child !== topBar && child !== body) {
+                child.style.setProperty("display", "none", "important");
+            }
+        });
+    }
 }
 
 async function openFullChatOverlay(targetThread = null) {
@@ -243,6 +254,7 @@ async function openFullChatOverlay(targetThread = null) {
 
 function closeFullChatOverlay() {
     const ov = document.getElementById("full-chat-overlay"); if (!ov) return;
+    ov.style.cssText = "";
     ov.classList.add("hide");
     document.body.style.overflow = "";
     tempChatAttachment = "";
