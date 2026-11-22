@@ -234,7 +234,7 @@ window.addEventListener("popstate", () => {
     if (isVis("app-confirm-modal")) { document.getElementById("app-confirm-cancel")?.click(); pushBackGuard(); return; }
     if (isVis("modal-install-welcome")) { dismissWelcomeInstall(); pushBackGuard(); return; }
     if (isVis("modal-auth")) { closeAuthModal(); pushBackGuard(); return; }
-    if (isVis("modal-chat-contacts")) { document.getElementById("modal-chat-contacts").classList.add("hide"); pushBackGuard(); return; }
+    if (isVis("modal-chat-contacts")) { document.getElementById("modal-chat-contacts").classList.add("hide"); pushStepBackGuard("chat_list"); return; }
     if (isVis("modal-sempurnakan")) { document.getElementById("modal-sempurnakan").classList.add("hide"); pushBackGuard(); return; }
     if (isVis("modal-portfolio-preview")) { document.getElementById("modal-portfolio-preview").classList.add("hide"); pushBackGuard(); return; }
     if (isVis("modal-drive-album-actions")) { document.getElementById("modal-drive-album-actions").classList.add("hide"); pushBackGuard(); return; }
@@ -273,8 +273,6 @@ window.addEventListener("popstate", () => {
             return;
         }
         closeFullChatOverlay();
-        refreshActiveViewSmart();
-        pushBackGuard();
         return;
     }
 
