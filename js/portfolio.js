@@ -39,70 +39,113 @@ function buildPortfolioMiniCardHtml(docType, tObj, showFavBtn = true) {
     const favKey = `pf::${docType}::${tObj.id}`;
     const isFav = isItemFavorited(favKey);
     const favObjStr = esc(JSON.stringify({ favKey, kind: "pf", docType, id: tObj.id }));
+    const acc = tObj.accent || "#1b7a49";
 
-    // Ilustrasi mini mencerminkan bentuk tata letak asli masing-masing tema
+    // Miniatur nyata berbentuk dokumen CV / Surat Lamaran lengkap dengan teks contoh
     let miniThumb = "";
     if (isLam) {
         miniThumb = `
-            <div class="bg-white/95 text-zinc-900 rounded-xl p-2 shadow-lg space-y-1 my-auto">
-                <div class="h-1.5 rounded w-2/3" style="background:${tObj.accent}"></div>
-                <div class="h-1 rounded bg-zinc-200 w-full"></div>
-                <div class="h-1 rounded bg-zinc-200 w-5/6"></div>
-                <div class="h-3 rounded bg-zinc-100 border border-zinc-200"></div>
-                <div class="flex justify-end"><div class="h-1 rounded bg-zinc-400 w-1/3"></div></div>
+            <div class="bg-white text-zinc-900 rounded-lg p-2 shadow-lg my-auto text-[7px] leading-[1.3] space-y-1 border border-white/70">
+                <div class="flex justify-between items-center border-b pb-0.5" style="border-color:${acc}">
+                    <span class="font-extrabold uppercase tracking-tight" style="color:${acc}">Surat Lamaran</span>
+                    <span class="text-[6px] text-zinc-500">HRD</span>
+                </div>
+                <p class="font-bold text-zinc-800 truncate">Yth. HRD PT Nusantara</p>
+                <p class="text-zinc-600 line-clamp-2">Dengan hormat, mengajukan lamaran posisi Staf Operasional...</p>
+                <div class="bg-zinc-50 border border-zinc-200 rounded px-1.5 py-1 space-y-0.5 text-[6px]">
+                    <div class="flex justify-between"><span class="text-zinc-500">Nama</span><strong class="text-zinc-800">Raka Pratama</strong></div>
+                    <div class="flex justify-between"><span class="text-zinc-500">Posisi</span><strong style="color:${acc}">Admin Ops</strong></div>
+                </div>
+                <div class="text-right pt-0.5"><span class="inline-block border-t border-zinc-400 px-1.5 text-[6px] font-bold text-zinc-700">Raka Pratama</span></div>
             </div>`;
     } else if (tObj.id === "cv_ats" || tObj.id === "cv_royal") {
         miniThumb = `
-            <div class="bg-white/95 text-zinc-900 rounded-xl p-2 shadow-lg space-y-1 my-auto">
-                <div class="h-1.5 rounded w-3/4 mx-auto" style="background:${tObj.accent}"></div>
-                <div class="h-0.5 rounded bg-zinc-300 w-full"></div>
-                <div class="h-1 rounded bg-zinc-200 w-full"></div>
-                <div class="h-1 rounded bg-zinc-200 w-5/6"></div>
-                <div class="h-0.5 rounded bg-zinc-300 w-full"></div>
-                <div class="h-1 rounded bg-zinc-200 w-4/5"></div>
+            <div class="bg-white text-zinc-900 rounded-lg p-2 shadow-lg my-auto text-[7px] leading-[1.3] space-y-1 border border-white/70">
+                <div class="text-center border-b pb-0.5" style="border-color:${acc}">
+                    <p class="font-extrabold text-[8px] uppercase text-zinc-900 truncate">RAKA PRATAMA</p>
+                    <p class="text-[6px] font-semibold truncate" style="color:${acc}">${escHtml(tObj.tag || "Operasional & Admin")}</p>
+                </div>
+                <div>
+                    <p class="text-[6px] font-extrabold uppercase text-zinc-500">Pengalaman</p>
+                    <p class="font-bold text-zinc-800 truncate">Koordinator Ops • 2023–Kini</p>
+                    <p class="text-[6px] text-zinc-600 truncate">Pelaporan harian &amp; koordinasi tim</p>
+                </div>
+                <div>
+                    <p class="text-[6px] font-extrabold uppercase text-zinc-500">Pendidikan &amp; Skill</p>
+                    <p class="text-[6px] text-zinc-700 truncate">S1 Manajemen • Excel, Admin, K3</p>
+                </div>
             </div>`;
     } else if (tObj.id === "cv_charcoal" || tObj.id === "cv_navy") {
         miniThumb = `
-            <div class="bg-white/95 text-zinc-900 rounded-xl overflow-hidden shadow-lg grid grid-cols-[34%_1fr] h-14 my-auto">
-                <div class="p-1.5 flex flex-col items-center gap-1" style="background:${tObj.accent}">
-                    <span class="w-3.5 h-3.5 rounded-full bg-white/80"></span>
-                    <div class="h-0.5 w-full bg-white/40 rounded"></div>
-                    <div class="h-0.5 w-3/4 bg-white/40 rounded"></div>
+            <div class="bg-white text-zinc-900 rounded-lg overflow-hidden shadow-lg grid grid-cols-[38%_1fr] my-auto text-[7px] leading-[1.25] border border-white/70">
+                <div class="p-1.5 text-white flex flex-col justify-between space-y-1" style="background:${acc}">
+                    <div class="text-center space-y-0.5">
+                        <div class="w-5 h-5 rounded-full bg-white/25 mx-auto flex items-center justify-center text-[6px] font-extrabold">RP</div>
+                        <p class="text-[6px] font-bold truncate">0812-5550</p>
+                    </div>
+                    <div class="space-y-0.5 border-t border-white/20 pt-1">
+                        <p class="text-[5.5px] uppercase opacity-75 font-bold">Keahlian</p>
+                        <p class="text-[5.5px] truncate">• Administrasi</p>
+                        <p class="text-[5.5px] truncate">• Ms. Excel</p>
+                    </div>
                 </div>
-                <div class="p-1.5 space-y-1">
-                    <div class="h-1.5 rounded bg-zinc-700 w-4/5"></div>
-                    <div class="h-1 rounded bg-zinc-200 w-full"></div>
-                    <div class="h-1 rounded bg-zinc-200 w-3/4"></div>
-                    <div class="h-1 rounded bg-zinc-200 w-5/6"></div>
+                <div class="p-1.5 space-y-1 bg-white">
+                    <div>
+                        <p class="font-extrabold text-[7.5px] text-zinc-900 truncate">Raka Pratama</p>
+                        <p class="text-[5.5px] text-zinc-500 truncate">${escHtml(tObj.tag || "Staf Operasional")}</p>
+                    </div>
+                    <div class="border-t border-zinc-200 pt-0.5">
+                        <p class="text-[5.5px] font-bold text-zinc-800 truncate">Staf Operasional</p>
+                        <p class="text-[5px] text-zinc-500 truncate">PT Borneo Karya</p>
+                    </div>
+                    <div class="border-t border-zinc-200 pt-0.5">
+                        <p class="text-[5.5px] font-bold text-zinc-800 truncate">S1 Manajemen</p>
+                        <p class="text-[5px] text-zinc-500 truncate">2017 – 2021</p>
+                    </div>
                 </div>
             </div>`;
     } else if (tObj.id === "cv_teal") {
         miniThumb = `
-            <div class="bg-white/95 text-zinc-900 rounded-xl p-2 shadow-lg space-y-1 my-auto">
-                <div class="h-2 rounded w-full" style="background:${tObj.accent}"></div>
-                <div class="grid grid-cols-2 gap-0.5 border border-zinc-200 p-0.5">
-                    <div class="h-1.5 bg-zinc-200"></div><div class="h-1.5 bg-zinc-100"></div>
-                    <div class="h-1.5 bg-zinc-200"></div><div class="h-1.5 bg-zinc-100"></div>
+            <div class="bg-white text-zinc-900 rounded-lg p-1.5 shadow-lg my-auto text-[6.5px] leading-[1.25] space-y-1 border border-white/70">
+                <div class="flex items-center justify-between border-b pb-0.5" style="border-color:${acc}">
+                    <span class="font-extrabold text-[7.5px] text-zinc-900 truncate">Raka Pratama</span>
+                    <span class="w-4 h-4 rounded bg-zinc-200 text-zinc-700 flex items-center justify-center text-[5.5px] font-bold shrink-0">CV</span>
                 </div>
-                <div class="h-1 rounded bg-zinc-200 w-5/6"></div>
+                <div class="border border-zinc-200 rounded overflow-hidden text-[5.5px]">
+                    <div class="px-1 py-0.5 text-white font-bold" style="background:${acc}">I. Data Pribadi</div>
+                    <div class="px-1 py-0.5 flex justify-between"><span class="text-zinc-500">Posisi</span><strong class="text-zinc-800 truncate">Admin Ops</strong></div>
+                    <div class="px-1 py-0.5 border-t border-zinc-100 flex justify-between"><span class="text-zinc-500">Kontak</span><span class="text-zinc-700 truncate">0812-5550</span></div>
+                </div>
+                <p class="text-[5.5px] text-zinc-600 truncate">II. Pendidikan &amp; III. Pengalaman</p>
             </div>`;
     } else {
         miniThumb = `
-            <div class="bg-white/95 text-zinc-900 rounded-xl p-2 shadow-lg space-y-1 my-auto">
-                <div class="flex items-center gap-1.5">
-                    <span class="w-4 h-4 rounded-full shrink-0" style="background:${tObj.accent}"></span>
-                    <div class="h-1.5 rounded bg-zinc-300 flex-1"></div>
+            <div class="bg-white text-zinc-900 rounded-lg p-2 shadow-lg my-auto text-[7px] leading-[1.3] space-y-1 border border-white/70">
+                <div class="flex items-center gap-1.5 border-b pb-1" style="border-color:${acc}40">
+                    <span class="w-5 h-5 rounded-lg text-white flex items-center justify-center text-[6.5px] font-extrabold shrink-0" style="background:${acc}">RP</span>
+                    <div class="min-w-0">
+                        <p class="font-extrabold text-[7.5px] text-zinc-900 truncate">Raka Pratama</p>
+                        <p class="text-[5.5px] text-zinc-500 truncate">${escHtml(tObj.tag || "Profil Profesional")}</p>
+                    </div>
                 </div>
-                <div class="h-1 rounded bg-zinc-200 w-4/5"></div>
-                <div class="grid grid-cols-2 gap-1 pt-0.5">
-                    <div class="h-5 rounded bg-zinc-100 border border-zinc-200"></div>
-                    <div class="h-5 rounded bg-zinc-100 border border-zinc-200"></div>
+                <div class="grid grid-cols-[1.2fr_1fr] gap-1 pt-0.5 text-[5.5px]">
+                    <div class="space-y-0.5">
+                        <p class="font-bold text-zinc-800 truncate">Pengalaman Kerja</p>
+                        <p class="text-zinc-600 truncate">Admin &amp; Operasional</p>
+                        <p class="font-bold text-zinc-800 truncate pt-0.5">Pendidikan</p>
+                        <p class="text-zinc-600 truncate">S1 Manajemen</p>
+                    </div>
+                    <div class="bg-zinc-50 rounded p-1 border border-zinc-200 space-y-0.5">
+                        <p class="font-bold text-zinc-800">Keahlian</p>
+                        <p class="text-zinc-600 truncate">★ Administrasi</p>
+                        <p class="text-zinc-600 truncate">★ Excel &amp; Laporan</p>
+                    </div>
                 </div>
             </div>`;
     }
 
     return `
-        <div class="relative aspect-[3/4] w-full overflow-hidden select-none p-3 flex flex-col justify-between text-white" style="background:linear-gradient(155deg,${tObj.accent} 0%,#141418 72%,#09090b 100%);">
+        <div class="relative aspect-[3/4] w-full overflow-hidden select-none p-3 flex flex-col justify-between text-white" style="background:linear-gradient(155deg,${acc} 0%,#141418 72%,#09090b 100%);">
             <div class="flex items-center justify-between gap-1 z-10">
                 <span class="text-[8px] font-extrabold uppercase px-2 py-0.5 rounded-full bg-white/20 backdrop-blur">${isLam ? "LAMARAN" : "CV"}</span>
                 ${tObj.badge ? `<span class="text-[8px] font-extrabold px-1.5 py-0.5 rounded-full bg-amber-400 text-black uppercase">${escHtml(tObj.badge)}</span>` : ""}
@@ -313,7 +356,6 @@ function renderPortfolioA4Html(doc, showWatermark = false) {
     const exps = doc.experiences || [];
     const edus = doc.educations || [];
 
-    // 1. ATS CLASSIC PRO — 1 Kolom Murni Standar HRD (Tanpa Foto, Ramah Mesin ATS)
     if (tid === "cv_ats") {
         const contactLine = [doc.phone, doc.email, doc.address].filter(Boolean).map(escHtml).join("  |  ");
         return `
@@ -369,7 +411,6 @@ function renderPortfolioA4Html(doc, showWatermark = false) {
         `;
     }
 
-    // 2. ROYAL BLUE EXECUTIVE — Korporat Tanpa Foto, Tipografi Tegas & Grid Keahlian
     if (tid === "cv_royal") {
         return `
             <div class="a4-paper-sheet flex flex-col text-zinc-800">
@@ -414,7 +455,6 @@ function renderPortfolioA4Html(doc, showWatermark = false) {
         `;
     }
 
-    // 3. CHARCOAL TIMELINE — Sidebar Gelap Kiri + Garis Timeline Vertikal di Kanan
     if (tid === "cv_charcoal") {
         return `
             <div class="a4-paper-sheet grid grid-cols-[255px_1fr] text-zinc-800">
@@ -478,7 +518,6 @@ function renderPortfolioA4Html(doc, showWatermark = false) {
         `;
     }
 
-    // 4. DEEP NAVY CORPORATE — Panel Kiri Navy Formal + Foto Kotak + Isi Kanan Tegas
     if (tid === "cv_navy") {
         return `
             <div class="a4-paper-sheet grid grid-cols-[265px_1fr] text-zinc-800">
@@ -518,7 +557,6 @@ function renderPortfolioA4Html(doc, showWatermark = false) {
         `;
     }
 
-    // 5. PASTEL PEACH GEN-Z — Estetik, Melengkung, Chip Keahlian Kreatif
     if (tid === "cv_peach") {
         return `
             <div class="a4-paper-sheet flex flex-col text-zinc-800" style="background:#fffaf8;">
@@ -566,7 +604,6 @@ function renderPortfolioA4Html(doc, showWatermark = false) {
         `;
     }
 
-    // 6. OCEAN TEAL FORMAL — Gaya Tabel & Data Lengkap Terstruktur
     if (tid === "cv_teal") {
         return `
             <div class="a4-paper-sheet px-11 py-10 flex flex-col text-zinc-800">
@@ -618,7 +655,6 @@ function renderPortfolioA4Html(doc, showWatermark = false) {
         `;
     }
 
-    // 7. SLATE FRESH GRAD — Pendidikan & Keahlian Menonjol di Atas (Untuk Lulusan Baru)
     if (tid === "cv_slate") {
         return `
             <div class="a4-paper-sheet flex flex-col text-zinc-800">
@@ -662,7 +698,6 @@ function renderPortfolioA4Html(doc, showWatermark = false) {
         `;
     }
 
-    // 8. CLEAN MINIMALIST — Putih Bersih Elegan Tanpa Blok Warna Berat
     if (tid === "cv_clean") {
         return `
             <div class="a4-paper-sheet px-12 py-11 flex flex-col text-zinc-900 bg-white">
@@ -705,7 +740,7 @@ function renderPortfolioA4Html(doc, showWatermark = false) {
         `;
     }
 
-    // 9. EMERALD FRESH (Default) — Header Emerald Modern + 2 Kolom Seimbang
+    // 9. EMERALD FRESH (Default)
     return `
         <div class="a4-paper-sheet flex flex-col text-zinc-800">
             ${wmHtml}
@@ -1013,7 +1048,6 @@ function pickCroppedPortfolioPhoto(inp) {
         hideLoading();
         const finalUrl = (up && up.ok && up.url) ? up.url : dataUrl;
         pfWizardState.photoData = finalUrl;
-        // Simpan salinan lokal agar foto tidak pernah blank putih saat cetak PDF
         if (finalUrl && !finalUrl.startsWith("data:")) {
             idbSet("pf_photo_url_" + finalUrl, dataUrl);
         }
@@ -1286,7 +1320,6 @@ async function _fetchImageAsDataUrl(url) {
     }
 }
 
-// Konversi foto profil CV ke dataUrl aman sebelum cetak PDF agar tidak blank putih akibat CORS Drive
 async function _resolvePdfSafePhotoDataUrl(photoUrl) {
     const raw = String(photoUrl || "").trim();
     if (!raw) return "";
@@ -1315,7 +1348,6 @@ async function _resolvePdfSafePhotoDataUrl(photoUrl) {
         }
     }
 
-    // Fallback terakhir: coba gambar lewat elemen Image crossOrigin anonymous
     for (const url of candidates) {
         const viaCanvas = await new Promise((resolve) => {
             const im = new Image();
@@ -1367,7 +1399,6 @@ async function openSempurnakanModal(pfId) {
     sempurnakanPfDocObj = pf;
     sempurnakanPdfMode = "hrd";
 
-    // Muat kembali lampiran scan yang tersimpan di HP agar tidak hilang saat refresh
     try {
         const savedAtts = await idbGet(_getLampiranCacheKey(pf.id));
         if (Array.isArray(savedAtts) && savedAtts.length) {
@@ -1461,7 +1492,6 @@ async function generateMergedPortfolioPdf() {
         await loadScriptOnce("https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js");
         await loadScriptOnce("https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js");
 
-        // Konversi pas foto ke base64 lokal agar tidak terblokir CORS saat dirender ke PDF
         const safePhoto = sempurnakanPfDocObj.photo
             ? await _resolvePdfSafePhotoDataUrl(sempurnakanPfDocObj.photo)
             : "";
@@ -1480,7 +1510,6 @@ async function generateMergedPortfolioPdf() {
         tempHost.innerHTML = renderPortfolioA4Html(docForPdf, false);
         document.body.appendChild(tempHost);
 
-        // Tunggu seluruh gambar di dalam lembaran A4 selesai dimuat sebelum memotret ke kanvas
         const imgs = Array.from(tempHost.querySelectorAll("img"));
         await Promise.all(imgs.map(im => im.complete ? Promise.resolve() : new Promise(r => { im.onload = r; im.onerror = r; })));
 
