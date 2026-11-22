@@ -245,7 +245,7 @@ window.addEventListener("popstate", () => {
     if (isVis("modal-create-choice")) { document.getElementById("modal-create-choice").classList.add("hide"); pushBackGuard(); return; }
     if (isVis("modal-client-portal")) { document.getElementById("modal-client-portal").classList.add("hide"); pushBackGuard(); return; }
 
-    // 1. PROFIL USER -> KEMBALI KE ISI OBROLAN CHAT
+    // 1. TAHAP 1: KELUAR DARI PROFIL USER -> KEMBALI KE ISI OBROLAN CHAT
     if (isVis("modal-view-user-profile") || isVis("modal-master-user")) {
         document.getElementById("modal-view-user-profile")?.classList.add("hide");
         document.getElementById("modal-master-user")?.classList.add("hide");
@@ -264,7 +264,8 @@ window.addEventListener("popstate", () => {
         return;
     }
 
-    // 2. ISI OBROLAN -> DAFTAR SELURUH CHAT -> KELUAR KE HALAMAN TERAKHIR
+    // 2. TAHAP 2: KELUAR DARI ISI OBROLAN -> KEMBALI KE DAFTAR SELURUH CHAT
+    // 3. TAHAP 3: KELUAR DARI DAFTAR CHAT -> KEMBALI KE HALAMAN ASAL (BUKAN KELUAR APLIKASI)
     if (isVis("full-chat-overlay")) {
         if (typeof activeMasterChatThread !== "undefined" && activeMasterChatThread) {
             activeMasterChatThread = null;
@@ -273,6 +274,7 @@ window.addEventListener("popstate", () => {
             return;
         }
         closeFullChatOverlay();
+        pushBackGuard();
         return;
     }
 
