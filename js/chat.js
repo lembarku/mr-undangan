@@ -10,7 +10,7 @@ const QUICK_REPLIES_STAFF = [
 
 let tempChatAttachment = "";
 let _lastKnownChatCount = -1;
-let _chatBackListenerBound = false;
+let _chatBackBound = false;
 window.openedFromChatThread = null;
 window._chatOriginView = null;
 
@@ -45,8 +45,8 @@ function _pushChatGuard(tag) {
 }
 
 function _bindChatBackCapture() {
-    if (_chatBackListenerBound) return;
-    _chatBackListenerBound = true;
+    if (_chatBackBound) return;
+    _chatBackBound = true;
 
     window.addEventListener("popstate", (e) => {
         const ov = document.getElementById("full-chat-overlay");
@@ -79,12 +79,12 @@ function _bindChatBackCapture() {
             return;
         }
 
-        // Tahap 3: Dari Daftar Seluruh Chat -> keluar ke halaman asal (bukan keluar aplikasi)
+        // Tahap 3: Dari Daftar Seluruh Chat -> keluar ke halaman asal tanpa keluar aplikasi
         if (chatVisible) {
             e.stopImmediatePropagation();
             closeFullChatOverlay();
-            _pushChatGuard("app_root_1");
-            _pushChatGuard("app_root_2");
+            _pushChatGuard("chat_exit_1");
+            _pushChatGuard("chat_exit_2");
         }
     }, true);
 }
@@ -380,7 +380,6 @@ function closeFullChatOverlay() {
         const targetId = mapView[origin];
         if (targetId) document.getElementById(targetId)?.classList.remove("hide");
         if (typeof renderHeaderActions === "function") renderHeaderActions();
-        if (typeof refreshActiveViewSmart === "function") refreshActiveViewSmart();
     }
     if (typeof scheduleAdaptivePoll === "function") scheduleAdaptivePoll();
 }
