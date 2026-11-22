@@ -35,7 +35,6 @@ function playSoftChatNotification() {
     } catch {}
 }
 
-// Bug 1 & Bug 21: Menyaring thread chat sesuai hak akses (Tim Administrasi fokus ke User & Tamu, Master melihat semua)
 function getChatThreads() {
     const curU = getCurrentUserObj();
     const isAdministrasiOnly = curU && curU.role === "administrasi";
@@ -66,16 +65,15 @@ function getChatThreads() {
     return Object.values(map).sort((a, b) => b.lastTs - a.lastTs);
 }
 
-// Revisi 22: Daftar kontak sesuai hak akses untuk fitur "+" kirim pesan duluan ala WA
 function getAccessibleChatContacts() {
     const curU = getCurrentUserObj();
     if (!curU) return [];
     const all = (db.users || []).filter(u => String(u.username || "").toLowerCase() !== String(curU.username || "").toLowerCase());
     if (curU.role === "master") {
-        return all; // Master dapat mengirim pesan ke semua user, akun Pro, cabang, maupun tim administrasi
+        return all;
     }
     if (curU.role === "administrasi") {
-        return all.filter(u => u.role === "user"); // Tim administrasi hanya dapat menghubungi kontak user sesuai aksesnya
+        return all.filter(u => u.role === "user");
     }
     return [];
 }
@@ -138,7 +136,6 @@ function startDirectChatWithContact(username) {
     openFullChatOverlay(String(username || "").toLowerCase());
 }
 
-// Revisi 22: Hapus Riwayat Chat Khusus Master Admin
 async function deleteChatThreadHistory(targetUser) {
     const curU = getCurrentUserObj();
     if (!curU || curU.role !== "master") return showToast("Hanya Master Admin yang dapat menghapus riwayat chat.", "error");
@@ -160,17 +157,42 @@ async function deleteChatThreadHistory(targetUser) {
     }
 }
 
+// Pindahkan logo Mr Undangan ke header atas & sembunyikan footer bawah saat overlay chat dibuka
+function _syncWaChatTopLogo(titleText, subText) {
+    const ov = document.getElementById("full-chat-overlay");
+    if (!ov) return;
+    const titleEl = document.getElementById("fchat-title");
+    const subEl = document.getElementById("fchat-subtitle");
+    if (titleEl && titleText) titleEl.innerText = titleText;
+    if (subEl && subText) subEl.innerText = subText;
+
+    const topBar = ov.querySelector(".gold-gradient");
+    if (topBar) {
+        let logoBox = topBar.querySelector("#wa-chat-top-logo");
+        if (!logoBox) {
+            logoBox = document.createElement("div");
+            logoBox.id = "wa-chat-top-logo";
+            logoBox.className = "w-9 h-9 rounded-full bg-white p-1 flex items-center justify-center shadow shrink-0 border border-black/10";
+            logoBox.innerHTML = `<img src="./logo.png" alt="Mr Undangan" class="w-full h-full object-contain rounded-full" onerror="this.style.display='none'">`;
+            topBar.insertBefore(logoBox, topBar.firstChild);
+        }
+    }
+
+    const bottomFooters = Array.from(ov.querySelectorAll("div")).filter(d => d.innerText && d.innerText.includes("Layanan Resmi Kausar.pictures"));
+    bottomFooters.forEach(d => d.classList.add("hide"));
+}
+
 async function openFullChatOverlay(targetThread = null) {
     const ov = document.getElementById("full-chat-overlay"); if (!ov) return;
     if (targetThread) activeMasterChatThread = String(targetThread).toLowerCase();
     tempChatAttachment = "";
     document.body.style.overflow = "hidden";
     ov.classList.remove("hide");
+    _syncWaChatTopLogo();
     pushBackGuard();
 
     const u = getCurrentUserObj();
     if (isStaffUserObj(u)) {
-        // Bug 1 & Bug 21: Paksa sinkron data chat & user terbaru saat Master atau Tim Administrasi membuka Live Chat
         fetchFullCloud().then((ok) => {
             if (ok && !ov.classList.contains("hide")) {
                 renderFullChatContentSmart();
@@ -218,13 +240,13 @@ function buildChatComposerHtml(onSubmitFn, inputId, btnId, placeholderText) {
             </div>
             <button type="button" onclick="clearChatAttachment()" class="w-7 h-7 rounded-full bg-red-600/15 text-red-500 text-xs"><i class="fa-solid fa-xmark"></i></button>
         </div>
-        <form onsubmit="${onSubmitFn}" class="p-3 chat-composer-safe app-card border-t gold-border flex items-center gap-2 shrink-0">
-            <label class="w-10 h-10 rounded-xl app-btn-sec flex items-center justify-center text-sm app-accent cursor-pointer shrink-0" title="Lampirkan Foto / Bukti">
+        <form onsubmit="${onSubmitFn}" class="px-3 pt-2.5 pb-[calc(0.625rem+env(safe-area-inset-bottom,0px))] app-card border-t gold-border flex items-center gap-2 shrink-0 w-full">
+            <label class="w-10 h-10 rounded-full app-btn-sec flex items-center justify-center text-sm app-accent cursor-pointer shrink-0" title="Lampirkan Foto / Bukti">
                 <i class="fa-solid fa-paperclip"></i>
                 <input type="file" accept="image/*" class="hide" onchange="pickChatAttachment(this)">
             </label>
-            <input type="text" id="${inputId}" placeholder="${placeholderText}" class="app-input flex-1">
-            <button type="submit" id="${btnId}" class="gold-pill-btn px-4 py-2.5 rounded-xl text-xs shrink-0"><i class="fa-solid fa-paper-plane mr-1"></i>Kirim</button>
+            <input type="text" id="${inputId}" placeholder="${placeholderText}" class="app-input !rounded-full !py-2.5 !px-4 flex-1 text-xs">
+            <button type="submit" id="${btnId}" class="w-10 h-10 rounded-full gold-pill-btn flex items-center justify-center text-xs shrink-0 shadow" title="Kirim Pesan"><i class="fa-solid fa-paper-plane"></i></button>
         </form>
     `;
 }
@@ -235,18 +257,17 @@ function renderFullChatOverlay() {
     if (isStaffUserObj(u)) {
         const isMaster = u.role === "master";
         const roleTag = isMaster ? "Master Admin" : "Tim Administrasi";
-        document.getElementById("fchat-title").innerText = `Live Chat Masuk — ${roleTag}`;
         const threads = getChatThreads();
         if (!activeMasterChatThread) {
-            document.getElementById("fchat-subtitle").innerText = `${threads.length} percakapan aktif`;
+            _syncWaChatTopLogo(`Live Chat • ${roleTag}`, `${threads.length} percakapan aktif`);
             body.innerHTML = `
                 <div class="flex-1 overflow-y-auto divide-y divide-black/10 pb-20">${threads.length ? threads.map(th => {
                     const last = th.messages[th.messages.length - 1];
                     const lastStaff = last.role === "master" || last.role === "administrasi";
                     const roleBadge = th.role === "cabang" ? `<span class="text-[9px] px-1.5 py-0.5 rounded bg-blue-500/15 text-blue-600 font-bold">CABANG</span>`
                         : th.role === "tamu" ? `<span class="text-[9px] px-1.5 py-0.5 rounded bg-zinc-500/15 app-muted font-bold">TAMU</span>` : "";
-                    return `<div onclick="openMasterChatThread('${esc(th.threadUser)}')" class="p-4 hover:bg-black/5 cursor-pointer flex items-center gap-3.5">
-                        <img src="${th.avatar}" class="w-12 h-12 rounded-full object-cover bg-zinc-800 border gold-border">
+                    return `<div onclick="openMasterChatThread('${esc(th.threadUser)}')" class="p-3.5 hover:bg-black/5 cursor-pointer flex items-center gap-3">
+                        <img src="${th.avatar}" class="w-12 h-12 rounded-full object-cover bg-zinc-800 border gold-border shrink-0">
                         <div class="flex-1 min-w-0">
                             <div class="flex justify-between items-center gap-2">
                                 <strong class="text-sm truncate flex items-center gap-1">${escHtml(th.displayName)} ${th.isPro ? '<i class="fa-solid fa-circle-check text-blue-500 text-xs"></i>' : ""} ${roleBadge}</strong>
@@ -261,9 +282,8 @@ function renderFullChatOverlay() {
                             </div>
                         </div>
                     </div>`;
-                }).join("") : '<p class="p-12 text-center text-xs app-muted">Belum ada percakapan. Ketuk tombol <strong>+</strong> di kiri bawah untuk memulai chat dengan user.</p>'}</div>
-                <!-- Revisi 22: Tombol + di pojok kiri bawah untuk memilih kontak & kirim pesan duluan -->
-                <button type="button" onclick="openChatContactsModal()" class="absolute bottom-4 left-4 z-20 w-12 h-12 rounded-full gold-gradient shadow-xl flex items-center justify-center text-lg font-extrabold hover:scale-105 transition" title="Mulai Chat Baru (Daftar Kontak)">
+                }).join("") : '<p class="p-12 text-center text-xs app-muted">Belum ada percakapan. Ketuk tombol <strong>+</strong> untuk memulai chat dengan user.</p>'}</div>
+                <button type="button" onclick="openChatContactsModal()" class="absolute bottom-4 right-4 z-20 w-12 h-12 rounded-full gold-gradient shadow-xl flex items-center justify-center text-lg font-extrabold hover:scale-105 transition" title="Mulai Chat Baru (Daftar Kontak)">
                     <i class="fa-solid fa-plus"></i>
                 </button>
             `;
@@ -274,32 +294,32 @@ function renderFullChatOverlay() {
                 displayName: (uObj && uObj.name) || activeMasterChatThread,
                 avatar: (uObj && uObj.avatar) || DEFAULT_AVATAR
             };
-            document.getElementById("fchat-subtitle").innerText = `Obrolan dengan ${th.displayName} (@${th.threadUser})`;
+            _syncWaChatTopLogo(th.displayName, `@${th.threadUser}`);
             const quickBar = `<div class="px-3 py-1.5 app-card border-t gold-border flex gap-1.5 overflow-x-auto no-scrollbar shrink-0">${QUICK_REPLIES_STAFF.map(txt => `<button type="button" onclick="fillQuickReply('${esc(txt)}')" class="px-2.5 py-1 rounded-full app-card-soft border text-[10px] font-semibold whitespace-nowrap hover:brightness-95">${escHtml(txt.slice(0, 34))}...</button>`).join("")}</div>`;
             body.innerHTML = `
-                <div class="app-card px-4 py-2.5 border-b gold-border flex items-center justify-between gap-2 shrink-0">
+                <div class="app-card px-3.5 py-2 border-b gold-border flex items-center justify-between gap-2 shrink-0">
                     <div class="flex items-center gap-2 min-w-0">
-                        <button onclick="activeMasterChatThread=null;renderFullChatOverlay();" class="px-3 py-1.5 rounded-xl app-btn-sec text-xs font-bold shrink-0"><i class="fa-solid fa-arrow-left mr-1"></i>Daftar</button>
+                        <button onclick="activeMasterChatThread=null;renderFullChatOverlay();" class="px-2.5 py-1.5 rounded-xl app-btn-sec text-xs font-bold shrink-0"><i class="fa-solid fa-arrow-left mr-1"></i>Daftar</button>
                         <img src="${th.avatar}" class="w-8 h-8 rounded-full object-cover bg-zinc-800 shrink-0">
                         <strong class="text-xs truncate">${escHtml(th.displayName)}</strong>
                     </div>
                     <div class="flex items-center gap-1.5 shrink-0">
+                        <button type="button" onclick="openChatContactsModal()" class="w-8 h-8 rounded-full gold-pill-btn flex items-center justify-center text-xs shadow" title="Kontak Baru (+)"><i class="fa-solid fa-plus"></i></button>
                         ${isMaster ? `<button onclick="closeFullChatOverlay();viewUserProfileModal('${esc(th.threadUser)}');" class="px-2.5 py-1.5 rounded-lg app-accent-bg app-accent text-[10px] font-bold">Profil &amp; PIN</button>` : ""}
-                        ${isMaster ? `<button onclick="deleteChatThreadHistory('${esc(th.threadUser)}')" class="px-2.5 py-1.5 rounded-lg bg-red-600/15 text-red-500 text-[10px] font-bold" title="Hapus Riwayat Chat"><i class="fa-solid fa-trash mr-1"></i>Hapus</button>` : ""}
+                        ${isMaster ? `<button onclick="deleteChatThreadHistory('${esc(th.threadUser)}')" class="px-2.5 py-1.5 rounded-lg bg-red-600/15 text-red-500 text-[10px] font-bold" title="Hapus Riwayat Chat"><i class="fa-solid fa-trash"></i></button>` : ""}
                     </div>
                 </div>
-                <div id="fchat-messages-scroll" class="flex-1 overflow-y-auto p-4 space-y-2.5"></div>
+                <div id="fchat-messages-scroll" class="flex-1 overflow-y-auto p-3.5 space-y-2.5"></div>
                 ${quickBar}
                 ${buildChatComposerHtml("sendMasterThreadReply(event)", "master-wa-input", "btn-wa-send", `Ketik pesan ke @${esc(th.threadUser)}...`)}
             `;
             renderFullChatMessagesOnly();
         }
     } else {
-        document.getElementById("fchat-title").innerText = "Live Chat Admin Mr Undangan";
-        document.getElementById("fchat-subtitle").innerText = "Tanyakan tema, CV/Lamaran, konfirmasi, atau bantuan PIN";
+        _syncWaChatTopLogo("Mr Undangan Chat", "Admin • Respon cepat");
         body.innerHTML = `
-            <div id="fchat-messages-scroll" class="flex-1 overflow-y-auto p-4 space-y-2.5"></div>
-            ${buildChatComposerHtml("sendUserChatMessage(event)", "chat-input-text", "btn-chat-send", "Tulis pesan atau lampirkan bukti ke Admin...")}
+            <div id="fchat-messages-scroll" class="flex-1 overflow-y-auto p-3.5 space-y-2.5"></div>
+            ${buildChatComposerHtml("sendUserChatMessage(event)", "chat-input-text", "btn-chat-send", "Ketik pesan...")}
         `;
         renderFullChatMessagesOnly();
         apiAction({ action: "mark_chat_read", threadUser: (currentSessionUser || guestChatId).toLowerCase(), by: "user" }).then(updateChatBadges);
@@ -442,7 +462,6 @@ async function sendUserChatMessage(e) {
     }
 }
 
-// Bug 1 & Bug 21: Lencana notifikasi chat masuk langsung muncul di Master Admin & Tim Administrasi
 function updateChatBadges() {
     const badge = document.getElementById("floating-chat-badge");
     const staffPill = document.getElementById("staff-chat-pill-cnt");
