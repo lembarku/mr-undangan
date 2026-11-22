@@ -10,7 +10,7 @@ const QUICK_REPLIES_STAFF = [
 
 let tempChatAttachment = "";
 let _lastKnownChatCount = -1;
-window.openedFromChatThread = null; // Penanda bahwa profil dibuka dari obrolan aktif
+window.openedFromChatThread = null;
 
 function isStaffUserObj(u) {
     return !!(u && (u.role === "master" || u.role === "administrasi"));
@@ -158,19 +158,35 @@ async function deleteChatThreadHistory(targetUser) {
     }
 }
 
-// Buka profil user dari dalam chat: JANGAN sembunyikan overlay chat agar bisa kembali bertahap
+// Buka profil user dari dalam chat: Pastikan mencari fungsi profil yang tersedia di Master maupun User
 function _openUserProfileFromChat(threadUser) {
     const cleanUser = String(threadUser || "").trim().toLowerCase();
-    if (!cleanUser || cleanUser.startsWith("tamu_")) return;
+    if (!cleanUser || cleanUser.startsWith("tamu_")) {
+        showToast("Pengunjung Tamu tidak memiliki profil terdaftar.", "info");
+        return;
+    }
 
     window.openedFromChatThread = activeMasterChatThread || cleanUser;
 
+    // Panggil modal profil yang sesuai di aplikasi
     if (typeof viewUserProfileModal === "function") {
         viewUserProfileModal(cleanUser);
-    } else if (typeof openUserProfileModal === "function") {
-        openUserProfileModal(cleanUser);
     } else if (typeof inspectUserProfile === "function") {
         inspectUserProfile(cleanUser);
+    } else if (typeof openMasterUserModal === "function") {
+        openMasterUserModal(cleanUser);
+    } else if (typeof openUserProfileModal === "function") {
+        openUserProfileModal(cleanUser);
+    } else {
+        // Fallback langsung render ke modal profil
+        const uTarget = (db.users || []).find(x => String(x.username || "").toLowerCase() === cleanUser);
+        if (uTarget) {
+            const m = document.getElementById("modal-view-user-profile") || document.getElementById("modal-master-user");
+            if (m) {
+                m.classList.remove("hide");
+                if (typeof pushBackGuard === "function") pushBackGuard();
+            }
+        }
     }
 }
 
@@ -190,13 +206,15 @@ function _syncWaChatHeader(mode = "list", title = "", avatarUrl = "", threadUser
         topBar.style.cssText = "display:flex !important;align-items:center !important;justify-content:flex-start !important;padding:0.75rem 1rem !important;border-radius:0 !important;";
 
         const isRealUser = mode === "thread" && threadUser && !String(threadUser).startsWith("tamu_");
+        const clickCall = isRealUser ? `onclick="_openUserProfileFromChat('${esc(threadUser)}'); event.stopPropagation();"` : "";
 
         topBar.innerHTML = `
-            <div id="wa-chat-profile-bar" class="flex items-center gap-3 w-full min-w-0 ${isRealUser ? "cursor-pointer active:opacity-80" : ""}">
+            <div id="wa-chat-profile-bar" class="flex items-center gap-3 w-full min-w-0 ${isRealUser ? "cursor-pointer active:opacity-75" : ""}" ${clickCall}>
                 ${mode === "thread"
                     ? `<img id="wa-thread-avatar" src="${avatarUrl || DEFAULT_AVATAR}" class="w-10 h-10 rounded-full object-cover border border-white/60 bg-zinc-800 shrink-0">
                        <div class="min-w-0 flex-1">
                            <h3 id="wa-thread-name" class="text-base font-extrabold text-white tracking-tight truncate">${escHtml(title || "Pengguna")}</h3>
+                           <span class="text-[10px] text-white/80 block -mt-0.5">Ketuk untuk lihat profil</span>
                        </div>`
                     : `<img src="./logo.png" class="w-9 h-9 rounded-xl bg-white p-1 object-contain border border-black/10 shrink-0">
                        <div class="min-w-0 flex-1">
@@ -205,17 +223,6 @@ function _syncWaChatHeader(mode = "list", title = "", avatarUrl = "", threadUser
                 }
             </div>
         `;
-
-        if (isRealUser) {
-            const barEl = topBar.querySelector("#wa-chat-profile-bar");
-            if (barEl) {
-                barEl.onclick = function (ev) {
-                    ev.preventDefault();
-                    ev.stopPropagation();
-                    _openUserProfileFromChat(threadUser);
-                };
-            }
-        }
     }
 
     const body = document.getElementById("fchat-body");
