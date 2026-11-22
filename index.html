@@ -45,6 +45,26 @@
             color: #ffffff;
         }
         #ios-hello-splash.hide { display: none !important; }
+
+        /* Penyesuaian banner promo full-bleed layar HP tanpa bingkai kaku */
+        .promo-banner-fullbleed {
+            position: relative;
+            width: 100vw;
+            margin-left: calc(-50vw + 50%);
+            margin-right: calc(-50vw + 50%);
+            height: clamp(170px, 48vw, 240px);
+            overflow: hidden;
+            background: #09090b;
+        }
+        @media (min-width: 768px) {
+            .promo-banner-fullbleed {
+                width: 100%;
+                margin-left: 0;
+                margin-right: 0;
+                border-radius: 1.5rem;
+                height: 220px;
+            }
+        }
     </style>
 </head>
 <body class="min-h-screen flex flex-col">
@@ -230,7 +250,8 @@
         </div>
         <div class="flex items-center gap-2">
             <div id="header-actions" class="flex items-center gap-2"></div>
-            <button id="header-dots-btn" onclick="toggleSlideMenu(true)" class="w-9 h-9 rounded-full app-card-soft border gold-border app-accent flex items-center justify-center hover:brightness-95 transition" title="Opsi & Pengaturan">
+            <!-- Tombol titik tiga hanya tampil di halaman profil/dashboard (disembunyikan saat di beranda) -->
+            <button id="header-dots-btn" onclick="toggleSlideMenu(true)" class="hide w-9 h-9 rounded-full app-card-soft border gold-border app-accent flex items-center justify-center hover:brightness-95 transition" title="Opsi &amp; Pengaturan">
                 <i class="fa-solid fa-ellipsis-vertical text-sm"></i>
             </button>
         </div>
@@ -242,19 +263,9 @@
         <!-- 1. BERANDA / LANDING PAGE                                 -->
         <!-- ========================================================= -->
         <section id="view-landing" class="space-y-5">
-            <div class="promo-banner-frame">
+            <!-- Banner promo full-bleed kiri-kanan tanpa bingkai kaku, auto-scroll, tanpa indikator titik-titik -->
+            <div class="promo-banner-fullbleed shadow-sm">
                 <div id="promo-banner-track" class="w-full h-full flex transition-transform duration-700 ease-out"></div>
-                <div id="promo-banner-dots" class="absolute bottom-2.5 right-4 flex gap-1.5 z-20"></div>
-            </div>
-
-            <div class="app-card border rounded-2xl px-4 py-3.5 md:px-6 md:py-4 shadow-sm">
-                <div class="space-y-1 max-w-2xl">
-                    <span class="text-[10px] uppercase tracking-widest app-accent font-extrabold">Solusi Berkas Digital dalam Genggaman</span>
-                    <h2 class="text-sm md:text-base font-extrabold leading-snug">Buat Undangan Digital, CV Profesional &amp; Surat Lamaran Langsung dari HP</h2>
-                    <p class="text-[11px] md:text-xs app-muted leading-relaxed">
-                        <strong>Pilih Desain → Isi Data &amp; Konfirmasi → Bagikan / Unduh PDF</strong> — praktis, rapi, dan hemat biaya langsung dari genggaman Anda.
-                    </p>
-                </div>
             </div>
 
             <!-- ETALASE 1: UNDANGAN DIGITAL -->
