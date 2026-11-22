@@ -11,6 +11,7 @@ const QUICK_REPLIES_STAFF = [
 let tempChatAttachment = "";
 let _lastKnownChatCount = -1;
 window.openedFromChatThread = null;
+window._chatOriginView = null;
 
 function isStaffUserObj(u) {
     return !!(u && (u.role === "master" || u.role === "administrasi"));
@@ -158,6 +159,15 @@ async function deleteChatThreadHistory(targetUser) {
     }
 }
 
+function _findProfileModalEl() {
+    const ids = ["modal-view-user-profile", "modal-user-profile", "modal-profile-detail", "modal-master-user"];
+    for (const id of ids) {
+        const el = document.getElementById(id);
+        if (el) return el;
+    }
+    return null;
+}
+
 function _openUserProfileFromChat(threadUser) {
     const cleanUser = String(threadUser || "").trim().toLowerCase();
     if (!cleanUser || cleanUser.startsWith("tamu_")) {
@@ -165,19 +175,45 @@ function _openUserProfileFromChat(threadUser) {
         return;
     }
 
-    window.openedFromChatThread = activeMasterChatThread || cleanUser;
+    const candidateFns = [
+        "viewUserProfileModal",
+        "inspectUserProfile",
+        "openUserProfileModal",
+        "openUserProfile",
+        "showUserProfileModal",
+        "openMasterUserModal"
+    ];
 
-    if (typeof viewUserProfileModal === "function") {
-        viewUserProfileModal(cleanUser);
-    } else if (typeof inspectUserProfile === "function") {
-        inspectUserProfile(cleanUser);
-    } else if (typeof openMasterUserModal === "function") {
-        openMasterUserModal(cleanUser);
-    } else if (typeof openUserProfileModal === "function") {
-        openUserProfileModal(cleanUser);
+    let opened = false;
+    for (const fnName of candidateFns) {
+        if (typeof window[fnName] === "function") {
+            try {
+                window.openedFromChatThread = activeMasterChatThread || cleanUser;
+                window[fnName](cleanUser);
+                opened = true;
+                break;
+            } catch {}
+        }
     }
 
-    if (typeof pushStepBackGuard === "function") pushStepBackGuard("chat_profile");
+    const modEl = _findProfileModalEl();
+    if (modEl && !modEl.classList.contains("hide")) {
+        opened = true;
+    } else if (modEl && !opened) {
+        const uObj = (db.users || []).find(x => String(x.username || "").toLowerCase() === cleanUser);
+        if (uObj) {
+            window.openedFromChatThread = activeMasterChatThread || cleanUser;
+            modEl.classList.remove("hide");
+            opened = true;
+        }
+    }
+
+    if (opened) {
+        if (typeof pushStepBackGuard === "function") pushStepBackGuard("chat_profile");
+    } else {
+        window.openedFromChatThread = null;
+        showToast("Data profil pengguna belum tersedia.", "info");
+    }
 }
 
 function _syncWaChatHeader(mode = "list", title = "", avatarUrl = "", threadUser = "") {
@@ -231,6 +267,9 @@ function _syncWaChatHeader(mode = "list", title = "", avatarUrl = "", threadUser
 
 async function openFullChatOverlay(targetThread = null) {
     const ov = document.getElementById("full-chat-overlay"); if (!ov) return;
+    if (ov.classList.contains("hide") && typeof currentViewName !== "undefined") {
+        window._chatOriginView = currentViewName;
+    }
     if (targetThread) activeMasterChatThread = String(targetThread).toLowerCase();
     tempChatAttachment = "";
     document.body.style.overflow = "hidden";
@@ -263,6 +302,27 @@ function closeFullChatOverlay() {
     tempChatAttachment = "";
     activeMasterChatThread = null;
     window.openedFromChatThread = null;
+    const origin = window._chatOriginView;
+    window._chatOriginView = null;
+    if (origin && typeof currentViewName !== "undefined" && currentViewName !== origin && typeof hideAllViews === "function") {
+        currentViewName = origin;
+        hideAllViews();
+        const mapView = {
+            landing: "view-landing",
+            profile: "view-profile",
+            cabang: "view-cabang-admin",
+            master: "view-master-admin",
+            staff: "view-staff-admin",
+            wizard: "view-wizard",
+            portfolio_wizard: "view-portfolio-wizard",
+            payment: "view-payment",
+            guestlist: "view-guestlist"
+        };
+        const targetId = mapView[origin];
+        if (targetId) document.getElementById(targetId)?.classList.remove("hide");
+        if (typeof renderHeaderActions === "function") renderHeaderActions();
+        if (typeof refreshActiveViewSmart === "function") refreshActiveViewSmart();
+    }
     if (typeof scheduleAdaptivePoll === "function") scheduleAdaptivePoll();
 }
 
