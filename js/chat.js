@@ -10,7 +10,7 @@ const QUICK_REPLIES_STAFF = [
 
 let tempChatAttachment = "";
 let _lastKnownChatCount = -1;
-let _waChatBackInstalled = false;
+let _waChatBackGuardActive = false;
 
 function isStaffUserObj(u) {
     return !!(u && (u.role === "master" || u.role === "administrasi"));
@@ -92,7 +92,7 @@ function openChatContactsModal() {
     if (inp) inp.value = "";
     renderChatContactsModalList();
     document.getElementById("modal-chat-contacts").classList.remove("hide");
-    if (typeof pushBackGuard === "function") pushBackGuard();
+    _pushWaHistoryState();
 }
 
 function renderChatContactsModalList() {
@@ -158,12 +158,32 @@ async function deleteChatThreadHistory(targetUser) {
     }
 }
 
+function _pushWaHistoryState() {
+    try {
+        history.pushState({ waChatGuard: true, ts: Date.now() }, "", window.location.href);
+    } catch {}
+}
+
+function openThreadUserProfile(threadUser) {
+    const cleanUser = String(threadUser || "").trim().toLowerCase();
+    if (!cleanUser || cleanUser.startsWith("tamu_")) return;
+    if (typeof viewUserProfileModal !== "function") return;
+    const ov = document.getElementById("full-chat-overlay");
+    if (ov) {
+        ov.style.cssText = "";
+        ov.classList.add("hide");
+    }
+    document.body.style.overflow = "";
+    tempChatAttachment = "";
+    if (typeof scheduleAdaptivePoll === "function") scheduleAdaptivePoll();
+    viewUserProfileModal(cleanUser);
+}
+
 // Format Header WhatsApp Mentok Kiri & Bersih
-function _syncWaChatHeader(mode = "list", title = "", avatarUrl = "") {
+function _syncWaChatHeader(mode = "list", title = "", avatarUrl = "", threadUser = "") {
     const ov = document.getElementById("full-chat-overlay");
     if (!ov) return;
 
-    // Full screen tanpa celah kosong
     ov.style.cssText = "display:flex !important;position:fixed !important;inset:0 !important;width:100vw !important;height:100vh !important;max-width:100vw !important;max-height:100vh !important;padding:0 !important;margin:0 !important;z-index:110 !important;background:#000000 !important;opacity:1 !important;visibility:visible !important;";
 
     const cardBox = ov.querySelector(".app-card");
@@ -175,17 +195,17 @@ function _syncWaChatHeader(mode = "list", title = "", avatarUrl = "") {
     if (topBar) {
         topBar.style.cssText = "display:flex !important;align-items:center !important;justify-content:flex-start !important;padding:0.75rem 1rem !important;border-radius:0 !important;";
 
-        // Hilangkan tombol X
         const xBtn = topBar.querySelector("button");
         if (xBtn) xBtn.style.setProperty("display", "none", "important");
 
-        // Hilangkan icon headset bawaan
         const headIcon = topBar.querySelector(".fa-headset");
         if (headIcon) headIcon.style.setProperty("display", "none", "important");
 
-        // Kosongkan topBar dan isi ulang agar mentok kiri
+        const canOpenProfile = mode === "thread" && threadUser && !String(threadUser).startsWith("tamu_") && typeof viewUserProfileModal === "function";
+        const clickAttr = canOpenProfile ? `onclick="openThreadUserProfile('${esc(threadUser)}')" style="cursor:pointer;"` : "";
+
         topBar.innerHTML = `
-            <div class="flex items-center gap-3 w-full min-w-0">
+            <div class="flex items-center gap-3 w-full min-w-0" ${clickAttr}>
                 ${mode === "thread"
                     ? `<img src="${avatarUrl || DEFAULT_AVATAR}" class="w-10 h-10 rounded-full object-cover border border-white/60 bg-zinc-800 shrink-0">
                        <div class="min-w-0 flex-1">
@@ -205,7 +225,6 @@ function _syncWaChatHeader(mode = "list", title = "", avatarUrl = "") {
         body.style.cssText = "display:flex !important;flex-direction:column !important;flex:1 1 auto !important;min-height:0 !important;background:var(--app-bg,#f8fafc) !important;";
     }
 
-    // Sembunyikan bar tulisan Mr Undangan di bagian paling bawah
     if (cardBox) {
         Array.from(cardBox.children).forEach(child => {
             if (child !== topBar && child !== body) {
@@ -215,38 +234,33 @@ function _syncWaChatHeader(mode = "list", title = "", avatarUrl = "") {
     }
 }
 
-// Logika Tombol Back HP: Jika dalam obrolan -> kembali ke daftar chat dulu
-function _handleWaChatPopState() {
-    const ov = document.getElementById("full-chat-overlay");
-    if (!ov || ov.classList.contains("hide")) return false;
-
-    const u = getCurrentUserObj();
-    if (isStaffUserObj(u) && activeMasterChatThread) {
-        activeMasterChatThread = null;
-        renderFullChatOverlay();
-        if (typeof pushBackGuard === "function") pushBackGuard();
-        return true;
-    }
-
-    closeFullChatOverlay();
-    return true;
-}
-
-if (!_waChatBackInstalled) {
-    _waChatBackInstalled = true;
+// Intercept tombol Back HP sebelum listener lain agar obrolan kembali ke daftar semua chat dulu
+if (!_waChatBackGuardActive) {
+    _waChatBackGuardActive = true;
     window.addEventListener("popstate", (e) => {
         const ov = document.getElementById("full-chat-overlay");
-        if (ov && !ov.classList.contains("hide")) {
-            const u = getCurrentUserObj();
-            if (isStaffUserObj(u) && activeMasterChatThread) {
-                activeMasterChatThread = null;
-                renderFullChatOverlay();
-                if (typeof pushBackGuard === "function") pushBackGuard();
-            } else {
-                closeFullChatOverlay();
-            }
+        if (!ov || ov.classList.contains("hide")) return;
+
+        const contactsMod = document.getElementById("modal-chat-contacts");
+        if (contactsMod && !contactsMod.classList.contains("hide")) {
+            e.stopImmediatePropagation();
+            contactsMod.classList.add("hide");
+            _pushWaHistoryState();
+            return;
         }
-    });
+
+        const u = getCurrentUserObj();
+        if (isStaffUserObj(u) && activeMasterChatThread) {
+            e.stopImmediatePropagation();
+            activeMasterChatThread = null;
+            renderFullChatOverlay();
+            _pushWaHistoryState();
+            return;
+        }
+
+        e.stopImmediatePropagation();
+        closeFullChatOverlay();
+    }, true);
 }
 
 async function openFullChatOverlay(targetThread = null) {
@@ -255,7 +269,8 @@ async function openFullChatOverlay(targetThread = null) {
     tempChatAttachment = "";
     document.body.style.overflow = "hidden";
     ov.classList.remove("hide");
-    if (typeof pushBackGuard === "function") pushBackGuard();
+    _pushWaHistoryState();
+    _pushWaHistoryState();
 
     const u = getCurrentUserObj();
     if (isStaffUserObj(u) && typeof fetchFullCloud === "function") {
@@ -361,10 +376,9 @@ function renderFullChatOverlay() {
                 displayName: (uObj && uObj.name) || activeMasterChatThread,
                 avatar: (uObj && uObj.avatar) || DEFAULT_AVATAR
             };
-            _syncWaChatHeader("thread", th.displayName, th.avatar);
+            _syncWaChatHeader("thread", th.displayName, th.avatar, th.threadUser);
             const quickBar = `<div class="px-3 py-1.5 app-card border-t gold-border flex gap-1.5 overflow-x-auto no-scrollbar shrink-0">${QUICK_REPLIES_STAFF.map(txt => `<button type="button" onclick="fillQuickReply('${esc(txt)}')" class="px-2.5 py-1 rounded-full app-card-soft border text-[10px] font-semibold whitespace-nowrap hover:brightness-95">${escHtml(txt.slice(0, 34))}...</button>`).join("")}</div>`;
-            
-            // Lingkar kuning dihapus, isi chat langsung mentok ke atas
+
             body.innerHTML = `
                 <div id="fchat-messages-scroll" class="flex-1 overflow-y-auto p-3.5 space-y-2.5"></div>
                 ${quickBar}
@@ -373,7 +387,7 @@ function renderFullChatOverlay() {
             renderFullChatMessagesOnly();
         }
     } else {
-        _syncWaChatHeader("thread", "Admin Mr Undangan", "./logo.png");
+        _syncWaChatHeader("thread", "Admin Mr Undangan", "./logo.png", "");
         body.innerHTML = `
             <div id="fchat-messages-scroll" class="flex-1 overflow-y-auto p-3.5 space-y-2.5"></div>
             ${buildChatComposerHtml("sendUserChatMessage(event)", "chat-input-text", "btn-chat-send", "Ketik pesan...")}
@@ -443,7 +457,7 @@ function renderFullChatContentSmart() {
 async function openMasterChatThread(tUser) {
     activeMasterChatThread = tUser;
     renderFullChatOverlay();
-    if (typeof pushBackGuard === "function") pushBackGuard();
+    _pushWaHistoryState();
     const u = getCurrentUserObj();
     await apiAction({ action: "mark_chat_read", threadUser: tUser, by: (u && u.role) || "master" });
     updateChatBadges();
