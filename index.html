@@ -46,7 +46,7 @@
         }
         #ios-hello-splash.hide { display: none !important; }
 
-        /* Penyesuaian banner promo full-bleed layar HP tanpa bingkai kaku */
+        /* Banner promo full lebar layar HP */
         .promo-banner-fullbleed {
             position: relative;
             width: 100vw;
@@ -65,9 +65,19 @@
                 height: 220px;
             }
         }
+
+        /* Sembunyikan titik indikator banner */
+        #promo-banner-dots {
+            display: none !important;
+        }
+
+        /* Tombol titik 3 disembunyikan saat di beranda utama */
+        body.in-home #header-dots-btn {
+            display: none !important;
+        }
     </style>
 </head>
-<body class="min-h-screen flex flex-col">
+<body class="min-h-screen flex flex-col in-home">
 
     <!-- 1. LAYAR LOADING "HALO" BERGAYA iOS -->
     <div id="ios-hello-splash">
@@ -250,8 +260,8 @@
         </div>
         <div class="flex items-center gap-2">
             <div id="header-actions" class="flex items-center gap-2"></div>
-            <!-- Tombol titik tiga hanya tampil di halaman profil/dashboard (disembunyikan saat di beranda) -->
-            <button id="header-dots-btn" onclick="toggleSlideMenu(true)" class="hide w-9 h-9 rounded-full app-card-soft border gold-border app-accent flex items-center justify-center hover:brightness-95 transition" title="Opsi &amp; Pengaturan">
+            <!-- Tombol titik tiga: otomatis tersembunyi di beranda via CSS body.in-home -->
+            <button id="header-dots-btn" onclick="toggleSlideMenu(true)" class="w-9 h-9 rounded-full app-card-soft border gold-border app-accent flex items-center justify-center hover:brightness-95 transition" title="Opsi &amp; Pengaturan">
                 <i class="fa-solid fa-ellipsis-vertical text-sm"></i>
             </button>
         </div>
@@ -263,9 +273,10 @@
         <!-- 1. BERANDA / LANDING PAGE                                 -->
         <!-- ========================================================= -->
         <section id="view-landing" class="space-y-5">
-            <!-- Banner promo full-bleed kiri-kanan tanpa bingkai kaku, auto-scroll, tanpa indikator titik-titik -->
+            <!-- Banner promo full layar HP, auto-scroll, titik-titik tetap ada untuk JS tapi disembunyikan CSS -->
             <div class="promo-banner-fullbleed shadow-sm">
                 <div id="promo-banner-track" class="w-full h-full flex transition-transform duration-700 ease-out"></div>
+                <div id="promo-banner-dots" class="hide"></div>
             </div>
 
             <!-- ETALASE 1: UNDANGAN DIGITAL -->
