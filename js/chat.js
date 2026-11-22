@@ -10,7 +10,7 @@ const QUICK_REPLIES_STAFF = [
 
 let tempChatAttachment = "";
 let _lastKnownChatCount = -1;
-let _waChatBackGuardActive = false;
+let _waChatPopListenerAttached = false;
 
 function isStaffUserObj(u) {
     return !!(u && (u.role === "master" || u.role === "administrasi"));
@@ -160,14 +160,14 @@ async function deleteChatThreadHistory(targetUser) {
 
 function _pushWaHistoryState() {
     try {
-        history.pushState({ waChatGuard: true, ts: Date.now() }, "", window.location.href);
+        history.pushState({ mrWaChat: true, t: Date.now() + Math.random() }, "", window.location.href);
     } catch {}
 }
 
-function openThreadUserProfile(threadUser) {
+function _openUserProfileDirect(threadUser) {
     const cleanUser = String(threadUser || "").trim().toLowerCase();
     if (!cleanUser || cleanUser.startsWith("tamu_")) return;
-    if (typeof viewUserProfileModal !== "function") return;
+
     const ov = document.getElementById("full-chat-overlay");
     if (ov) {
         ov.style.cssText = "";
@@ -176,7 +176,18 @@ function openThreadUserProfile(threadUser) {
     document.body.style.overflow = "";
     tempChatAttachment = "";
     if (typeof scheduleAdaptivePoll === "function") scheduleAdaptivePoll();
-    viewUserProfileModal(cleanUser);
+
+    if (typeof viewUserProfileModal === "function") {
+        viewUserProfileModal(cleanUser);
+        return;
+    }
+    if (typeof openUserProfileModal === "function") {
+        openUserProfileModal(cleanUser);
+        return;
+    }
+    if (typeof inspectUserProfile === "function") {
+        inspectUserProfile(cleanUser);
+    }
 }
 
 // Format Header WhatsApp Mentok Kiri & Bersih
@@ -195,21 +206,14 @@ function _syncWaChatHeader(mode = "list", title = "", avatarUrl = "", threadUser
     if (topBar) {
         topBar.style.cssText = "display:flex !important;align-items:center !important;justify-content:flex-start !important;padding:0.75rem 1rem !important;border-radius:0 !important;";
 
-        const xBtn = topBar.querySelector("button");
-        if (xBtn) xBtn.style.setProperty("display", "none", "important");
-
-        const headIcon = topBar.querySelector(".fa-headset");
-        if (headIcon) headIcon.style.setProperty("display", "none", "important");
-
-        const canOpenProfile = mode === "thread" && threadUser && !String(threadUser).startsWith("tamu_") && typeof viewUserProfileModal === "function";
-        const clickAttr = canOpenProfile ? `onclick="openThreadUserProfile('${esc(threadUser)}')" style="cursor:pointer;"` : "";
+        const isRealUser = mode === "thread" && threadUser && !String(threadUser).startsWith("tamu_");
 
         topBar.innerHTML = `
-            <div class="flex items-center gap-3 w-full min-w-0" ${clickAttr}>
+            <div id="wa-chat-header-trigger" class="flex items-center gap-3 w-full min-w-0 ${isRealUser ? "cursor-pointer active:opacity-80" : ""}">
                 ${mode === "thread"
-                    ? `<img src="${avatarUrl || DEFAULT_AVATAR}" class="w-10 h-10 rounded-full object-cover border border-white/60 bg-zinc-800 shrink-0">
+                    ? `<img id="wa-thread-prof-img" src="${avatarUrl || DEFAULT_AVATAR}" class="w-10 h-10 rounded-full object-cover border border-white/60 bg-zinc-800 shrink-0">
                        <div class="min-w-0 flex-1">
-                           <h3 class="text-base font-extrabold text-white tracking-tight truncate">${escHtml(title || "Pengguna")}</h3>
+                           <h3 id="wa-thread-prof-name" class="text-base font-extrabold text-white tracking-tight truncate">${escHtml(title || "Pengguna")}</h3>
                        </div>`
                     : `<img src="./logo.png" class="w-9 h-9 rounded-xl bg-white p-1 object-contain border border-black/10 shrink-0">
                        <div class="min-w-0 flex-1">
@@ -218,6 +222,17 @@ function _syncWaChatHeader(mode = "list", title = "", avatarUrl = "", threadUser
                 }
             </div>
         `;
+
+        if (isRealUser) {
+            const trig = topBar.querySelector("#wa-chat-header-trigger");
+            if (trig) {
+                trig.addEventListener("click", (ev) => {
+                    ev.preventDefault();
+                    ev.stopPropagation();
+                    _openUserProfileDirect(threadUser);
+                });
+            }
+        }
     }
 
     const body = document.getElementById("fchat-body");
@@ -234,9 +249,9 @@ function _syncWaChatHeader(mode = "list", title = "", avatarUrl = "", threadUser
     }
 }
 
-// Intercept tombol Back HP sebelum listener lain agar obrolan kembali ke daftar semua chat dulu
-if (!_waChatBackGuardActive) {
-    _waChatBackGuardActive = true;
+// Tangkap tombol Back HP pada fase capture agar obrolan kembali ke daftar chat dulu
+if (!_waChatPopListenerAttached) {
+    _waChatPopListenerAttached = true;
     window.addEventListener("popstate", (e) => {
         const ov = document.getElementById("full-chat-overlay");
         if (!ov || ov.classList.contains("hide")) return;
@@ -253,8 +268,8 @@ if (!_waChatBackGuardActive) {
         if (isStaffUserObj(u) && activeMasterChatThread) {
             e.stopImmediatePropagation();
             activeMasterChatThread = null;
-            renderFullChatOverlay();
             _pushWaHistoryState();
+            renderFullChatOverlay();
             return;
         }
 
@@ -269,8 +284,11 @@ async function openFullChatOverlay(targetThread = null) {
     tempChatAttachment = "";
     document.body.style.overflow = "hidden";
     ov.classList.remove("hide");
+
     _pushWaHistoryState();
-    _pushWaHistoryState();
+    if (activeMasterChatThread) {
+        _pushWaHistoryState();
+    }
 
     const u = getCurrentUserObj();
     if (isStaffUserObj(u) && typeof fetchFullCloud === "function") {
@@ -456,8 +474,8 @@ function renderFullChatContentSmart() {
 
 async function openMasterChatThread(tUser) {
     activeMasterChatThread = tUser;
-    renderFullChatOverlay();
     _pushWaHistoryState();
+    renderFullChatOverlay();
     const u = getCurrentUserObj();
     await apiAction({ action: "mark_chat_read", threadUser: tUser, by: (u && u.role) || "master" });
     updateChatBadges();
