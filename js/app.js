@@ -32,55 +32,61 @@ window.addEventListener("appinstalled", () => {
 function openWelcomeInstallModal(force = false) {
     if (!force && isAppInstalled()) return;
     if (!force && sessionStorage.getItem("MR_INSTALL_PROMPTED_SESSION") === "1") return;
-    if (!document.getElementById("guest-invitation-overlay").classList.contains("hide")) return;
+    const gOv = document.getElementById("guest-invitation-overlay");
+    if (gOv && !gOv.classList.contains("hide")) return;
     sessionStorage.setItem("MR_INSTALL_PROMPTED_SESSION", "1");
 
-    document.getElementById("install-offer-state").classList.remove("hide");
-    document.getElementById("install-progress-state").classList.add("hide");
-    document.getElementById("install-done-state").classList.add("hide");
-    document.getElementById("modal-install-welcome").classList.remove("hide");
+    document.getElementById("install-offer-state")?.classList.remove("hide");
+    document.getElementById("install-progress-state")?.classList.add("hide");
+    document.getElementById("install-done-state")?.classList.add("hide");
+    document.getElementById("modal-install-welcome")?.classList.remove("hide");
     pushBackGuard();
 }
 
 function dismissWelcomeInstall() {
-    localStorage.setItem(PWA_REMIND_KEY, String(Date.now()));
-    document.getElementById("modal-install-welcome").classList.add("hide");
+    if (typeof PWA_REMIND_KEY !== "undefined") {
+        localStorage.setItem(PWA_REMIND_KEY, String(Date.now()));
+    }
+    document.getElementById("modal-install-welcome")?.classList.add("hide");
 }
 
 async function acceptWelcomeInstall() {
-    document.getElementById("install-offer-state").classList.add("hide");
-    document.getElementById("install-progress-state").classList.remove("hide");
+    document.getElementById("install-offer-state")?.classList.add("hide");
+    document.getElementById("install-progress-state")?.classList.remove("hide");
     const bar = document.getElementById("install-progress-bar");
     const lbl = document.getElementById("install-progress-label");
-    bar.style.width = "22%";
-    lbl.innerText = "Menyiapkan paket aplikasi ringan (< 2 MB)...";
+    if (bar) bar.style.width = "22%";
+    if (lbl) lbl.innerText = "Menyiapkan paket aplikasi ringan (< 2 MB)...";
 
     if (deferredPwaPrompt) {
         try {
-            bar.style.width = "50%";
+            if (bar) bar.style.width = "50%";
             deferredPwaPrompt.prompt();
             const choice = await deferredPwaPrompt.userChoice;
             deferredPwaPrompt = null;
             if (choice && choice.outcome === "accepted") {
-                lbl.innerText = "Memasang ikon ke layar utama HP Anda...";
-                bar.style.width = "82%";
+                if (lbl) lbl.innerText = "Memasang ikon ke layar utama HP Anda...";
+                if (bar) bar.style.width = "82%";
                 localStorage.setItem("MR_PWA_INSTALLED", "true");
                 setTimeout(() => completeInstallAnimationUI(), 1300);
             } else {
-                document.getElementById("modal-install-welcome").classList.add("hide");
+                document.getElementById("modal-install-welcome")?.classList.add("hide");
                 showToast("Pemasangan dibatalkan. Anda tetap bisa pasang kapan saja lewat menu titik 3.", "info");
             }
         } catch {
-            document.getElementById("modal-install-welcome").classList.add("hide");
+            document.getElementById("modal-install-welcome")?.classList.add("hide");
         }
         return;
     }
 
-    setTimeout(() => { bar.style.width = "65%"; lbl.innerText = "Memeriksa dukungan instalasi browser..."; }, 450);
     setTimeout(() => {
-        bar.style.width = "100%";
-        document.getElementById("install-progress-state").classList.add("hide");
-        document.getElementById("install-done-state").classList.remove("hide");
+        if (bar) bar.style.width = "65%";
+        if (lbl) lbl.innerText = "Memeriksa dukungan instalasi browser...";
+    }, 450);
+    setTimeout(() => {
+        if (bar) bar.style.width = "100%";
+        document.getElementById("install-progress-state")?.classList.add("hide");
+        document.getElementById("install-done-state")?.classList.remove("hide");
         const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent);
         const descEl = document.querySelector("#install-done-state p");
         const headEl = document.querySelector("#install-done-state h4");
@@ -96,36 +102,39 @@ async function acceptWelcomeInstall() {
 function completeInstallAnimationUI() {
     const bar = document.getElementById("install-progress-bar");
     if (bar) bar.style.width = "100%";
-    document.getElementById("install-offer-state").classList.add("hide");
-    document.getElementById("install-progress-state").classList.add("hide");
-    document.getElementById("install-done-state").classList.remove("hide");
+    document.getElementById("install-offer-state")?.classList.add("hide");
+    document.getElementById("install-progress-state")?.classList.add("hide");
+    document.getElementById("install-done-state")?.classList.remove("hide");
 }
 
 function finishAndLaunchApp() {
-    document.getElementById("modal-install-welcome").classList.add("hide");
-    try { window.open(getCleanBaseUrl(), "_self"); } catch {}
+    document.getElementById("modal-install-welcome")?.classList.add("hide");
+    try { if (typeof getCleanBaseUrl === "function") window.open(getCleanBaseUrl(), "_self"); } catch {}
     showToast("Selamat menggunakan Mr Undangan!");
 }
 
 // ================= 2. POPUP LOGIN TENGAH & PENGINGAT LOGIN =================
 function openAuthModal() {
-    document.getElementById("modal-auth").classList.remove("hide");
+    document.getElementById("modal-auth")?.classList.remove("hide");
     setTimeout(() => document.getElementById("auth-username")?.focus(), 120);
     pushBackGuard();
 }
-function closeAuthModal() { document.getElementById("modal-auth").classList.add("hide"); }
+function closeAuthModal() { document.getElementById("modal-auth")?.classList.add("hide"); }
 
 function maybeShowLoginReminder() {
-    if (currentSessionUser || clientPortalState.active) return;
-    if (!document.getElementById("modal-auth").classList.contains("hide")) return;
-    if (!document.getElementById("modal-install-welcome").classList.contains("hide")) return;
+    if (currentSessionUser || (typeof clientPortalState !== "undefined" && clientPortalState.active)) return;
+    if (!document.getElementById("modal-auth")?.classList.contains("hide")) return;
+    if (!document.getElementById("modal-install-welcome")?.classList.contains("hide")) return;
+    if (typeof LOGIN_REMIND_KEY === "undefined") return;
     const last = Number(localStorage.getItem(LOGIN_REMIND_KEY) || 0);
     if (Date.now() - last < 1000 * 60 * 5) return;
     localStorage.setItem(LOGIN_REMIND_KEY, String(Date.now()));
     document.getElementById("login-reminder-pill")?.classList.remove("hide");
 }
 function dismissLoginReminder() {
-    localStorage.setItem(LOGIN_REMIND_KEY, String(Date.now()));
+    if (typeof LOGIN_REMIND_KEY !== "undefined") {
+        localStorage.setItem(LOGIN_REMIND_KEY, String(Date.now()));
+    }
     document.getElementById("login-reminder-pill")?.classList.add("hide");
 }
 
@@ -159,7 +168,7 @@ async function handleAuthSubmit(e) {
         dismissLoginReminder();
         showToast(`Halo, ${res.user.name}! Selamat datang kembali.`);
         routeDashboard();
-        scheduleAdaptivePoll();
+        if (typeof scheduleAdaptivePoll === "function") scheduleAdaptivePoll();
         return;
     }
     if (res && res.code === "NOT_FOUND") {
@@ -189,12 +198,12 @@ function logoutSession() {
     localStorage.removeItem(SESSION_TOKEN_KEY);
     localStorage.removeItem(DISPLAY_NAME_KEY);
     localStorage.removeItem(USER_CACHE_KEY);
-    idbRemove("db_snapshot");
+    if (typeof idbRemove === "function") idbRemove("db_snapshot");
     db.users = []; db.invitations = []; db.portfolios = []; db.chats = [];
     toggleSlideMenu(false);
-    closeFullChatOverlay();
+    if (typeof closeFullChatOverlay === "function") closeFullChatOverlay();
     goToLanding();
-    fetchPublicCloud().then(renderLandingPage);
+    if (typeof fetchPublicCloud === "function") fetchPublicCloud().then(renderLandingPage);
     showToast("Anda telah keluar.", "info");
 }
 
@@ -219,7 +228,7 @@ function pushBackGuard() {
 
 function pushStepBackGuard(stepTag) {
     try {
-        history.pushState({ mrActive: true, stepTag, s: ++_backStepSeq }, "");
+        history.pushState({ mrActive: true, stepTag: stepTag, s: ++_backStepSeq }, "");
     } catch {}
 }
 
@@ -227,36 +236,36 @@ window.addEventListener("popstate", () => {
     const isVis = (id) => { const el = document.getElementById(id); return el && !el.classList.contains("hide"); };
     const drawerOpen = document.getElementById("drawer-main")?.classList.contains("open");
 
-    if (isVis("ios-vault-lightbox")) { closeSecretPhotoLightbox(); pushBackGuard(); return; }
-    if (isVis("modal-image-cropper")) { closeImageCropper(); pushBackGuard(); return; }
-    if (isVis("modal-audio-cropper")) { closeAudioCropper(); pushBackGuard(); return; }
-    if (isVis("modal-proof-viewer")) { document.getElementById("modal-proof-viewer").classList.add("hide"); pushBackGuard(); return; }
-    if (isVis("modal-theme-builder")) { closeThemeBuilderModal(); pushBackGuard(); return; }
+    if (isVis("ios-vault-lightbox")) { if (typeof closeSecretPhotoLightbox === "function") closeSecretPhotoLightbox(); pushBackGuard(); return; }
+    if (isVis("modal-image-cropper")) { if (typeof closeImageCropper === "function") closeImageCropper(); pushBackGuard(); return; }
+    if (isVis("modal-audio-cropper")) { if (typeof closeAudioCropper === "function") closeAudioCropper(); pushBackGuard(); return; }
+    if (isVis("modal-proof-viewer")) { document.getElementById("modal-proof-viewer")?.classList.add("hide"); pushBackGuard(); return; }
+    if (isVis("modal-theme-builder")) { if (typeof closeThemeBuilderModal === "function") closeThemeBuilderModal(); pushBackGuard(); return; }
     if (isVis("app-confirm-modal")) { document.getElementById("app-confirm-cancel")?.click(); pushBackGuard(); return; }
     if (isVis("modal-install-welcome")) { dismissWelcomeInstall(); pushBackGuard(); return; }
     if (isVis("modal-auth")) { closeAuthModal(); pushBackGuard(); return; }
-    if (isVis("modal-chat-contacts")) { document.getElementById("modal-chat-contacts").classList.add("hide"); pushBackGuard(); return; }
-    if (isVis("modal-sempurnakan")) { document.getElementById("modal-sempurnakan").classList.add("hide"); pushBackGuard(); return; }
-    if (isVis("modal-portfolio-preview")) { document.getElementById("modal-portfolio-preview").classList.add("hide"); pushBackGuard(); return; }
-    if (isVis("modal-drive-album-actions")) { document.getElementById("modal-drive-album-actions").classList.add("hide"); pushBackGuard(); return; }
-    if (isVis("modal-pin-gate")) { document.getElementById("modal-pin-gate").classList.add("hide"); pushBackGuard(); return; }
-    if (isVis("modal-album-form")) { document.getElementById("modal-album-form").classList.add("hide"); pushBackGuard(); return; }
-    if (isVis("modal-add-album-choice")) { document.getElementById("modal-add-album-choice").classList.add("hide"); pushBackGuard(); return; }
-    if (isVis("modal-secret-album")) { document.getElementById("modal-secret-album").classList.add("hide"); pushBackGuard(); return; }
-    if (isVis("modal-create-choice")) { document.getElementById("modal-create-choice").classList.add("hide"); pushBackGuard(); return; }
-    if (isVis("modal-client-portal")) { document.getElementById("modal-client-portal").classList.add("hide"); pushBackGuard(); return; }
+    if (isVis("modal-chat-contacts")) { document.getElementById("modal-chat-contacts")?.classList.add("hide"); pushBackGuard(); return; }
+    if (isVis("modal-sempurnakan")) { document.getElementById("modal-sempurnakan")?.classList.add("hide"); pushBackGuard(); return; }
+    if (isVis("modal-portfolio-preview")) { document.getElementById("modal-portfolio-preview")?.classList.add("hide"); pushBackGuard(); return; }
+    if (isVis("modal-drive-album-actions")) { document.getElementById("modal-drive-album-actions")?.classList.add("hide"); pushBackGuard(); return; }
+    if (isVis("modal-pin-gate")) { document.getElementById("modal-pin-gate")?.classList.add("hide"); pushBackGuard(); return; }
+    if (isVis("modal-album-form")) { document.getElementById("modal-album-form")?.classList.add("hide"); pushBackGuard(); return; }
+    if (isVis("modal-add-album-choice")) { document.getElementById("modal-add-album-choice")?.classList.add("hide"); pushBackGuard(); return; }
+    if (isVis("modal-secret-album")) { document.getElementById("modal-secret-album")?.classList.add("hide"); pushBackGuard(); return; }
+    if (isVis("modal-create-choice")) { document.getElementById("modal-create-choice")?.classList.add("hide"); pushBackGuard(); return; }
+    if (isVis("modal-client-portal")) { document.getElementById("modal-client-portal")?.classList.add("hide"); pushBackGuard(); return; }
 
-    // Jika overlay chat atau modal profil terbuka, biarkan capture listener di chat.js yang mengurus secara bertahap
+    // Biarkan listener capture di js/chat.js mengurus tahapan Profil -> Isi Chat -> Daftar Chat -> Keluar
     if (isVis("full-chat-overlay") || isVis("modal-view-user-profile")) {
         return;
     }
 
-    if (isVis("modal-master-user")) { document.getElementById("modal-master-user").classList.add("hide"); pushBackGuard(); return; }
-    if (isVis("guest-invitation-overlay") && isVis("gv-close-btn")) { closeGuestInvitation(); pushBackGuard(); return; }
+    if (isVis("modal-master-user")) { document.getElementById("modal-master-user")?.classList.add("hide"); pushBackGuard(); return; }
+    if (isVis("guest-invitation-overlay") && isVis("gv-close-btn")) { if (typeof closeGuestInvitation === "function") closeGuestInvitation(); pushBackGuard(); return; }
     if (drawerOpen) { toggleSlideMenu(false); pushBackGuard(); return; }
-    if (isVis("modal-share-sosmed")) { cancelSocialShareModal(); pushBackGuard(); return; }
+    if (isVis("modal-share-sosmed")) { if (typeof cancelSocialShareModal === "function") cancelSocialShareModal(); pushBackGuard(); return; }
 
-    if (clientPortalState.active) {
+    if (typeof clientPortalState !== "undefined" && clientPortalState.active) {
         const now = Date.now();
         if (now - lastBackPressTs < 2400) { history.back(); return; }
         lastBackPressTs = now;
@@ -266,15 +275,22 @@ window.addEventListener("popstate", () => {
     }
 
     if (["wizard", "portfolio_wizard", "payment", "guestlist"].includes(currentViewName)) {
-        stopPreviewAudio(); routeDashboard(true); pushBackGuard(); return;
+        if (typeof stopPreviewAudio === "function") stopPreviewAudio();
+        routeDashboard(true);
+        pushBackGuard();
+        return;
     }
 
-    if (currentViewName === "master" && currentMasterWorkspace !== "overview") {
-        openMasterWorkspace("overview"); pushBackGuard(); return;
+    if (currentViewName === "master" && typeof currentMasterWorkspace !== "undefined" && currentMasterWorkspace !== "overview") {
+        if (typeof openMasterWorkspace === "function") openMasterWorkspace("overview");
+        pushBackGuard();
+        return;
     }
 
     if (["profile", "master", "cabang", "staff"].includes(currentViewName)) {
-        goToLanding(true); pushBackGuard(); return;
+        goToLanding(true);
+        pushBackGuard();
+        return;
     }
 
     const now = Date.now();
@@ -285,7 +301,7 @@ window.addEventListener("popstate", () => {
 });
 
 function handleHeaderBrandClick() {
-    if (clientPortalState.active) { window.scrollTo({ top: 0, behavior: "smooth" }); return; }
+    if (typeof clientPortalState !== "undefined" && clientPortalState.active) { window.scrollTo({ top: 0, behavior: "smooth" }); return; }
     goToLanding();
 }
 
@@ -297,16 +313,16 @@ function hideAllViews() {
 function goToLanding(fromBack = false) {
     currentViewName = "landing";
     hideAllViews();
-    document.getElementById("view-landing").classList.remove("hide");
+    document.getElementById("view-landing")?.classList.remove("hide");
     renderHeaderActions();
     renderLandingPage();
     window.scrollTo({ top: 0, behavior: "smooth" });
 }
 
 function routeDashboard(fromBack = false) {
-    if (clientPortalState.active) return;
+    if (typeof clientPortalState !== "undefined" && clientPortalState.active) return;
     if (!currentSessionUser) return goToLanding(fromBack);
-    let u = getCurrentUserObj();
+    let u = typeof getCurrentUserObj === "function" ? getCurrentUserObj() : null;
     if (!u) {
         try {
             const cachedU = JSON.parse(localStorage.getItem(USER_CACHE_KEY) || "null");
@@ -321,26 +337,26 @@ function routeDashboard(fromBack = false) {
     if (window.pendingActionAfterLogin) {
         const act = window.pendingActionAfterLogin;
         window.pendingActionAfterLogin = null;
-        if (act.type === "inv") return startCreateInvitation(u.role === "cabang", act.cat, act.theme);
-        if (act.type === "portfolio") return startCreatePortfolio(u.role === "cabang", act.docType, act.themeId);
+        if (act.type === "inv" && typeof startCreateInvitation === "function") return startCreateInvitation(u.role === "cabang", act.cat, act.theme);
+        if (act.type === "portfolio" && typeof startCreatePortfolio === "function") return startCreatePortfolio(u.role === "cabang", act.docType, act.themeId);
     }
 
     hideAllViews();
     if (u.role === "master") {
         currentViewName = "master";
-        document.getElementById("view-master-admin").classList.remove("hide");
-        renderMasterAdmin();
+        document.getElementById("view-master-admin")?.classList.remove("hide");
+        if (typeof renderMasterAdmin === "function") renderMasterAdmin();
     } else if (u.role === "administrasi") {
         currentViewName = "staff";
-        document.getElementById("view-staff-admin").classList.remove("hide");
-        renderStaffAdmin();
+        document.getElementById("view-staff-admin")?.classList.remove("hide");
+        if (typeof renderStaffAdmin === "function") renderStaffAdmin();
     } else if (u.role === "cabang") {
         currentViewName = "cabang";
-        document.getElementById("view-cabang-admin").classList.remove("hide");
+        document.getElementById("view-cabang-admin")?.classList.remove("hide");
         renderCabangAdmin();
     } else {
         currentViewName = "profile";
-        document.getElementById("view-profile").classList.remove("hide");
+        document.getElementById("view-profile")?.classList.remove("hide");
         renderUserProfile();
     }
     renderHeaderActions();
@@ -354,13 +370,14 @@ function renderHeaderActions() {
     const mainEl = document.getElementById("header-brand-main");
     const subEl = document.getElementById("header-brand-sub");
     const footLoginBtn = document.getElementById("footer-login-cta");
+    const defAv = typeof DEFAULT_AVATAR !== "undefined" ? DEFAULT_AVATAR : "./logo.png";
 
-    if (clientPortalState.active) {
+    if (typeof clientPortalState !== "undefined" && clientPortalState.active) {
         if (mainEl) mainEl.innerText = clientPortalState.brandName || "Mitra Cabang";
         if (subEl) subEl.innerText = "Powered by Mr Undangan";
         document.getElementById("floating-chat-wrap")?.classList.add("hide");
         if (dotsBtn) dotsBtn.classList.add("hide");
-        box.innerHTML = `<button onclick="cycleAppThemeQuick()" class="w-9 h-9 rounded-full app-card-soft border gold-border app-accent flex items-center justify-center text-xs" title="Ubah Warna Tampilan"><i class="fa-solid fa-palette"></i></button>`;
+        if (box) box.innerHTML = `<button onclick="cycleAppThemeQuick()" class="w-9 h-9 rounded-full app-card-soft border gold-border app-accent flex items-center justify-center text-xs" title="Ubah Warna Tampilan"><i class="fa-solid fa-palette"></i></button>`;
         return;
     }
 
@@ -369,19 +386,21 @@ function renderHeaderActions() {
     document.getElementById("floating-chat-wrap")?.classList.remove("hide");
     if (dotsBtn) dotsBtn.classList.remove("hide");
 
-    const u = getCurrentUserObj();
+    const u = typeof getCurrentUserObj === "function" ? getCurrentUserObj() : null;
     if (footLoginBtn) footLoginBtn.classList.toggle("hide", !!u);
 
     if (!u) {
-        box.innerHTML = `<button onclick="openAuthModal()" class="gold-pill-btn px-3.5 py-1.5 rounded-xl text-xs">Masuk / Daftar</button>`;
+        if (box) box.innerHTML = `<button onclick="openAuthModal()" class="gold-pill-btn px-3.5 py-1.5 rounded-xl text-xs">Masuk / Daftar</button>`;
         return;
     }
 
     const onDashboard = ["profile", "master", "cabang", "staff"].includes(currentViewName);
-    box.innerHTML = onDashboard
-        ? ``
-        : `<button onclick="routeDashboard()" class="w-9 h-9 rounded-full overflow-hidden border-2 gold-border shadow-sm hover:scale-105 transition bg-zinc-800 shrink-0" title="Buka Profil"><img src="${u.avatar || DEFAULT_AVATAR}" alt="Profil" class="w-full h-full object-cover"></button>`;
-    updateChatBadges();
+    if (box) {
+        box.innerHTML = onDashboard
+            ? ``
+            : `<button onclick="routeDashboard()" class="w-9 h-9 rounded-full overflow-hidden border-2 gold-border shadow-sm hover:scale-105 transition bg-zinc-800 shrink-0" title="Buka Profil"><img src="${u.avatar || defAv}" alt="Profil" class="w-full h-full object-cover"></button>`;
+    }
+    if (typeof updateChatBadges === "function") updateChatBadges();
 }
 
 // ================= 4. MENU TITIK 3 POPUP PENUH =================
@@ -397,8 +416,9 @@ function toggleSlideMenu(show) {
 }
 
 function backToMainSlideMenu() {
-    document.getElementById("drawer-main-title").innerText = "Pengaturan";
-    document.getElementById("drawer-main-list").classList.remove("hide");
+    const tEl = document.getElementById("drawer-main-title");
+    if (tEl) tEl.innerText = "Pengaturan";
+    document.getElementById("drawer-main-list")?.classList.remove("hide");
     ["drawer-sub-theme", "drawer-sub-about", "drawer-sub-profil", "drawer-sub-akun", "drawer-sub-qris"]
         .forEach(id => document.getElementById(id)?.classList.add("hide"));
     renderMainSlideMenuList();
@@ -417,7 +437,7 @@ function menuRowItem(icon, title, sub, onclickJs) {
 
 function renderMainSlideMenuList() {
     const box = document.getElementById("drawer-main-list"); if (!box) return;
-    const u = getCurrentUserObj();
+    const u = typeof getCurrentUserObj === "function" ? getCurrentUserObj() : null;
     let html = "";
 
     if (!u) {
@@ -454,53 +474,62 @@ function renderMainSlideMenuList() {
 }
 
 function openSlideSub(sec) {
-    document.getElementById("drawer-main-list").classList.add("hide");
+    document.getElementById("drawer-main-list")?.classList.add("hide");
     ["drawer-sub-theme", "drawer-sub-about", "drawer-sub-profil", "drawer-sub-akun", "drawer-sub-qris"]
         .forEach(id => document.getElementById(id)?.classList.add("hide"));
 
-    const u = getCurrentUserObj();
+    const u = typeof getCurrentUserObj === "function" ? getCurrentUserObj() : null;
+    const defAv = typeof DEFAULT_AVATAR !== "undefined" ? DEFAULT_AVATAR : "./logo.png";
+    const tKey = typeof APP_THEME_KEY !== "undefined" ? APP_THEME_KEY : "MR_UNDANGAN_APP_THEME";
+    const tEl = document.getElementById("drawer-main-title");
+
     if (sec === "theme") {
-        document.getElementById("drawer-main-title").innerText = "Tampilan & Warna";
-        applyAppTheme(localStorage.getItem(APP_THEME_KEY) || "light", false);
-        document.getElementById("drawer-sub-theme").classList.remove("hide");
+        if (tEl) tEl.innerText = "Tampilan & Warna";
+        if (typeof applyAppTheme === "function") applyAppTheme(localStorage.getItem(tKey) || "light", false);
+        document.getElementById("drawer-sub-theme")?.classList.remove("hide");
     } else if (sec === "about") {
-        document.getElementById("drawer-main-title").innerText = "Tentang Mr Undangan";
-        document.getElementById("drawer-sub-about").classList.remove("hide");
+        if (tEl) tEl.innerText = "Tentang Mr Undangan";
+        document.getElementById("drawer-sub-about")?.classList.remove("hide");
     } else if (sec === "profil" && u) {
-        document.getElementById("drawer-main-title").innerText = u.role === "cabang" ? "Profil & Label Brand" : "Pengaturan Profil";
-        document.getElementById("set-prof-avatar-prev").src = u.avatar || DEFAULT_AVATAR;
+        if (tEl) tEl.innerText = u.role === "cabang" ? "Profil & Label Brand" : "Pengaturan Profil";
+        const prevAv = document.getElementById("set-prof-avatar-prev");
+        if (prevAv) prevAv.src = u.avatar || defAv;
         const bw = document.getElementById("set-prof-brand-wrap");
-        if (bw) { bw.classList.toggle("hide", u.role !== "cabang"); document.getElementById("set-prof-brand").value = u.brandName || ""; }
-        document.getElementById("set-prof-name").value = u.name || "";
-        document.getElementById("set-prof-bio").value = u.bio || "";
-        document.getElementById("set-prof-phone").value = u.phone || "";
-        document.getElementById("set-prof-address").value = u.address || "";
-        document.getElementById("drawer-sub-profil").classList.remove("hide");
+        if (bw) { bw.classList.toggle("hide", u.role !== "cabang"); const bInp = document.getElementById("set-prof-brand"); if (bInp) bInp.value = u.brandName || ""; }
+        const nInp = document.getElementById("set-prof-name"); if (nInp) nInp.value = u.name || "";
+        const bioInp = document.getElementById("set-prof-bio"); if (bioInp) bioInp.value = u.bio || "";
+        const phInp = document.getElementById("set-prof-phone"); if (phInp) phInp.value = u.phone || "";
+        const adInp = document.getElementById("set-prof-address"); if (adInp) adInp.value = u.address || "";
+        document.getElementById("drawer-sub-profil")?.classList.remove("hide");
     } else if (sec === "akun" && u) {
-        document.getElementById("drawer-main-title").innerText = "Pengaturan Akun";
-        document.getElementById("set-acc-user").value = u.username;
-        document.getElementById("set-acc-pass").value = u.password || "";
-        document.getElementById("drawer-sub-akun").classList.remove("hide");
+        if (tEl) tEl.innerText = "Pengaturan Akun";
+        const uInp = document.getElementById("set-acc-user"); if (uInp) uInp.value = u.username;
+        const pInp = document.getElementById("set-acc-pass"); if (pInp) pInp.value = u.password || "";
+        document.getElementById("drawer-sub-akun")?.classList.remove("hide");
     } else if (sec === "qris" && u && u.role === "master") {
-        document.getElementById("drawer-main-title").innerText = "QRIS DANA & Rekening";
+        if (tEl) tEl.innerText = "QRIS DANA & Rekening";
         const ms = db.masterSettings || {};
-        document.getElementById("ms-qris-mode").value = ms.qrisMode || "static";
-        document.getElementById("ms-qris-dyn-str").value = ms.qrisDynamicString || "";
-        document.getElementById("ms-qris-unique").checked = ms.qrisUniqueCode !== false;
-        document.getElementById("ms-qris-prev").src = ms.qrisImage || "";
-        document.getElementById("ms-p").value = ms.priceText || "Rp 150.000";
-        toggleQrisModeFields();
-        const box = document.getElementById("ms-banks-container"); box.innerHTML = "";
-        getMasterBanksList().forEach(b => addMasterBankRow(b.bank, b.no, b.holder));
-        document.getElementById("drawer-sub-qris").classList.remove("hide");
+        const mSel = document.getElementById("ms-qris-mode"); if (mSel) mSel.value = ms.qrisMode || "static";
+        const dInp = document.getElementById("ms-qris-dyn-str"); if (dInp) dInp.value = ms.qrisDynamicString || "";
+        const uChk = document.getElementById("ms-qris-unique"); if (uChk) uChk.checked = ms.qrisUniqueCode !== false;
+        const qPrev = document.getElementById("ms-qris-prev"); if (qPrev) qPrev.src = ms.qrisImage || "";
+        const pInp = document.getElementById("ms-p"); if (pInp) pInp.value = ms.priceText || "Rp 150.000";
+        if (typeof toggleQrisModeFields === "function") toggleQrisModeFields();
+        const box = document.getElementById("ms-banks-container");
+        if (box && typeof getMasterBanksList === "function" && typeof addMasterBankRow === "function") {
+            box.innerHTML = "";
+            getMasterBanksList().forEach(b => addMasterBankRow(b.bank, b.no, b.holder));
+        }
+        document.getElementById("drawer-sub-qris")?.classList.remove("hide");
     }
 }
 
 function pickCroppedProfileMedia(inp, type) {
     const file = inp.files[0]; if (!file) return; inp.value = "";
     const isBanner = type === "banner";
+    if (typeof openImageCropper !== "function") return;
     openImageCropper(file, isBanner ? 16 / 6 : 1, isBanner ? "Atur Sampul Profil (16:6)" : "Atur Foto Profil (1:1)", isBanner ? 1000 : 380, isBanner ? 375 : 380, async (dataUrl) => {
-        const u = getCurrentUserObj(); if (!u) return;
+        const u = typeof getCurrentUserObj === "function" ? getCurrentUserObj() : null; if (!u) return;
         showLoading("Menyimpan foto...");
         const up = await apiAction({ action: "upload_media", dataUrl, prefix: `${type}_${u.username}` });
         if (!up || !up.ok || !up.url) { hideLoading(); return showToast("Gagal mengunggah foto.", "error"); }
@@ -509,14 +538,15 @@ function pickCroppedProfileMedia(inp, type) {
         hideLoading();
         if (res && res.ok) {
             ensureUserInLocalDb(upd);
-            if (!isBanner) document.getElementById("set-prof-avatar-prev").src = up.url;
+            if (!isBanner) { const prev = document.getElementById("set-prof-avatar-prev"); if (prev) prev.src = up.url; }
             refreshActiveViewSmart(); renderHeaderActions();
             showToast(isBanner ? "Sampul profil diperbarui & file lama dihapus!" : "Foto profil diperbarui & foto lama dihapus!");
         }
     });
 }
 async function removeProfileMedia(type) {
-    const u = getCurrentUserObj(); if (!u) return;
+    const u = typeof getCurrentUserObj === "function" ? getCurrentUserObj() : null; if (!u) return;
+    const defAv = typeof DEFAULT_AVATAR !== "undefined" ? DEFAULT_AVATAR : "./logo.png";
     if (!u[type]) return showToast("Foto sudah kosong.", "info");
     if (!(await showConfirm("Hapus Foto", `Hapus ${type === "avatar" ? "foto profil" : "sampul profil"} ini?`, "fa-solid fa-trash", "Ya, Hapus"))) return;
     showLoading("Menghapus...");
@@ -525,12 +555,12 @@ async function removeProfileMedia(type) {
     hideLoading();
     if (res && res.ok) {
         ensureUserInLocalDb(upd);
-        if (type === "avatar") document.getElementById("set-prof-avatar-prev").src = DEFAULT_AVATAR;
+        if (type === "avatar") { const prev = document.getElementById("set-prof-avatar-prev"); if (prev) prev.src = defAv; }
         refreshActiveViewSmart(); renderHeaderActions(); showToast("Foto dihapus.", "info");
     }
 }
 async function saveProfileInfo() {
-    const u = getCurrentUserObj(); if (!u) return;
+    const u = typeof getCurrentUserObj === "function" ? getCurrentUserObj() : null; if (!u) return;
     setBtnLoading("btn-save-prof", true, "Menyimpan...");
     const updatedUser = Object.assign({}, u, {
         name: document.getElementById("set-prof-name").value.trim() || u.name,
@@ -543,13 +573,13 @@ async function saveProfileInfo() {
     setBtnLoading("btn-save-prof", false);
     if (res && res.ok) {
         ensureUserInLocalDb(updatedUser);
-        localStorage.setItem(DISPLAY_NAME_KEY, updatedUser.name.split(" ")[0]);
+        if (typeof DISPLAY_NAME_KEY !== "undefined") localStorage.setItem(DISPLAY_NAME_KEY, updatedUser.name.split(" ")[0]);
         toggleSlideMenu(false); refreshActiveViewSmart(); renderHeaderActions();
         showToast("Profil berhasil disimpan!");
     } else showToast("Gagal menyimpan profil.", "error");
 }
 async function changeUserCredentials() {
-    const u = getCurrentUserObj(); if (!u) return;
+    const u = typeof getCurrentUserObj === "function" ? getCurrentUserObj() : null; if (!u) return;
     const newU = document.getElementById("set-acc-user").value.trim().toLowerCase();
     const newP = document.getElementById("set-acc-pass").value.trim();
     if (!newU || !newP) return showToast("Isi username dan password baru.", "error");
@@ -574,8 +604,24 @@ function renderLandingPage() {
     renderTestimonials();
 }
 
+function _getSafeBanners() {
+    if (Array.isArray(db.promoBanners) && db.promoBanners.length) return db.promoBanners;
+    if (typeof getLocalFallbackDB === "function") {
+        const fb = getLocalFallbackDB();
+        if (fb && Array.isArray(fb.promoBanners) && fb.promoBanners.length) return fb.promoBanners;
+    }
+    return [{
+        badge: "PROMO",
+        title: "Buat Undangan Digital, CV & Lamaran Praktis",
+        subtitle: "Pilih desain, isi data, dan bagikan tautan undangan atau unduh PDF langsung dari HP.",
+        ctaText: "Mulai Buat",
+        img: "./logo.png",
+        targetSection: "sec-undangan"
+    }];
+}
+
 function renderPromoBannerSlider() {
-    const slides = (db.promoBanners && db.promoBanners.length) ? db.promoBanners : getLocalFallbackDB().promoBanners;
+    const slides = _getSafeBanners();
     if (promoBannerIdx >= slides.length) promoBannerIdx = 0;
     const track = document.getElementById("promo-banner-track");
     const dots = document.getElementById("promo-banner-dots");
@@ -583,18 +629,20 @@ function renderPromoBannerSlider() {
 
     track.innerHTML = slides.map((s, idx) => `
         <div onclick="handlePromoBannerClick(${idx})" class="min-w-full h-full relative flex items-end sm:items-center px-4 py-3.5 md:px-14 cursor-pointer select-none">
-            <img src="${s.img}" class="absolute inset-0 w-full h-full object-cover opacity-75">
+            <img src="${s.img || "./logo.png"}" class="absolute inset-0 w-full h-full object-cover opacity-75">
             <div class="absolute inset-0 bg-gradient-to-r from-black/85 via-black/50 to-black/20"></div>
             <div class="relative z-10 max-w-xl space-y-1 sm:space-y-2 text-white">
                 <span class="inline-block px-2.5 py-0.5 rounded-full bg-amber-400 text-black font-extrabold text-[9px] uppercase tracking-wider">${escHtml(s.badge || "PROMO")}</span>
-                <h2 class="text-sm sm:text-2xl md:text-3xl font-extrabold leading-tight drop-shadow">${escHtml(s.title)}</h2>
+                <h2 class="text-sm sm:text-2xl md:text-3xl font-extrabold leading-tight drop-shadow">${escHtml(s.title || "Mr Undangan")}</h2>
                 <p class="text-[10px] sm:text-xs text-zinc-200 line-clamp-2 max-w-md">${escHtml(s.subtitle || "")}</p>
                 ${s.ctaText ? `<span class="inline-block mt-1 gold-pill-btn px-3.5 py-1.5 rounded-lg text-[10px] sm:text-xs shadow">${escHtml(s.ctaText)} <i class="fa-solid fa-arrow-right ml-1"></i></span>` : ""}
             </div>
         </div>
     `).join("");
 
-    dots.innerHTML = slides.map((_, i) => `<button type="button" data-pb-dot="${i}" onclick="event.stopPropagation();promoBannerIdx=${i};updatePromoBannerPos();" class="h-1.5 rounded-full transition-all ${i === promoBannerIdx ? "w-6 bg-amber-400" : "w-2 bg-white/45"}"></button>`).join("");
+    if (dots) {
+        dots.innerHTML = slides.map((_, i) => `<button type="button" data-pb-dot="${i}" onclick="event.stopPropagation();promoBannerIdx=${i};updatePromoBannerPos();" class="h-1.5 rounded-full transition-all ${i === promoBannerIdx ? "w-6 bg-amber-400" : "w-2 bg-white/45"}"></button>`).join("");
+    }
     updatePromoBannerPos();
 }
 function updatePromoBannerPos() {
@@ -606,14 +654,15 @@ function updatePromoBannerPos() {
     });
 }
 function handlePromoBannerClick(idx) {
-    const s = ((db.promoBanners && db.promoBanners.length) ? db.promoBanners : getLocalFallbackDB().promoBanners)[idx];
+    const s = _getSafeBanners()[idx];
     if (!s) return;
     if (s.targetType === "login") { if (currentSessionUser) routeDashboard(); else openAuthModal(); }
-    else if (s.targetType === "chat") openFullChatOverlay();
+    else if (s.targetType === "chat" && typeof openFullChatOverlay === "function") openFullChatOverlay();
     else document.getElementById(s.targetSection || "sec-undangan")?.scrollIntoView({ behavior: "smooth" });
 }
 
 function renderInvCategoryPills() {
+    if (typeof THEME_CATALOG === "undefined") return;
     const cats = Object.keys(THEME_CATALOG);
     const box = document.getElementById("landing-inv-cat-tabs"); if (!box) return;
     box.innerHTML = cats.map(c =>
@@ -623,15 +672,18 @@ function renderInvCategoryPills() {
 
 function renderInfiniteInvShelf() {
     const shelf = document.getElementById("landing-inv-shelf"); if (!shelf) return;
+    if (typeof THEME_CATALOG === "undefined" || typeof getMergedThemes !== "function") return;
     const cats = Object.keys(THEME_CATALOG);
     const flat = [];
     cats.forEach(cat => getMergedThemes(cat, false).forEach(t => flat.push(t)));
 
     shelf.innerHTML = flat.map(t => {
         const targetId = (db.themeOverrides && db.themeOverrides[`${t.cat}::${t.name}`]?.targetInvId) || "";
+        const coverHtml = typeof buildMiniCoverCardHtml === "function" ? buildMiniCoverCardHtml(t.cat, t, true) : "";
+        const priceHtml = typeof buildPriceStripHtml === "function" ? buildPriceStripHtml(t, true) : "";
         return `<div data-inv-cat="${esc(t.cat)}" onclick="openBannerOrCardTarget('${esc(t.cat)}','${esc(t.name)}','${esc(targetId)}')" class="h-shelf-card group rounded-2xl overflow-hidden border gold-border bg-black shadow-md cursor-pointer flex flex-col">
-            ${buildMiniCoverCardHtml(t.cat, t, true)}
-            ${buildPriceStripHtml(t, true)}
+            ${coverHtml}
+            ${priceHtml}
         </div>`;
     }).join("");
     renderInvCategoryPills();
@@ -675,8 +727,10 @@ function scrollInvShelfToCat(cat) {
 }
 
 function openBannerOrCardTarget(cat, themeName, targetInvId) {
-    if (targetInvId && db.invitations.some(i => String(i.id) === String(targetInvId))) return openGuestView(targetInvId, "Tamu Kehormatan");
-    openThemeLivePreview(cat || "Pernikahan", themeName || "Adat Kalimantan");
+    if (targetInvId && Array.isArray(db.invitations) && db.invitations.some(i => String(i.id) === String(targetInvId)) && typeof openGuestView === "function") {
+        return openGuestView(targetInvId, "Tamu Kehormatan");
+    }
+    if (typeof openThemeLivePreview === "function") openThemeLivePreview(cat || "Pernikahan", themeName || "Adat Kalimantan");
 }
 
 function renderPfCategoryPills() {
@@ -689,16 +743,21 @@ function renderPfCategoryPills() {
 
 function renderPortfolioShelf() {
     const shelf = document.getElementById("landing-pf-shelf"); if (!shelf) return;
+    if (typeof PORTFOLIO_CATALOG === "undefined" || typeof getPortfolioThemeObj !== "function") return;
     const items = [
         ...PORTFOLIO_CATALOG.cv.map(x => ({ docType: "cv", obj: getPortfolioThemeObj("cv", x.id) })),
         ...PORTFOLIO_CATALOG.lamaran.map(x => ({ docType: "lamaran", obj: getPortfolioThemeObj("lamaran", x.id) }))
     ];
-    shelf.innerHTML = items.map(it => `
-        <div data-pf-cat="${it.docType}" onclick="openPortfolioDemoPreview('${it.docType}','${it.obj.id}')" class="h-shelf-card group rounded-2xl overflow-hidden border gold-border bg-black shadow-md cursor-pointer flex flex-col">
-            ${buildPortfolioMiniCardHtml(it.docType, it.obj, true)}
-            ${buildPriceStripHtml(it.obj, true)}
-        </div>
-    `).join("");
+    shelf.innerHTML = items.map(it => {
+        const cardHtml = typeof buildPortfolioMiniCardHtml === "function" ? buildPortfolioMiniCardHtml(it.docType, it.obj, true) : "";
+        const priceHtml = typeof buildPriceStripHtml === "function" ? buildPriceStripHtml(it.obj, true) : "";
+        return `
+            <div data-pf-cat="${it.docType}" onclick="openPortfolioDemoPreview('${it.docType}','${it.obj.id}')" class="h-shelf-card group rounded-2xl overflow-hidden border gold-border bg-black shadow-md cursor-pointer flex flex-col">
+                ${cardHtml}
+                ${priceHtml}
+            </div>
+        `;
+    }).join("");
     renderPfCategoryPills();
 
     if (!shelf.dataset.pfBound) {
@@ -730,6 +789,7 @@ function scrollPfShelfToCat(cat) {
 
 function renderCertificateShowcaseShelf() {
     const shelf = document.getElementById("landing-cert-shelf"); if (!shelf) return;
+    if (typeof CERT_SHOWCASE === "undefined" || !Array.isArray(CERT_SHOWCASE)) return;
     shelf.innerHTML = CERT_SHOWCASE.map(c => {
         const isPortrait = c.orientation === "portrait";
         const sizeCls = isPortrait ? "cert-card-portrait" : "cert-card-landscape";
@@ -800,10 +860,10 @@ function renderCertificateShowcaseShelf() {
 function renderTestimonials() {
     const list = db.testimonials || [], tr = document.getElementById("testimonial-track"), dt = document.getElementById("testimonial-dots");
     if (!tr) return;
-    if (!list.length) { tr.innerHTML = `<div class="min-w-full text-center text-xs app-muted py-5">Belum ada testimoni.</div>`; dt.innerHTML = ""; return; }
+    if (!list.length) { tr.innerHTML = `<div class="min-w-full text-center text-xs app-muted py-5">Belum ada testimoni.</div>`; if (dt) dt.innerHTML = ""; return; }
     if (testiIdx >= list.length) testiIdx = 0;
     tr.innerHTML = list.map(t => `<div class="min-w-full px-1"><div class="app-card-soft border rounded-2xl p-4 space-y-2 text-center max-w-2xl mx-auto"><div class="text-amber-500 text-xs">${'<i class="fa-solid fa-star mx-0.5"></i>'.repeat(t.rating || 5)}</div><p class="text-xs italic">"${escHtml(t.text)}"</p><div><h4 class="font-bold text-xs">${escHtml(t.name)}</h4><span class="text-[10px] app-accent uppercase font-semibold">${escHtml(t.category)}</span></div></div></div>`).join("");
-    dt.innerHTML = list.map((_, i) => `<button onclick="testiIdx=${i};renderTestimonials()" class="h-1.5 rounded-full transition-all ${i===testiIdx?"w-6 bg-blue-600":"w-2 bg-zinc-500/40"}"></button>`).join("");
+    if (dt) dt.innerHTML = list.map((_, i) => `<button onclick="testiIdx=${i};renderTestimonials()" class="h-1.5 rounded-full transition-all ${i===testiIdx?"w-6 bg-blue-600":"w-2 bg-zinc-500/40"}"></button>`).join("");
     tr.style.transform = `translateX(-${testiIdx * 100}%)`;
 }
 function slideTestimonial(d) { const n = (db.testimonials || []).length; if (!n) return; testiIdx = (testiIdx + d + n) % n; renderTestimonials(); }
@@ -814,7 +874,7 @@ setInterval(() => {
     const chatOpen = !document.getElementById("full-chat-overlay")?.classList.contains("hide");
     if (guestOpen || chatOpen) return;
 
-    const s = (db.promoBanners && db.promoBanners.length) ? db.promoBanners : [1];
+    const s = _getSafeBanners();
     if (s.length > 1) {
         promoBannerIdx = (promoBannerIdx + 1) % s.length;
         updatePromoBannerPos();
@@ -824,20 +884,20 @@ setInterval(() => {
 
 // ================= 6. BUAT BERKASMU & PROFIL USER / CABANG =================
 function openCreateChoiceModal(isCabang = false) {
-    const u = getCurrentUserObj();
+    const u = typeof getCurrentUserObj === "function" ? getCurrentUserObj() : null;
     if (!u) {
         showToast("Masuk atau daftar akun dulu untuk membuat berkasmu!", "info");
         return openAuthModal();
     }
     createChoiceIsCabang = isCabang || (u.role === "cabang");
-    document.getElementById("modal-create-choice").classList.remove("hide");
+    document.getElementById("modal-create-choice")?.classList.remove("hide");
     pushBackGuard();
 }
 function chooseCreateDoc(kind) {
-    document.getElementById("modal-create-choice").classList.add("hide");
-    if (kind === "undangan") startCreateInvitation(createChoiceIsCabang);
-    else if (kind === "cv") startCreatePortfolio(createChoiceIsCabang, "cv");
-    else if (kind === "lamaran") startCreatePortfolio(createChoiceIsCabang, "lamaran");
+    document.getElementById("modal-create-choice")?.classList.add("hide");
+    if (kind === "undangan" && typeof startCreateInvitation === "function") startCreateInvitation(createChoiceIsCabang);
+    else if (kind === "cv" && typeof startCreatePortfolio === "function") startCreatePortfolio(createChoiceIsCabang, "cv");
+    else if (kind === "lamaran" && typeof startCreatePortfolio === "function") startCreatePortfolio(createChoiceIsCabang, "lamaran");
 }
 
 function buildFilmPosterDocCardHtml(doc, isCabang = false) {
@@ -931,7 +991,7 @@ function getUserCombinedDocs(username) {
 }
 
 function renderProfileFavoritesShelf() {
-    const u = getCurrentUserObj(); if (!u) return;
+    const u = typeof getCurrentUserObj === "function" ? getCurrentUserObj() : null; if (!u) return;
     const favs = u.favorites || [];
     const html = !favs.length
         ? `<div class="w-full app-card border border-dashed rounded-2xl p-7 text-center text-xs app-muted">Belum ada produk favorit. Ketuk ikon <i class="fa-solid fa-heart text-red-500"></i> pada kartu di Beranda untuk menyimpannya di sini.</div>`
@@ -950,62 +1010,68 @@ function renderProfileFavoritesShelf() {
 
 function switchProfileDocsTab(tab) {
     const isDocs = tab === "docs";
-    document.getElementById("prof-docs-panel").classList.toggle("hide", !isDocs);
-    document.getElementById("prof-favs-panel").classList.toggle("hide", isDocs);
-    document.getElementById("tab-prof-docs").className = `px-4 py-1.5 rounded-full text-xs font-extrabold ${isDocs ? "gold-pill-btn" : "app-btn-sec"}`;
-    document.getElementById("tab-prof-favs").className = `px-4 py-1.5 rounded-full text-xs font-bold ${!isDocs ? "gold-pill-btn" : "app-btn-sec"}`;
+    document.getElementById("prof-docs-panel")?.classList.toggle("hide", !isDocs);
+    document.getElementById("prof-favs-panel")?.classList.toggle("hide", isDocs);
+    const td = document.getElementById("tab-prof-docs"); if (td) td.className = `px-4 py-1.5 rounded-full text-xs font-extrabold ${isDocs ? "gold-pill-btn" : "app-btn-sec"}`;
+    const tf = document.getElementById("tab-prof-favs"); if (tf) tf.className = `px-4 py-1.5 rounded-full text-xs font-bold ${!isDocs ? "gold-pill-btn" : "app-btn-sec"}`;
 }
 function switchCabangDocsTab(tab) {
     const isDocs = tab === "docs";
-    document.getElementById("cab-docs-panel").classList.toggle("hide", !isDocs);
-    document.getElementById("cab-favs-panel").classList.toggle("hide", isDocs);
-    document.getElementById("tab-cab-docs").className = `px-4 py-1.5 rounded-full text-xs font-extrabold ${isDocs ? "gold-pill-btn" : "app-btn-sec"}`;
-    document.getElementById("tab-cab-favs").className = `px-4 py-1.5 rounded-full text-xs font-bold ${!isDocs ? "gold-pill-btn" : "app-btn-sec"}`;
+    document.getElementById("cab-docs-panel")?.classList.toggle("hide", !isDocs);
+    document.getElementById("cab-favs-panel")?.classList.toggle("hide", isDocs);
+    const td = document.getElementById("tab-cab-docs"); if (td) td.className = `px-4 py-1.5 rounded-full text-xs font-extrabold ${isDocs ? "gold-pill-btn" : "app-btn-sec"}`;
+    const tf = document.getElementById("tab-cab-favs"); if (tf) tf.className = `px-4 py-1.5 rounded-full text-xs font-bold ${!isDocs ? "gold-pill-btn" : "app-btn-sec"}`;
 }
 
 function renderUserProfile() {
-    const u = getCurrentUserObj(); if (!u) return;
-    document.getElementById("prof-banner").style.backgroundImage = u.banner ? `url('${u.banner}')` : "";
-    document.getElementById("prof-avatar").src = u.avatar || DEFAULT_AVATAR;
-    document.getElementById("prof-composer-avatar").src = u.avatar || DEFAULT_AVATAR;
-    document.getElementById("prof-name").innerText = u.name;
-    document.getElementById("prof-pro-badge").classList.toggle("hide", !u.isPro);
-    document.getElementById("prof-username").innerText = `@${u.username}`;
-    document.getElementById("prof-bio").innerText = u.bio || "";
-    document.getElementById("prof-contact").innerHTML = `${u.phone ? `<span><i class="fa-solid fa-phone app-accent mr-1"></i>${escHtml(u.phone)}</span>` : ""}${u.address ? `<span><i class="fa-solid fa-location-dot app-accent mr-1"></i>${escHtml(u.address)}</span>` : ""}`;
+    const u = typeof getCurrentUserObj === "function" ? getCurrentUserObj() : null; if (!u) return;
+    const defAv = typeof DEFAULT_AVATAR !== "undefined" ? DEFAULT_AVATAR : "./logo.png";
+    const bEl = document.getElementById("prof-banner"); if (bEl) bEl.style.backgroundImage = u.banner ? `url('${u.banner}')` : "";
+    const aEl = document.getElementById("prof-avatar"); if (aEl) aEl.src = u.avatar || defAv;
+    const caEl = document.getElementById("prof-composer-avatar"); if (caEl) caEl.src = u.avatar || defAv;
+    const nEl = document.getElementById("prof-name"); if (nEl) nEl.innerText = u.name;
+    document.getElementById("prof-pro-badge")?.classList.toggle("hide", !u.isPro);
+    const uEl = document.getElementById("prof-username"); if (uEl) uEl.innerText = `@${u.username}`;
+    const bioEl = document.getElementById("prof-bio"); if (bioEl) bioEl.innerText = u.bio || "";
+    const cEl = document.getElementById("prof-contact"); if (cEl) cEl.innerHTML = `${u.phone ? `<span><i class="fa-solid fa-phone app-accent mr-1"></i>${escHtml(u.phone)}</span>` : ""}${u.address ? `<span><i class="fa-solid fa-location-dot app-accent mr-1"></i>${escHtml(u.address)}</span>` : ""}`;
 
-    renderProfileAlbumHighlights("prof-album-highlights", "prof-album-count-lbl", u.username);
+    if (typeof renderProfileAlbumHighlights === "function") renderProfileAlbumHighlights("prof-album-highlights", "prof-album-count-lbl", u.username);
 
     const docs = getUserCombinedDocs(u.username);
-    document.getElementById("prof-doc-count").innerText = docs.length;
+    const dcEl = document.getElementById("prof-doc-count"); if (dcEl) dcEl.innerText = docs.length;
     const shelf = document.getElementById("user-docs-shelf");
-    shelf.innerHTML = !docs.length
-        ? `<div class="w-full app-card border border-dashed rounded-3xl p-8 text-center space-y-3"><p class="text-xs app-muted">Belum ada berkas yang dibuat.</p><button onclick="openCreateChoiceModal(false)" class="gold-pill-btn px-5 py-2.5 rounded-xl text-xs">+ Buat Berkas Pertamamu</button></div>`
-        : docs.map(d => buildFilmPosterDocCardHtml(d, false)).join("");
+    if (shelf) {
+        shelf.innerHTML = !docs.length
+            ? `<div class="w-full app-card border border-dashed rounded-3xl p-8 text-center space-y-3"><p class="text-xs app-muted">Belum ada berkas yang dibuat.</p><button onclick="openCreateChoiceModal(false)" class="gold-pill-btn px-5 py-2.5 rounded-xl text-xs">+ Buat Berkas Pertamamu</button></div>`
+            : docs.map(d => buildFilmPosterDocCardHtml(d, false)).join("");
+    }
 
     renderProfileFavoritesShelf();
 }
 
 function renderCabangAdmin() {
-    const cab = getCurrentUserObj(); if (!cab) return;
-    document.getElementById("cprof-banner").style.backgroundImage = cab.banner ? `url('${cab.banner}')` : "";
-    document.getElementById("cprof-avatar").src = cab.avatar || DEFAULT_AVATAR;
-    document.getElementById("cabang-composer-avatar").src = cab.avatar || DEFAULT_AVATAR;
-    document.getElementById("cabang-title-name").innerText = cab.name;
-    document.getElementById("cabang-pro-badge").classList.toggle("hide", !cab.isPro);
-    document.getElementById("cabang-username").innerText = `@${cab.username}`;
-    document.getElementById("cabang-quota-badge").innerText = cab.quota || 0;
+    const cab = typeof getCurrentUserObj === "function" ? getCurrentUserObj() : null; if (!cab) return;
+    const defAv = typeof DEFAULT_AVATAR !== "undefined" ? DEFAULT_AVATAR : "./logo.png";
+    const bEl = document.getElementById("cprof-banner"); if (bEl) bEl.style.backgroundImage = cab.banner ? `url('${cab.banner}')` : "";
+    const aEl = document.getElementById("cprof-avatar"); if (aEl) aEl.src = cab.avatar || defAv;
+    const caEl = document.getElementById("cabang-composer-avatar"); if (caEl) caEl.src = cab.avatar || defAv;
+    const nEl = document.getElementById("cabang-title-name"); if (nEl) nEl.innerText = cab.name;
+    document.getElementById("cabang-pro-badge")?.classList.toggle("hide", !cab.isPro);
+    const uEl = document.getElementById("cabang-username"); if (uEl) uEl.innerText = `@${cab.username}`;
+    const qEl = document.getElementById("cabang-quota-badge"); if (qEl) qEl.innerText = cab.quota || 0;
     const brandLbl = (cab.brandName && cab.brandName.trim()) ? cab.brandName.trim() : cab.name;
-    document.getElementById("cabang-brand-badge").innerHTML = `<i class="fa-solid fa-tag app-accent mr-1"></i>Label: <strong>${escHtml(brandLbl)}</strong> • Powered by Mr Undangan`;
+    const brEl = document.getElementById("cabang-brand-badge"); if (brEl) brEl.innerHTML = `<i class="fa-solid fa-tag app-accent mr-1"></i>Label: <strong>${escHtml(brandLbl)}</strong> • Powered by Mr Undangan`;
 
-    renderProfileAlbumHighlights("cabang-album-highlights", "cabang-album-count-lbl", cab.username);
+    if (typeof renderProfileAlbumHighlights === "function") renderProfileAlbumHighlights("cabang-album-highlights", "cabang-album-count-lbl", cab.username);
 
     const docs = getUserCombinedDocs(cab.username);
-    document.getElementById("cabang-doc-count").innerText = docs.length;
+    const dcEl = document.getElementById("cabang-doc-count"); if (dcEl) dcEl.innerText = docs.length;
     const shelf = document.getElementById("cabang-docs-shelf");
-    shelf.innerHTML = !docs.length
-        ? `<div class="w-full app-card border border-dashed rounded-3xl p-8 text-center space-y-3"><p class="text-xs app-muted">Belum ada berkas klien.</p><button onclick="openCreateChoiceModal(true)" class="gold-pill-btn px-5 py-2.5 rounded-xl text-xs">+ Buat Berkas Klien (-1 Kuota)</button></div>`
-        : docs.map(d => buildFilmPosterDocCardHtml(d, true)).join("");
+    if (shelf) {
+        shelf.innerHTML = !docs.length
+            ? `<div class="w-full app-card border border-dashed rounded-3xl p-8 text-center space-y-3"><p class="text-xs app-muted">Belum ada berkas klien.</p><button onclick="openCreateChoiceModal(true)" class="gold-pill-btn px-5 py-2.5 rounded-xl text-xs">+ Buat Berkas Klien (-1 Kuota)</button></div>`
+            : docs.map(d => buildFilmPosterDocCardHtml(d, true)).join("");
+    }
 
     renderProfileFavoritesShelf();
 }
@@ -1019,24 +1085,26 @@ function isUserTypingIn(id) {
 }
 
 function refreshActiveViewSmart() {
-    updateChatBadges();
-    if (!document.getElementById("full-chat-overlay").classList.contains("hide")) renderFullChatContentSmart();
+    if (typeof updateChatBadges === "function") updateChatBadges();
+    const chatOv = document.getElementById("full-chat-overlay");
+    if (chatOv && !chatOv.classList.contains("hide") && typeof renderFullChatContentSmart === "function") renderFullChatContentSmart();
     if (currentViewName === "landing" && !isUserTypingIn("view-landing")) renderLandingPage();
     else if (currentViewName === "profile") renderUserProfile();
     else if (currentViewName === "cabang") renderCabangAdmin();
-    else if (currentViewName === "staff") renderStaffAdmin();
-    else if (currentViewName === "guestlist" && !isUserTypingIn("view-guestlist")) renderGuestListStatsAndRows();
-    else if (currentViewName === "master") {
+    else if (currentViewName === "staff" && typeof renderStaffAdmin === "function") renderStaffAdmin();
+    else if (currentViewName === "guestlist" && !isUserTypingIn("view-guestlist") && typeof renderGuestListStatsAndRows === "function") renderGuestListStatsAndRows();
+    else if (currentViewName === "master" && typeof renderMasterHeaderStats === "function") {
         renderMasterHeaderStats();
-        if (currentMasterWorkspace !== "home_editor" && currentMasterWorkspace !== "media" && !isUserTypingIn("master-workspace-body")) {
+        if (currentMasterWorkspace !== "home_editor" && currentMasterWorkspace !== "media" && !isUserTypingIn("master-workspace-body") && typeof renderMasterWorkspaceContent === "function") {
             renderMasterWorkspaceContent();
         }
     }
-    if (!document.getElementById("guest-invitation-overlay").classList.contains("hide") && activeGuestInv && activeGuestInv.id !== "demo") {
-        const fresh = db.invitations.find(i => String(i.id) === String(activeGuestInv.id));
+    const gOv = document.getElementById("guest-invitation-overlay");
+    if (gOv && !gOv.classList.contains("hide") && typeof activeGuestInv !== "undefined" && activeGuestInv && activeGuestInv.id !== "demo") {
+        const fresh = (db.invitations || []).find(i => String(i.id) === String(activeGuestInv.id));
         if (fresh) {
             activeGuestInv = fresh;
-            if (!isUserTypingIn("guest-invitation-overlay")) {
+            if (!isUserTypingIn("guest-invitation-overlay") && typeof renderGuestWishes === "function") {
                 renderGuestWishes();
             }
         }
@@ -1050,20 +1118,21 @@ async function bootMrUndanganApp() {
     const splashStartedAt = Date.now();
     const finishSplash = (minMs = 1100) => {
         const left = Math.max(0, minMs - (Date.now() - splashStartedAt));
-        setTimeout(() => hideHelloSplash(), left);
+        setTimeout(() => { if (typeof hideHelloSplash === "function") hideHelloSplash(); }, left);
     };
 
     try {
-        applyAppTheme(localStorage.getItem(APP_THEME_KEY) || "light", false);
+        const tKey = typeof APP_THEME_KEY !== "undefined" ? APP_THEME_KEY : "MR_UNDANGAN_APP_THEME";
+        if (typeof applyAppTheme === "function") applyAppTheme(localStorage.getItem(tKey) || "light", false);
         initBackNavigationGuard();
         const p = new URLSearchParams(window.location.search);
 
-        if (p.has("client")) {
-            hideHelloSplash();
+        if (p.has("client") && typeof fetchClientPortalData === "function") {
+            if (typeof hideHelloSplash === "function") hideHelloSplash();
             showLoading("Membuka Portal Tamu Mandiri...");
             const res = await fetchClientPortalData(p.get("client"), p.get("key") || "");
             hideLoading();
-            if (res && res.ok && res.invitation) {
+            if (res && res.ok && res.invitation && typeof openClientPortalView === "function") {
                 openClientPortalView(res.invitation, res.brandName || "");
                 return;
             }
@@ -1072,42 +1141,42 @@ async function bootMrUndanganApp() {
             return;
         }
 
-        if (p.has("demo") && p.has("theme")) {
-            hideHelloSplash();
-            showEnvelopeLoader("Menyiapkan Contoh Tema...");
+        if (p.has("demo") && p.has("theme") && typeof fetchPublicCloud === "function") {
+            if (typeof hideHelloSplash === "function") hideHelloSplash();
+            if (typeof showEnvelopeLoader === "function") showEnvelopeLoader("Menyiapkan Contoh Tema...");
             await fetchPublicCloud();
-            openThemeLivePreview(p.get("demo"), p.get("theme"), false);
-            hideEnvelopeLoader();
+            if (typeof openThemeLivePreview === "function") openThemeLivePreview(p.get("demo"), p.get("theme"), false);
+            if (typeof hideEnvelopeLoader === "function") hideEnvelopeLoader();
             goToLanding(true);
             return;
         }
 
-        if (p.has("inv") || p.has("to")) {
-            hideHelloSplash();
-            showEnvelopeLoader("Membuka Undangan...");
+        if ((p.has("inv") || p.has("to")) && typeof fetchSingleInvitationFast === "function") {
+            if (typeof hideHelloSplash === "function") hideHelloSplash();
+            if (typeof showEnvelopeLoader === "function") showEnvelopeLoader("Membuka Undangan...");
             document.getElementById("gv-close-btn")?.classList.add("hide");
             const id = p.get("inv"), g = p.get("to") || "Tamu Kehormatan";
             let invObj = id ? await fetchSingleInvitationFast(id) : null;
-            if (!invObj && id) {
+            if (!invObj && id && typeof fetchFullCloud === "function") {
                 await fetchFullCloud();
                 invObj = (db.invitations || []).find(x => String(x.id) === String(id)) || null;
             }
-            if (invObj) {
+            if (invObj && typeof openGuestViewWithObject === "function") {
                 openGuestViewWithObject(invObj, g, true);
             } else {
-                hideEnvelopeLoader();
+                if (typeof hideEnvelopeLoader === "function") hideEnvelopeLoader();
                 showToast("Undangan tidak ditemukan atau tautan sudah kedaluwarsa.", "error");
                 goToLanding(true);
                 return;
             }
-            hideEnvelopeLoader();
-            fetchPublicCloud();
+            if (typeof hideEnvelopeLoader === "function") hideEnvelopeLoader();
+            if (typeof fetchPublicCloud === "function") fetchPublicCloud();
             return;
         }
 
-        if (currentSessionUser) {
-            const cached = await idbGet("db_snapshot");
-            if (cached) applyServerDb(cached);
+        if (typeof currentSessionUser !== "undefined" && currentSessionUser) {
+            const cached = typeof idbGet === "function" ? await idbGet("db_snapshot") : null;
+            if (cached && typeof applyServerDb === "function") applyServerDb(cached);
 
             try {
                 const savedU = JSON.parse(localStorage.getItem(USER_CACHE_KEY) || "null");
@@ -1116,7 +1185,7 @@ async function bootMrUndanganApp() {
                 }
             } catch {}
 
-            const uCached = getCurrentUserObj();
+            const uCached = typeof getCurrentUserObj === "function" ? getCurrentUserObj() : null;
             if (uCached) {
                 const nmEl = document.getElementById("ios-hello-name");
                 if (nmEl && uCached.name) nmEl.innerText = uCached.name.split(" ")[0];
@@ -1126,26 +1195,30 @@ async function bootMrUndanganApp() {
             }
             finishSplash(1150);
 
-            fetchFullCloud().then((synced) => {
-                if (!synced) return;
-                const uNow = getCurrentUserObj();
-                if (uNow) {
-                    ensureUserInLocalDb(uNow);
-                    if (currentViewName === "landing") renderLandingPage();
-                    else refreshActiveViewSmart();
-                }
-                updateChatBadges();
-            });
+            if (typeof fetchFullCloud === "function") {
+                fetchFullCloud().then((synced) => {
+                    if (!synced) return;
+                    const uNow = typeof getCurrentUserObj === "function" ? getCurrentUserObj() : null;
+                    if (uNow) {
+                        ensureUserInLocalDb(uNow);
+                        if (currentViewName === "landing") renderLandingPage();
+                        else refreshActiveViewSmart();
+                    }
+                    if (typeof updateChatBadges === "function") updateChatBadges();
+                });
+            }
         } else {
-            const pubCached = await idbGet("public_snapshot");
-            if (pubCached) applyPublicDb(pubCached);
+            const pubCached = typeof idbGet === "function" ? await idbGet("public_snapshot") : null;
+            if (pubCached && typeof applyPublicDb === "function") applyPublicDb(pubCached);
             goToLanding(true);
             finishSplash(1100);
 
-            fetchPublicCloud().then((syncedPub) => {
-                if (syncedPub) refreshActiveViewSmart();
-                updateChatBadges();
-            });
+            if (typeof fetchPublicCloud === "function") {
+                fetchPublicCloud().then((syncedPub) => {
+                    if (syncedPub) refreshActiveViewSmart();
+                    if (typeof updateChatBadges === "function") updateChatBadges();
+                });
+            }
 
             setTimeout(() => {
                 if (!currentSessionUser && currentViewName === "landing") openWelcomeInstallModal(false);
@@ -1153,11 +1226,11 @@ async function bootMrUndanganApp() {
             setTimeout(() => maybeShowLoginReminder(), 35000);
         }
 
-        updateChatBadges();
-        scheduleAdaptivePoll();
+        if (typeof updateChatBadges === "function") updateChatBadges();
+        if (typeof scheduleAdaptivePoll === "function") scheduleAdaptivePoll();
     } catch (err) {
         console.error("Boot error:", err);
-        hideHelloSplash();
+        if (typeof hideHelloSplash === "function") hideHelloSplash();
         try { goToLanding(true); } catch {}
     }
 }
