@@ -41,96 +41,98 @@ function buildPortfolioMiniCardHtml(docType, tObj, showFavBtn = true) {
     const favObjStr = esc(JSON.stringify({ favKey, kind: "pf", docType, id: tObj.id }));
     const acc = tObj.accent || "#1b7a49";
 
-    // Miniatur nyata berbentuk dokumen CV / Surat Lamaran lengkap dengan teks contoh
+    // Lembaran mini contoh berisi data nyata agar langsung terbaca seperti dokumen jadi
     let miniThumb = "";
     if (isLam) {
         miniThumb = `
-            <div class="bg-white text-zinc-900 rounded-lg p-2 shadow-lg my-auto text-[7px] leading-[1.3] space-y-1 border border-white/70">
+            <div class="bg-white text-zinc-900 rounded-lg p-2 shadow-lg my-auto text-[6.8px] leading-[1.28] space-y-1 border border-white/75">
                 <div class="flex justify-between items-center border-b pb-0.5" style="border-color:${acc}">
-                    <span class="font-extrabold uppercase tracking-tight" style="color:${acc}">Surat Lamaran</span>
-                    <span class="text-[6px] text-zinc-500">HRD</span>
+                    <span class="font-extrabold uppercase tracking-tight" style="color:${acc}">Surat Lamaran Kerja</span>
+                    <span class="text-[5.5px] text-zinc-500">Banjarmasin</span>
                 </div>
-                <p class="font-bold text-zinc-800 truncate">Yth. HRD PT Nusantara</p>
-                <p class="text-zinc-600 line-clamp-2">Dengan hormat, mengajukan lamaran posisi Staf Operasional...</p>
-                <div class="bg-zinc-50 border border-zinc-200 rounded px-1.5 py-1 space-y-0.5 text-[6px]">
-                    <div class="flex justify-between"><span class="text-zinc-500">Nama</span><strong class="text-zinc-800">Raka Pratama</strong></div>
-                    <div class="flex justify-between"><span class="text-zinc-500">Posisi</span><strong style="color:${acc}">Admin Ops</strong></div>
+                <p class="font-bold text-zinc-800 truncate">Yth. HRD PT Nusantara Jaya</p>
+                <p class="text-zinc-600 line-clamp-2">Dengan hormat, saya Raka Pratama mengajukan lamaran posisi Staf Operasional &amp; Admin.</p>
+                <div class="bg-zinc-50 border border-zinc-200 rounded px-1.5 py-0.5 space-y-0.5 text-[5.8px]">
+                    <div class="flex justify-between gap-1"><span class="text-zinc-500">Nama</span><strong class="text-zinc-800 truncate">Raka Pratama</strong></div>
+                    <div class="flex justify-between gap-1"><span class="text-zinc-500">Pendidikan</span><strong class="text-zinc-800 truncate">S1 Manajemen</strong></div>
+                    <div class="flex justify-between gap-1"><span class="text-zinc-500">Kontak</span><strong style="color:${acc}" class="truncate">0812-5550-8899</strong></div>
                 </div>
-                <div class="text-right pt-0.5"><span class="inline-block border-t border-zinc-400 px-1.5 text-[6px] font-bold text-zinc-700">Raka Pratama</span></div>
+                <div class="text-right pt-0.5"><span class="inline-block border-t border-zinc-400 px-1.5 text-[5.8px] font-bold text-zinc-700">Raka Pratama</span></div>
             </div>`;
     } else if (tObj.id === "cv_ats" || tObj.id === "cv_royal") {
         miniThumb = `
-            <div class="bg-white text-zinc-900 rounded-lg p-2 shadow-lg my-auto text-[7px] leading-[1.3] space-y-1 border border-white/70">
+            <div class="bg-white text-zinc-900 rounded-lg p-2 shadow-lg my-auto text-[6.8px] leading-[1.26] space-y-1 border border-white/75">
                 <div class="text-center border-b pb-0.5" style="border-color:${acc}">
-                    <p class="font-extrabold text-[8px] uppercase text-zinc-900 truncate">RAKA PRATAMA</p>
-                    <p class="text-[6px] font-semibold truncate" style="color:${acc}">${escHtml(tObj.tag || "Operasional & Admin")}</p>
+                    <p class="font-extrabold text-[7.8px] uppercase text-zinc-900 truncate">RAKA PRATAMA WIJAYA</p>
+                    <p class="text-[5.8px] font-semibold truncate" style="color:${acc}">${escHtml(tObj.tag || "Operasional & Admin")} • 0812-5550-8899</p>
                 </div>
                 <div>
-                    <p class="text-[6px] font-extrabold uppercase text-zinc-500">Pengalaman</p>
-                    <p class="font-bold text-zinc-800 truncate">Koordinator Ops • 2023–Kini</p>
-                    <p class="text-[6px] text-zinc-600 truncate">Pelaporan harian &amp; koordinasi tim</p>
+                    <p class="text-[5.5px] font-extrabold uppercase text-zinc-500">Pengalaman Kerja</p>
+                    <p class="font-bold text-zinc-800 truncate">Koordinator Ops • PT Borneo Karya</p>
+                    <p class="text-[5.5px] text-zinc-600 truncate">Laporan harian, K3 &amp; arsip dokumen</p>
                 </div>
-                <div>
-                    <p class="text-[6px] font-extrabold uppercase text-zinc-500">Pendidikan &amp; Skill</p>
-                    <p class="text-[6px] text-zinc-700 truncate">S1 Manajemen • Excel, Admin, K3</p>
+                <div class="border-t border-zinc-200 pt-0.5">
+                    <p class="text-[5.5px] font-extrabold uppercase text-zinc-500">Pendidikan &amp; Keahlian</p>
+                    <p class="text-[5.8px] text-zinc-700 truncate">S1 Manajemen • Excel, Admin, Pelaporan</p>
                 </div>
             </div>`;
     } else if (tObj.id === "cv_charcoal" || tObj.id === "cv_navy") {
         miniThumb = `
-            <div class="bg-white text-zinc-900 rounded-lg overflow-hidden shadow-lg grid grid-cols-[38%_1fr] my-auto text-[7px] leading-[1.25] border border-white/70">
+            <div class="bg-white text-zinc-900 rounded-lg overflow-hidden shadow-lg grid grid-cols-[38%_1fr] my-auto text-[6.6px] leading-[1.24] border border-white/75">
                 <div class="p-1.5 text-white flex flex-col justify-between space-y-1" style="background:${acc}">
                     <div class="text-center space-y-0.5">
                         <div class="w-5 h-5 rounded-full bg-white/25 mx-auto flex items-center justify-center text-[6px] font-extrabold">RP</div>
-                        <p class="text-[6px] font-bold truncate">0812-5550</p>
+                        <p class="text-[5.5px] font-bold truncate">0812-5550-8899</p>
                     </div>
                     <div class="space-y-0.5 border-t border-white/20 pt-1">
-                        <p class="text-[5.5px] uppercase opacity-75 font-bold">Keahlian</p>
-                        <p class="text-[5.5px] truncate">• Administrasi</p>
-                        <p class="text-[5.5px] truncate">• Ms. Excel</p>
+                        <p class="text-[5.2px] uppercase opacity-75 font-bold">Keahlian</p>
+                        <p class="text-[5.5px] truncate">★ Administrasi</p>
+                        <p class="text-[5.5px] truncate">★ Ms. Excel</p>
+                        <p class="text-[5.5px] truncate">★ Pelaporan</p>
                     </div>
                 </div>
                 <div class="p-1.5 space-y-1 bg-white">
                     <div>
-                        <p class="font-extrabold text-[7.5px] text-zinc-900 truncate">Raka Pratama</p>
+                        <p class="font-extrabold text-[7.2px] text-zinc-900 truncate">Raka Pratama</p>
                         <p class="text-[5.5px] text-zinc-500 truncate">${escHtml(tObj.tag || "Staf Operasional")}</p>
                     </div>
                     <div class="border-t border-zinc-200 pt-0.5">
-                        <p class="text-[5.5px] font-bold text-zinc-800 truncate">Staf Operasional</p>
-                        <p class="text-[5px] text-zinc-500 truncate">PT Borneo Karya</p>
+                        <p class="text-[5.5px] font-bold text-zinc-800 truncate">Koordinator Ops</p>
+                        <p class="text-[5.2px] text-zinc-500 truncate">PT Borneo Karya (2023–Kini)</p>
                     </div>
                     <div class="border-t border-zinc-200 pt-0.5">
                         <p class="text-[5.5px] font-bold text-zinc-800 truncate">S1 Manajemen</p>
-                        <p class="text-[5px] text-zinc-500 truncate">2017 – 2021</p>
+                        <p class="text-[5.2px] text-zinc-500 truncate">Univ. Lambung Mangkurat</p>
                     </div>
                 </div>
             </div>`;
     } else if (tObj.id === "cv_teal") {
         miniThumb = `
-            <div class="bg-white text-zinc-900 rounded-lg p-1.5 shadow-lg my-auto text-[6.5px] leading-[1.25] space-y-1 border border-white/70">
+            <div class="bg-white text-zinc-900 rounded-lg p-1.5 shadow-lg my-auto text-[6.4px] leading-[1.24] space-y-1 border border-white/75">
                 <div class="flex items-center justify-between border-b pb-0.5" style="border-color:${acc}">
-                    <span class="font-extrabold text-[7.5px] text-zinc-900 truncate">Raka Pratama</span>
-                    <span class="w-4 h-4 rounded bg-zinc-200 text-zinc-700 flex items-center justify-center text-[5.5px] font-bold shrink-0">CV</span>
+                    <span class="font-extrabold text-[7.2px] text-zinc-900 truncate">Raka Pratama</span>
+                    <span class="px-1 py-0.2 rounded bg-zinc-200 text-zinc-700 text-[5px] font-bold shrink-0">CV</span>
                 </div>
-                <div class="border border-zinc-200 rounded overflow-hidden text-[5.5px]">
-                    <div class="px-1 py-0.5 text-white font-bold" style="background:${acc}">I. Data Pribadi</div>
-                    <div class="px-1 py-0.5 flex justify-between"><span class="text-zinc-500">Posisi</span><strong class="text-zinc-800 truncate">Admin Ops</strong></div>
-                    <div class="px-1 py-0.5 border-t border-zinc-100 flex justify-between"><span class="text-zinc-500">Kontak</span><span class="text-zinc-700 truncate">0812-5550</span></div>
+                <div class="border border-zinc-200 rounded overflow-hidden text-[5.4px]">
+                    <div class="px-1 py-0.5 text-white font-bold" style="background:${acc}">I. Data &amp; Pengalaman</div>
+                    <div class="px-1 py-0.5 flex justify-between gap-1"><span class="text-zinc-500">Posisi</span><strong class="text-zinc-800 truncate">Admin &amp; Ops</strong></div>
+                    <div class="px-1 py-0.5 border-t border-zinc-100 flex justify-between gap-1"><span class="text-zinc-500">Pendidikan</span><strong class="text-zinc-800 truncate">S1 Manajemen</strong></div>
+                    <div class="px-1 py-0.5 border-t border-zinc-100 flex justify-between gap-1"><span class="text-zinc-500">Skill</span><span class="text-zinc-700 truncate">Excel, Admin, K3</span></div>
                 </div>
-                <p class="text-[5.5px] text-zinc-600 truncate">II. Pendidikan &amp; III. Pengalaman</p>
             </div>`;
     } else {
         miniThumb = `
-            <div class="bg-white text-zinc-900 rounded-lg p-2 shadow-lg my-auto text-[7px] leading-[1.3] space-y-1 border border-white/70">
-                <div class="flex items-center gap-1.5 border-b pb-1" style="border-color:${acc}40">
-                    <span class="w-5 h-5 rounded-lg text-white flex items-center justify-center text-[6.5px] font-extrabold shrink-0" style="background:${acc}">RP</span>
+            <div class="bg-white text-zinc-900 rounded-lg p-1.5 shadow-lg my-auto text-[6.6px] leading-[1.25] space-y-1 border border-white/75">
+                <div class="flex items-center gap-1.5 border-b pb-1" style="border-color:${acc}45">
+                    <span class="w-5 h-5 rounded-lg text-white flex items-center justify-center text-[6px] font-extrabold shrink-0" style="background:${acc}">RP</span>
                     <div class="min-w-0">
-                        <p class="font-extrabold text-[7.5px] text-zinc-900 truncate">Raka Pratama</p>
-                        <p class="text-[5.5px] text-zinc-500 truncate">${escHtml(tObj.tag || "Profil Profesional")}</p>
+                        <p class="font-extrabold text-[7.2px] text-zinc-900 truncate">Raka Pratama</p>
+                        <p class="text-[5.4px] text-zinc-500 truncate">${escHtml(tObj.tag || "Profil Profesional")}</p>
                     </div>
                 </div>
-                <div class="grid grid-cols-[1.2fr_1fr] gap-1 pt-0.5 text-[5.5px]">
+                <div class="grid grid-cols-[1.2fr_1fr] gap-1 pt-0.5 text-[5.4px]">
                     <div class="space-y-0.5">
-                        <p class="font-bold text-zinc-800 truncate">Pengalaman Kerja</p>
+                        <p class="font-bold text-zinc-800 truncate">Pengalaman</p>
                         <p class="text-zinc-600 truncate">Admin &amp; Operasional</p>
                         <p class="font-bold text-zinc-800 truncate pt-0.5">Pendidikan</p>
                         <p class="text-zinc-600 truncate">S1 Manajemen</p>
