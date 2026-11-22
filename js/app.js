@@ -237,7 +237,20 @@ window.addEventListener("popstate", () => {
     if (isVis("modal-secret-album")) { document.getElementById("modal-secret-album").classList.add("hide"); pushBackGuard(); return; }
     if (isVis("modal-create-choice")) { document.getElementById("modal-create-choice").classList.add("hide"); pushBackGuard(); return; }
     if (isVis("modal-client-portal")) { document.getElementById("modal-client-portal").classList.add("hide"); pushBackGuard(); return; }
-    if (isVis("full-chat-overlay")) { closeFullChatOverlay(); pushBackGuard(); return; }
+
+    // Navigasi Bertahap Chat: jika sedang membaca thread obrolan, kembali ke daftar percakapan dulu
+    if (isVis("full-chat-overlay")) {
+        if (typeof activeMasterChatThread !== "undefined" && activeMasterChatThread) {
+            activeMasterChatThread = null;
+            if (typeof renderFullChatOverlay === "function") renderFullChatOverlay();
+            pushBackGuard();
+            return;
+        }
+        closeFullChatOverlay();
+        pushBackGuard();
+        return;
+    }
+
     if (isVis("guest-invitation-overlay") && isVis("gv-close-btn")) { closeGuestInvitation(); pushBackGuard(); return; }
     if (drawerOpen) { toggleSlideMenu(false); pushBackGuard(); return; }
     if (isVis("modal-view-user-profile")) { document.getElementById("modal-view-user-profile").classList.add("hide"); pushBackGuard(); return; }
@@ -609,7 +622,6 @@ function renderInvCategoryPills() {
     ).join("");
 }
 
-// Etalase Undangan Ringan (1x render tanpa menggandakan kartu 3x lipat)
 function renderInfiniteInvShelf() {
     const shelf = document.getElementById("landing-inv-shelf"); if (!shelf) return;
     const cats = Object.keys(THEME_CATALOG);
@@ -717,7 +729,6 @@ function scrollPfShelfToCat(cat) {
     }
 }
 
-// 6 Desain Sertifikat & Piagam Profesional Berkelas
 function renderCertificateShowcaseShelf() {
     const shelf = document.getElementById("landing-cert-shelf"); if (!shelf) return;
     shelf.innerHTML = CERT_SHOWCASE.map(c => {
@@ -798,7 +809,6 @@ function renderTestimonials() {
 }
 function slideTestimonial(d) { const n = (db.testimonials || []).length; if (!n) return; testiIdx = (testiIdx + d + n) % n; renderTestimonials(); }
 
-// Hemat baterai: jeda auto-slide saat tab diminimalkan atau overlay layar penuh sedang dibuka
 setInterval(() => {
     if (document.hidden || currentViewName !== "landing") return;
     const guestOpen = !document.getElementById("guest-invitation-overlay")?.classList.contains("hide");
