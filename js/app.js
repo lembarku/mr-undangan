@@ -219,11 +219,11 @@ function pushBackGuard() {
 
 function pushStepBackGuard(stepTag) {
     try {
-        history.pushState({ mrActive: true, stepTag: stepTag, s: ++_backStepSeq }, "");
+        history.pushState({ mrActive: true, stepTag, s: ++_backStepSeq }, "");
     } catch {}
 }
 
-window.addEventListener("popstate", (e) => {
+window.addEventListener("popstate", () => {
     const isVis = (id) => { const el = document.getElementById(id); return el && !el.classList.contains("hide"); };
     const drawerOpen = document.getElementById("drawer-main")?.classList.contains("open");
 
@@ -246,39 +246,12 @@ window.addEventListener("popstate", (e) => {
     if (isVis("modal-create-choice")) { document.getElementById("modal-create-choice").classList.add("hide"); pushBackGuard(); return; }
     if (isVis("modal-client-portal")) { document.getElementById("modal-client-portal").classList.add("hide"); pushBackGuard(); return; }
 
-    // 1. TAHAP 1: KELUAR DARI PROFIL USER -> KEMBALI KE ISI OBROLAN
-    if (isVis("modal-view-user-profile") || isVis("modal-master-user")) {
-        document.getElementById("modal-view-user-profile")?.classList.add("hide");
-        document.getElementById("modal-master-user")?.classList.add("hide");
-        if (window.openedFromChatThread) {
-            if (typeof activeMasterChatThread !== "undefined") {
-                activeMasterChatThread = window.openedFromChatThread;
-            }
-            window.openedFromChatThread = null;
-            const ov = document.getElementById("full-chat-overlay");
-            if (ov) ov.classList.remove("hide");
-            if (typeof renderFullChatOverlay === "function") renderFullChatOverlay();
-        }
-        pushBackGuard();
+    // Jika overlay chat atau modal profil terbuka, biarkan capture listener di chat.js yang mengurus secara bertahap
+    if (isVis("full-chat-overlay") || isVis("modal-view-user-profile")) {
         return;
     }
 
-    // 2. TAHAP 2: KELUAR DARI ISI OBROLAN -> KEMBALI KE DAFTAR SEMUA CHAT
-    // 3. TAHAP 3: KELUAR DARI DAFTAR SEMUA CHAT -> KEMBALI KE HALAMAN ASAL (TIDAK KELUAR APLIKASI)
-    if (isVis("full-chat-overlay")) {
-        if (typeof activeMasterChatThread !== "undefined" && activeMasterChatThread) {
-            activeMasterChatThread = null;
-            if (typeof renderFullChatOverlay === "function") renderFullChatOverlay();
-            pushBackGuard();
-            return;
-        }
-        closeFullChatOverlay();
-        lastBackPressTs = 0;
-        pushBackGuard();
-        pushBackGuard();
-        return;
-    }
-
+    if (isVis("modal-master-user")) { document.getElementById("modal-master-user").classList.add("hide"); pushBackGuard(); return; }
     if (isVis("guest-invitation-overlay") && isVis("gv-close-btn")) { closeGuestInvitation(); pushBackGuard(); return; }
     if (drawerOpen) { toggleSlideMenu(false); pushBackGuard(); return; }
     if (isVis("modal-share-sosmed")) { cancelSocialShareModal(); pushBackGuard(); return; }
@@ -1151,4 +1124,46 @@ async function bootMrUndanganApp() {
             } else {
                 goToLanding(true);
             }
-            finishSplash(1150
+            finishSplash(1150);
+
+            fetchFullCloud().then((synced) => {
+                if (!synced) return;
+                const uNow = getCurrentUserObj();
+                if (uNow) {
+                    ensureUserInLocalDb(uNow);
+                    if (currentViewName === "landing") renderLandingPage();
+                    else refreshActiveViewSmart();
+                }
+                updateChatBadges();
+            });
+        } else {
+            const pubCached = await idbGet("public_snapshot");
+            if (pubCached) applyPublicDb(pubCached);
+            goToLanding(true);
+            finishSplash(1100);
+
+            fetchPublicCloud().then((syncedPub) => {
+                if (syncedPub) refreshActiveViewSmart();
+                updateChatBadges();
+            });
+
+            setTimeout(() => {
+                if (!currentSessionUser && currentViewName === "landing") openWelcomeInstallModal(false);
+            }, 1900);
+            setTimeout(() => maybeShowLoginReminder(), 35000);
+        }
+
+        updateChatBadges();
+        scheduleAdaptivePoll();
+    } catch (err) {
+        console.error("Boot error:", err);
+        hideHelloSplash();
+        try { goToLanding(true); } catch {}
+    }
+}
+
+if (document.readyState === "loading") {
+    document.addEventListener("DOMContentLoaded", bootMrUndanganApp);
+} else {
+    bootMrUndanganApp();
+}
