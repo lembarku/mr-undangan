@@ -199,19 +199,26 @@ function logoutSession() {
 }
 
 // ================= 3. NAVIGASI & TOMBOL BACK HP BERTAHAP =================
-let lastBackPressTs = 0, historyGuardReady = false;
+let lastBackPressTs = 0, historyGuardReady = false, _backStepSeq = 0;
+
 function initBackNavigationGuard() {
     if (historyGuardReady) return;
     historyGuardReady = true;
     try {
-        history.replaceState({ mrBase: true }, "");
-        history.pushState({ mrActive: true }, "");
+        history.replaceState({ mrBase: true, s: 0 }, "");
+        history.pushState({ mrActive: true, s: ++_backStepSeq }, "");
     } catch {}
 }
+
 function pushBackGuard() {
     try {
-        if (history.state && history.state.mrActive) return;
-        history.pushState({ mrActive: true }, "");
+        history.pushState({ mrActive: true, s: ++_backStepSeq }, "");
+    } catch {}
+}
+
+function pushStepBackGuard(stepTag) {
+    try {
+        history.pushState({ mrActive: true, stepTag, s: ++_backStepSeq }, "");
     } catch {}
 }
 
@@ -238,12 +245,11 @@ window.addEventListener("popstate", () => {
     if (isVis("modal-create-choice")) { document.getElementById("modal-create-choice").classList.add("hide"); pushBackGuard(); return; }
     if (isVis("modal-client-portal")) { document.getElementById("modal-client-portal").classList.add("hide"); pushBackGuard(); return; }
 
-    // 1. TAHAP 1: KELUAR DARI PROFIL USER
-    // Jika modal profil user sedang tampil dan sebelumnya dibuka dari dalam chat obrolan:
-    if (isVis("modal-view-user-profile")) {
-        document.getElementById("modal-view-user-profile").classList.add("hide");
+    // 1. PROFIL USER -> KEMBALI KE ISI OBROLAN CHAT
+    if (isVis("modal-view-user-profile") || isVis("modal-master-user")) {
+        document.getElementById("modal-view-user-profile")?.classList.add("hide");
+        document.getElementById("modal-master-user")?.classList.add("hide");
         if (window.openedFromChatThread) {
-            // Pulihkan obrolan chat yang sedang aktif
             if (typeof activeMasterChatThread !== "undefined") {
                 activeMasterChatThread = window.openedFromChatThread;
             }
@@ -251,28 +257,29 @@ window.addEventListener("popstate", () => {
             const ov = document.getElementById("full-chat-overlay");
             if (ov) ov.classList.remove("hide");
             if (typeof renderFullChatOverlay === "function") renderFullChatOverlay();
+            pushStepBackGuard("chat_thread");
+        } else {
+            pushBackGuard();
         }
-        pushBackGuard();
         return;
     }
 
-    // 2. TAHAP 2: KELUAR DARI SATU OBROLAN KE DAFTAR SELURUH CHAT
+    // 2. ISI OBROLAN -> DAFTAR SELURUH CHAT -> KELUAR KE HALAMAN TERAKHIR
     if (isVis("full-chat-overlay")) {
         if (typeof activeMasterChatThread !== "undefined" && activeMasterChatThread) {
             activeMasterChatThread = null;
             if (typeof renderFullChatOverlay === "function") renderFullChatOverlay();
-            pushBackGuard();
+            pushStepBackGuard("chat_list");
             return;
         }
-        // 3. TAHAP 3: KELUAR DARI DAFTAR CHAT
         closeFullChatOverlay();
+        refreshActiveViewSmart();
         pushBackGuard();
         return;
     }
 
     if (isVis("guest-invitation-overlay") && isVis("gv-close-btn")) { closeGuestInvitation(); pushBackGuard(); return; }
     if (drawerOpen) { toggleSlideMenu(false); pushBackGuard(); return; }
-    if (isVis("modal-master-user")) { document.getElementById("modal-master-user").classList.add("hide"); pushBackGuard(); return; }
     if (isVis("modal-share-sosmed")) { cancelSocialShareModal(); pushBackGuard(); return; }
 
     if (clientPortalState.active) {
