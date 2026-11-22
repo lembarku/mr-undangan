@@ -37,6 +37,12 @@ function playSoftChatNotification() {
     } catch {}
 }
 
+function _pushChatLayerState(layerName) {
+    try {
+        history.pushState({ mrChatLayer: layerName, t: Date.now() + Math.random() }, "", window.location.href);
+    } catch {}
+}
+
 function getChatThreads() {
     const curU = getCurrentUserObj();
     const isAdministrasiOnly = curU && curU.role === "administrasi";
@@ -93,7 +99,8 @@ function openChatContactsModal() {
     if (inp) inp.value = "";
     renderChatContactsModalList();
     document.getElementById("modal-chat-contacts").classList.remove("hide");
-    if (typeof pushStepBackGuard === "function") pushStepBackGuard("chat_contacts");
+    _pushChatLayerState("chat_contacts");
+    if (typeof pushBackGuard === "function") pushBackGuard();
 }
 
 function renderChatContactsModalList() {
@@ -215,7 +222,8 @@ function _openUserProfileFromChat(threadUser) {
     }
 
     if (handled) {
-        if (typeof pushStepBackGuard === "function") pushStepBackGuard("chat_profile");
+        _pushChatLayerState("chat_profile");
+        if (typeof pushBackGuard === "function") pushBackGuard();
     } else {
         window.openedFromChatThread = null;
         showToast("Profil pengguna tidak ditemukan.", "info");
@@ -281,10 +289,9 @@ async function openFullChatOverlay(targetThread = null) {
     document.body.style.overflow = "hidden";
     ov.classList.remove("hide");
 
-    if (typeof pushStepBackGuard === "function") {
-        pushStepBackGuard("chat_list");
-        if (activeMasterChatThread) pushStepBackGuard("chat_thread");
-    }
+    _pushChatLayerState("chat_list");
+    if (activeMasterChatThread) _pushChatLayerState("chat_thread");
+    if (typeof pushBackGuard === "function") pushBackGuard();
 
     const u = getCurrentUserObj();
     if (isStaffUserObj(u) && typeof fetchFullCloud === "function") {
@@ -492,7 +499,8 @@ function renderFullChatContentSmart() {
 
 async function openMasterChatThread(tUser) {
     activeMasterChatThread = tUser;
-    if (typeof pushStepBackGuard === "function") pushStepBackGuard("chat_thread");
+    _pushChatLayerState("chat_thread");
+    if (typeof pushBackGuard === "function") pushBackGuard();
     renderFullChatOverlay();
     const u = getCurrentUserObj();
     await apiAction({ action: "mark_chat_read", threadUser: tUser, by: (u && u.role) || "master" });
