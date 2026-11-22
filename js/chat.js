@@ -159,41 +159,33 @@ async function deleteChatThreadHistory(targetUser) {
     }
 }
 
-function _buildQuickUserProfileModalIfNeeded(uObj) {
-    let mod = document.getElementById("modal-view-user-profile");
-    if (!mod) {
-        mod = document.createElement("div");
-        mod.id = "modal-view-user-profile";
-        mod.className = "hide fixed inset-0 z-[130] bg-black/75 flex items-center justify-center p-4";
-        mod.innerHTML = `
-            <div class="app-card border gold-border rounded-3xl w-full max-w-md p-5 space-y-4 shadow-2xl">
-                <div class="flex items-center justify-between border-b gold-border pb-3">
-                    <h3 class="font-extrabold text-sm">Profil Pengguna</h3>
-                    <button type="button" onclick="document.getElementById('modal-view-user-profile').classList.add('hide');window.openedFromChatThread=null;" class="w-8 h-8 rounded-full app-btn-sec text-xs"><i class="fa-solid fa-xmark"></i></button>
-                </div>
-                <div id="mvup-body" class="space-y-2 text-xs"></div>
-            </div>
-        `;
-        document.body.appendChild(mod);
-    }
-    const body = mod.querySelector("#mvup-body");
-    if (body && uObj) {
+function _renderUserProfileModalFallback(uObj) {
+    const mod = document.getElementById("modal-view-user-profile");
+    if (!mod || !uObj) return false;
+    const body = mod.querySelector("#mvp-body");
+    if (body) {
         body.innerHTML = `
-            <div class="flex items-center gap-3">
-                <img src="${uObj.avatar || DEFAULT_AVATAR}" class="w-14 h-14 rounded-full object-cover border gold-border bg-zinc-800 shrink-0">
-                <div class="min-w-0">
-                    <strong class="text-sm block truncate">${escHtml(uObj.name || uObj.username)}</strong>
-                    <span class="app-muted block truncate">@${escHtml(uObj.username)} • Role: ${escHtml(uObj.role || "user")}</span>
+            <div class="p-5 space-y-3 text-xs">
+                <div class="flex items-center gap-3.5">
+                    <img src="${uObj.avatar || DEFAULT_AVATAR}" class="w-16 h-16 rounded-full object-cover border-2 gold-border bg-zinc-800 shrink-0">
+                    <div class="min-w-0">
+                        <strong class="text-base font-extrabold block truncate">${escHtml(uObj.name || uObj.username)}</strong>
+                        <span class="app-accent font-semibold block truncate">@${escHtml(uObj.username)}</span>
+                        <span class="text-[10px] app-muted uppercase font-bold">Role: ${escHtml(uObj.role || "user")}</span>
+                    </div>
                 </div>
-            </div>
-            ${uObj.bio ? `<p class="app-card-soft border rounded-xl p-3">${escHtml(uObj.bio)}</p>` : ""}
-            <div class="app-card-soft border rounded-xl p-3 space-y-1">
-                ${uObj.phone ? `<div><strong>No. HP/WA:</strong> ${escHtml(uObj.phone)}</div>` : ""}
-                ${uObj.address ? `<div><strong>Alamat:</strong> ${escHtml(uObj.address)}</div>` : ""}
+                ${uObj.bio ? `<p class="app-card-soft border rounded-2xl p-3">${escHtml(uObj.bio)}</p>` : ""}
+                <div class="app-card-soft border rounded-2xl p-3 space-y-1">
+                    ${uObj.phone ? `<div><strong>No. HP/WA:</strong> ${escHtml(uObj.phone)}</div>` : ""}
+                    ${uObj.address ? `<div><strong>Alamat:</strong> ${escHtml(uObj.address)}</div>` : ""}
+                    ${typeof uObj.quota === "number" && uObj.role === "cabang" ? `<div><strong>Kuota:</strong> ${uObj.quota}</div>` : ""}
+                </div>
             </div>
         `;
     }
-    return mod;
+    mod.classList.remove("hide");
+    mod.style.zIndex = "130";
+    return true;
 }
 
 function _openUserProfileFromChat(threadUser) {
@@ -205,37 +197,28 @@ function _openUserProfileFromChat(threadUser) {
 
     window.openedFromChatThread = activeMasterChatThread || cleanUser;
 
-    const candidateFns = [
-        "viewUserProfileModal",
-        "inspectUserProfile",
-        "openUserProfileModal",
-        "openUserProfile",
-        "showUserProfileModal",
-        "openMasterUserModal",
-        "openEditMasterUser"
-    ];
-
-    for (const fnName of candidateFns) {
-        if (typeof window[fnName] === "function") {
-            try {
-                window[fnName](cleanUser);
-                break;
-            } catch {}
-        }
+    let handled = false;
+    if (typeof viewUserProfileModal === "function") {
+        try {
+            viewUserProfileModal(cleanUser);
+            handled = true;
+        } catch {}
     }
 
-    const uObj = (db.users || []).find(x => String(x.username || "").toLowerCase() === cleanUser);
-    const modEl = document.getElementById("modal-view-user-profile")
-        || document.getElementById("modal-master-user")
-        || (uObj ? _buildQuickUserProfileModalIfNeeded(uObj) : null);
-
-    if (modEl) {
-        modEl.classList.remove("hide");
+    const modEl = document.getElementById("modal-view-user-profile");
+    if (modEl && !modEl.classList.contains("hide")) {
         modEl.style.zIndex = "130";
+        handled = true;
+    } else if (!handled) {
+        const uObj = (db.users || []).find(x => String(x.username || "").toLowerCase() === cleanUser);
+        if (uObj) handled = _renderUserProfileModalFallback(uObj);
+    }
+
+    if (handled) {
         if (typeof pushStepBackGuard === "function") pushStepBackGuard("chat_profile");
     } else {
         window.openedFromChatThread = null;
-        showToast("Data profil pengguna tidak ditemukan.", "info");
+        showToast("Profil pengguna tidak ditemukan.", "info");
     }
 }
 
