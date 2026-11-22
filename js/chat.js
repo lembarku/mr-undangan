@@ -92,7 +92,7 @@ function openChatContactsModal() {
     if (inp) inp.value = "";
     renderChatContactsModalList();
     document.getElementById("modal-chat-contacts").classList.remove("hide");
-    if (typeof pushBackGuard === "function") pushBackGuard();
+    if (typeof pushStepBackGuard === "function") pushStepBackGuard("chat_contacts");
 }
 
 function renderChatContactsModalList() {
@@ -158,7 +158,6 @@ async function deleteChatThreadHistory(targetUser) {
     }
 }
 
-// Buka profil user dari dalam chat: Pastikan mencari fungsi profil yang tersedia di Master maupun User
 function _openUserProfileFromChat(threadUser) {
     const cleanUser = String(threadUser || "").trim().toLowerCase();
     if (!cleanUser || cleanUser.startsWith("tamu_")) {
@@ -168,7 +167,6 @@ function _openUserProfileFromChat(threadUser) {
 
     window.openedFromChatThread = activeMasterChatThread || cleanUser;
 
-    // Panggil modal profil yang sesuai di aplikasi
     if (typeof viewUserProfileModal === "function") {
         viewUserProfileModal(cleanUser);
     } else if (typeof inspectUserProfile === "function") {
@@ -177,17 +175,9 @@ function _openUserProfileFromChat(threadUser) {
         openMasterUserModal(cleanUser);
     } else if (typeof openUserProfileModal === "function") {
         openUserProfileModal(cleanUser);
-    } else {
-        // Fallback langsung render ke modal profil
-        const uTarget = (db.users || []).find(x => String(x.username || "").toLowerCase() === cleanUser);
-        if (uTarget) {
-            const m = document.getElementById("modal-view-user-profile") || document.getElementById("modal-master-user");
-            if (m) {
-                m.classList.remove("hide");
-                if (typeof pushBackGuard === "function") pushBackGuard();
-            }
-        }
     }
+
+    if (typeof pushStepBackGuard === "function") pushStepBackGuard("chat_profile");
 }
 
 function _syncWaChatHeader(mode = "list", title = "", avatarUrl = "", threadUser = "") {
@@ -246,7 +236,10 @@ async function openFullChatOverlay(targetThread = null) {
     document.body.style.overflow = "hidden";
     ov.classList.remove("hide");
 
-    if (typeof pushBackGuard === "function") pushBackGuard();
+    if (typeof pushStepBackGuard === "function") {
+        pushStepBackGuard("chat_list");
+        if (activeMasterChatThread) pushStepBackGuard("chat_thread");
+    }
 
     const u = getCurrentUserObj();
     if (isStaffUserObj(u) && typeof fetchFullCloud === "function") {
@@ -433,8 +426,8 @@ function renderFullChatContentSmart() {
 
 async function openMasterChatThread(tUser) {
     activeMasterChatThread = tUser;
+    if (typeof pushStepBackGuard === "function") pushStepBackGuard("chat_thread");
     renderFullChatOverlay();
-    if (typeof pushBackGuard === "function") pushBackGuard();
     const u = getCurrentUserObj();
     await apiAction({ action: "mark_chat_read", threadUser: tUser, by: (u && u.role) || "master" });
     updateChatBadges();
