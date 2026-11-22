@@ -91,7 +91,7 @@ function openChatContactsModal() {
     if (inp) inp.value = "";
     renderChatContactsModalList();
     document.getElementById("modal-chat-contacts").classList.remove("hide");
-    pushBackGuard();
+    if (typeof pushBackGuard === "function") pushBackGuard();
 }
 
 function renderChatContactsModalList() {
@@ -164,6 +164,10 @@ function _syncWaChatLayout(mode = "list", titleText = "", subText = "", avatarUr
     const topBar = ov.querySelector(".gold-gradient");
     const body = document.getElementById("fchat-body");
 
+    if (body) {
+        body.classList.add("flex-1", "min-h-0", "flex", "flex-col", "overflow-hidden");
+    }
+
     if (topBar) {
         const closeBtn = topBar.querySelector("button[onclick*='closeFullChatOverlay']");
         if (closeBtn) closeBtn.classList.add("hide");
@@ -207,9 +211,9 @@ function _syncWaChatLayout(mode = "list", titleText = "", subText = "", avatarUr
     if (titleEl && titleText) titleEl.innerText = titleText;
     if (subEl && subText) subEl.innerText = subText;
 
-    const shell = topBar ? topBar.parentElement : null;
-    if (shell) {
-        Array.from(shell.children).forEach(child => {
+    // Sembunyikan bar/tulisan bawah di dalam overlay chat
+    if (topBar && topBar.parentElement) {
+        Array.from(topBar.parentElement.children).forEach(child => {
             if (child !== topBar && child !== body) {
                 child.classList.add("hide");
             }
@@ -224,10 +228,9 @@ async function openFullChatOverlay(targetThread = null) {
     document.body.style.overflow = "hidden";
     ov.classList.remove("hide");
     _syncWaChatLayout(activeMasterChatThread ? "thread" : "list");
-    pushBackGuard();
 
     const u = getCurrentUserObj();
-    if (isStaffUserObj(u)) {
+    if (isStaffUserObj(u) && typeof fetchFullCloud === "function") {
         fetchFullCloud().then((ok) => {
             if (ok && !ov.classList.contains("hide")) {
                 renderFullChatContentSmart();
@@ -296,7 +299,7 @@ function renderFullChatOverlay() {
         if (!activeMasterChatThread) {
             _syncWaChatLayout("list", `Live Chat • ${roleTag}`, `${threads.length} percakapan aktif`);
             body.innerHTML = `
-                <div class="flex-1 overflow-y-auto divide-y divide-black/10 pb-20">${threads.length ? threads.map(th => {
+                <div class="flex-1 min-h-0 overflow-y-auto divide-y divide-black/10 pb-20">${threads.length ? threads.map(th => {
                     const last = th.messages[th.messages.length - 1];
                     const lastStaff = last.role === "master" || last.role === "administrasi";
                     const roleBadge = th.role === "cabang" ? `<span class="text-[9px] px-1.5 py-0.5 rounded bg-blue-500/15 text-blue-600 font-bold">CABANG</span>`
@@ -337,7 +340,7 @@ function renderFullChatOverlay() {
                     ${isMaster ? `<button onclick="closeFullChatOverlay();viewUserProfileModal('${esc(th.threadUser)}');" class="px-2.5 py-1.5 rounded-lg app-accent-bg app-accent text-[10px] font-bold">Profil &amp; PIN</button>` : ""}
                     ${isMaster ? `<button onclick="deleteChatThreadHistory('${esc(th.threadUser)}')" class="px-2.5 py-1.5 rounded-lg bg-red-600/15 text-red-500 text-[10px] font-bold" title="Hapus Riwayat Chat"><i class="fa-solid fa-trash mr-1"></i>Hapus</button>` : ""}
                 </div>
-                <div id="fchat-messages-scroll" class="flex-1 overflow-y-auto p-3.5 space-y-2.5"></div>
+                <div id="fchat-messages-scroll" class="flex-1 min-h-0 overflow-y-auto p-3.5 space-y-2.5"></div>
                 ${quickBar}
                 ${buildChatComposerHtml("sendMasterThreadReply(event)", "master-wa-input", "btn-wa-send", `Ketik pesan ke @${esc(th.threadUser)}...`)}
             `;
@@ -346,7 +349,7 @@ function renderFullChatOverlay() {
     } else {
         _syncWaChatLayout("thread", "Admin Mr Undangan", "Respon cepat");
         body.innerHTML = `
-            <div id="fchat-messages-scroll" class="flex-1 overflow-y-auto p-3.5 space-y-2.5"></div>
+            <div id="fchat-messages-scroll" class="flex-1 min-h-0 overflow-y-auto p-3.5 space-y-2.5"></div>
             ${buildChatComposerHtml("sendUserChatMessage(event)", "chat-input-text", "btn-chat-send", "Ketik pesan...")}
         `;
         renderFullChatMessagesOnly();
@@ -414,7 +417,6 @@ function renderFullChatContentSmart() {
 async function openMasterChatThread(tUser) {
     activeMasterChatThread = tUser;
     renderFullChatOverlay();
-    pushBackGuard();
     const u = getCurrentUserObj();
     await apiAction({ action: "mark_chat_read", threadUser: tUser, by: (u && u.role) || "master" });
     updateChatBadges();
