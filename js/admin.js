@@ -1,3 +1,24 @@
+<div class="grid grid-cols-4 gap-2 text-center mt-3 md:mt-0">
+    <div class="app-card-soft px-3 py-2 rounded-2xl border"><span id="stat-users" ...>0</span><span ...>Akun</span></div>
+    <div class="app-card-soft px-3 py-2 rounded-2xl border"><span id="stat-pending" ...>0</span><span ...>Antrean</span></div>
+    <div class="app-card-soft px-3 py-2 rounded-2xl border"><span id="stat-active" ...>0</span><span ...>Aktif</span></div>
+    <div class="app-card-soft px-3 py-2 rounded-2xl border"><span id="stat-pro" ...>0</span><span ...>Akun Pro</span></div>
+</div>
+```[cite: 28]
+
+Karena elemen 4 kotak itu dirender dan diperbarui langsung di dalam **`js/admin.js`** (`renderMasterHeaderStats`), kita ubah **hanya 1 file `js/admin.js`** agar:
+1. 4 kotak tersebut langsung digantikan dengan **3 list metrik Instagram elegan** sejajar di bawah nama/bio:
+   * **Followers:** Menampilkan angka dummy `18.3k + <jumlah real user>` (saat diklik Master membuka halaman penuh terpisah dengan 3 kategori: User, Administrasi, Cabang lengkap dengan centang biru jika Pro; privat jika dilihat akun lain)[cite: 24, 25].
+   * **Following:** Menampilkan jumlah & daftar yang diikuti[cite: 24].
+   * **Project:** Menampilkan total seluruh project (saat diklik membuka halaman penuh terbagi 2 kategori: Proses & Aktif)[cite: 24].
+2. Tombol di luar berfungsi masing-masing membuka halamannya sendiri secara terpisah tanpa digabung tab di dalamnya[cite: 24].
+3. Tombol kembali HP mundur bertahap dengan mulus tanpa menutup aplikasi[cite: 24, 25].
+
+---
+
+### Kode Utuh `js/admin.js` (Ganti Seluruh Isi `js/admin.js`)
+
+```javascript
 // =========================================================================
 // MR UNDANGAN — MASTER ADMIN (GRAFIK, INSPEKSI, THEME BUILDER) & STAFF
 // File: js/admin.js
@@ -13,27 +34,61 @@ function renderMasterAdmin() {
     openMasterWorkspace(currentMasterWorkspace || "overview");
 }
 
+function _formatMasterFollowersNum() {
+    const allUsers = Array.isArray(db.users) ? db.users : [];
+    const realCount = allUsers.filter(u => u && u.role !== "master").length;
+    return `18.3k + ${realCount}`;
+}
+
 function renderMasterHeaderStats() {
     const m = getCurrentUserObj(); if (!m) return;
-    document.getElementById("mprof-banner").style.backgroundImage = m.banner ? `url('${m.banner}')` : "";
-    document.getElementById("mprof-avatar").src = m.avatar || DEFAULT_AVATAR;
-    document.getElementById("mprof-name").innerText = m.name || "Master Admin";
-    document.getElementById("mprof-username").innerText = `@${m.username}`;
-    document.getElementById("mprof-bio").innerText = m.bio || "Mr Undangan — Powered by Kausar.pictures";
+    const bEl = document.getElementById("mprof-banner");
+    if (bEl) bEl.style.backgroundImage = m.banner ? `url('${m.banner}')` : "";
+    const aEl = document.getElementById("mprof-avatar");
+    if (aEl) {
+        aEl.src = m.avatar || DEFAULT_AVATAR;
+        aEl.onclick = () => openExpandedAvatarLightbox(m.avatar || DEFAULT_AVATAR, m.name || m.username);
+        aEl.classList.add("cursor-pointer", "active:scale-95", "transition");
+    }
+    const nEl = document.getElementById("mprof-name");
+    if (nEl) nEl.innerText = m.name || "Master Admin";
+    const uEl = document.getElementById("mprof-username");
+    if (uEl) uEl.innerText = `@${m.username}`;
+    const bioEl = document.getElementById("mprof-bio");
+    if (bioEl) bioEl.innerText = m.bio || "Mr Undangan founder";
 
-    const setT = (id, v) => { const el = document.getElementById(id); if (el) el.innerText = v; };
-    const nonMaster = (db.users || []).filter(u => u.role !== "master");
-    const pendingAll = (db.invitations || []).filter(i => i.status !== "Aktif").length
-        + (db.portfolios || []).filter(p => p.status !== "Aktif").length
-        + nonMaster.filter(u => u.status !== "Aktif").length;
-    const activeAll = (db.invitations || []).filter(i => i.status === "Aktif").length
-        + (db.portfolios || []).filter(p => p.status === "Aktif").length;
-    const proCount = nonMaster.filter(u => u.isPro).length;
+    // Ubah area 4 kotak statistik menjadi baris list Instagram elegan (Followers, Following, Project)
+    const statsContainer = document.querySelector("#view-master-admin .grid.grid-cols-4") 
+        || document.querySelector("#view-master-admin .ig-master-stats-wrap");
 
-    setT("stat-users", nonMaster.length);
-    setT("stat-pending", pendingAll);
-    setT("stat-active", activeAll);
-    setT("stat-pro", proCount);
+    if (statsContainer) {
+        statsContainer.className = "ig-master-stats-wrap w-full mt-3 md:mt-0";
+        const followingCount = (typeof _getFollowingListForUser === "function")
+            ? _getFollowingListForUser(m).length
+            : (Array.isArray(m.following) ? m.following.length : 0);
+        const allProj = (typeof _getProjectsForUser === "function")
+            ? _getProjectsForUser(m)
+            : [...(db.invitations || []), ...(db.portfolios || [])];
+
+        statsContainer.innerHTML = `
+            <div class="app-card-soft border rounded-2xl p-2 shadow-sm">
+                <div class="grid grid-cols-3 divide-x divide-black/10 text-center">
+                    <button type="button" onclick="openSoloFollowersModal('${esc(m.username)}')" class="py-2 px-1 rounded-xl hover:bg-black/5 active:scale-98 transition">
+                        <span class="block text-sm sm:text-base font-extrabold tracking-tight">${escHtml(_formatMasterFollowersNum())}</span>
+                        <span class="block text-[11px] app-muted font-medium">Followers</span>
+                    </button>
+                    <button type="button" onclick="openSoloFollowingModal('${esc(m.username)}')" class="py-2 px-1 rounded-xl hover:bg-black/5 active:scale-98 transition">
+                        <span class="block text-sm sm:text-base font-extrabold tracking-tight">${followingCount}</span>
+                        <span class="block text-[11px] app-muted font-medium">Following</span>
+                    </button>
+                    <button type="button" onclick="openSoloProjectModal('${esc(m.username)}')" class="py-2 px-1 rounded-xl hover:bg-black/5 active:scale-98 transition">
+                        <span class="block text-sm sm:text-base font-extrabold tracking-tight">${allProj.length}</span>
+                        <span class="block text-[11px] app-muted font-medium">Project</span>
+                    </button>
+                </div>
+            </div>
+        `;
+    }
 }
 
 function openMasterWorkspace(name) {
@@ -260,7 +315,6 @@ function buildUnifiedOrdersListHtml(isStaffMode = false) {
     }).join("") + `</div>`;
 }
 
-// Penampil Bukti Pembayaran Aman (Tanpa document.write & bebas blokir popup HP)
 function viewOrderProof(kind, id) {
     const item = kind === "pf"
         ? (db.portfolios || []).find(p => String(p.id) === String(id))
@@ -844,9 +898,7 @@ function viewUserProfileModal(username) {
 
     let followersCount = 0;
     if (isMasterProfile) {
-        const allUsers = Array.isArray(db.users) ? db.users : [];
-        const realCount = allUsers.filter(x => x && x.role !== "master").length;
-        followersCount = `18.3k + ${realCount}`;
+        followersCount = _formatMasterFollowersNum();
     } else if (typeof _getFollowersListForUser === "function") {
         followersCount = _getFollowersListForUser(u).length;
     } else {
