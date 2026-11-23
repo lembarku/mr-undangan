@@ -265,6 +265,44 @@ function renderStaffAdmin() {
     updateChatBadges();
 }
 
+function buildFullOrderCardHtml(item, options = {}) {
+    const isStaffMode = !!options.isStaffMode;
+    const closeModalBeforeAction = !!options.closeModalBeforeAction;
+    const preCloseJs = closeModalBeforeAction ? "closeSoloStatsModal();closeUserProfileModalCustom();" : "";
+
+    const isPf = item._kind === "pf";
+    const hasRev = !!item.pendingRevision;
+    const typeTag = isPf ? (item.docType === "lamaran" ? "SURAT LAMARAN" : "CV") : `UNDANGAN • ${escHtml(item.category)}`;
+    const priceInfo = item.totalPay ? `${fmtRp(item.totalPay)} (kode unik)` : (item.price ? fmtRp(item.price) : "");
+
+    return `<div class="app-card-soft border rounded-2xl p-4 flex flex-col md:flex-row md:items-center justify-between gap-3 shadow-sm">
+        <div class="min-w-0">
+            <div class="flex flex-wrap items-center gap-1.5">
+                <span class="text-[9px] px-2 py-0.5 rounded-full app-accent-bg app-accent font-extrabold">${typeTag}</span>
+                <span class="text-[10px] px-2 py-0.5 rounded-full font-bold ${item.status==="Aktif"?"bg-emerald-500/20 text-emerald-600":"bg-amber-500/20 app-accent"}">● ${escHtml(item.status)}</span>
+            </div>
+            <h4 class="font-bold text-sm mt-1 truncate">${escHtml(item.title)} <span class="text-xs app-muted font-normal">(@${escHtml(item.owner)}${item.brandName ? ` • ${escHtml(item.brandName)}` : ""})</span></h4>
+            <p class="text-xs app-muted">${escHtml(isPf ? (item.themeName || item.themeId) : item.theme)} ${priceInfo ? `• <strong class="app-accent">${priceInfo}</strong>` : ""} • Revisi: ${item.editCount || 0}/2</p>
+        </div>
+        <div class="flex flex-wrap gap-1.5">
+            ${item.owner ? `<button type="button" onclick="${preCloseJs}openFullChatOverlay('${esc(item.owner)}')" class="px-3 py-1.5 rounded-xl bg-emerald-600/15 border border-emerald-500/40 text-emerald-600 text-xs font-bold" title="Kirim Pesan ke Pemilik Order"><i class="fa-solid fa-comments mr-1"></i>Chat</button>` : ""}
+            ${item.paymentProof ? `<button type="button" onclick="viewOrderProof('${item._kind}',${item.id})" class="px-3 py-1.5 rounded-xl bg-blue-600/15 border border-blue-500/40 text-blue-600 text-xs font-bold">Bukti / SS</button>` : ""}
+            <button type="button" onclick="${preCloseJs}${isPf ? `openEditPortfolio(${item.id},true)` : `openEditInvitation(${item.id},true)`}" class="px-3 py-1.5 rounded-xl app-card border app-accent text-xs font-bold"><i class="fa-solid fa-pen mr-1"></i>Edit</button>
+            ${hasRev ? `
+                <button type="button" onclick="${preCloseJs}${isPf ? `openPortfolioDocPreview(${item.id},true)` : `previewPendingRevision(${item.id})`}" class="px-3 py-1.5 rounded-xl app-btn-sec text-xs font-bold">Cek Revisi</button>
+                <button type="button" onclick="approveOrderRevision('${item._kind}',${item.id},this)" class="gold-pill-btn px-3.5 py-1.5 rounded-xl text-xs">✓ ACC Revisi</button>
+                <button type="button" onclick="rejectOrderRevision('${item._kind}',${item.id},this)" class="px-3 py-1.5 rounded-xl bg-red-600/15 text-red-500 text-xs font-bold">Tolak</button>
+            ` : `
+                <button type="button" onclick="${preCloseJs}${isPf ? `openPortfolioDocPreview(${item.id},false)` : `openGuestView(${item.id},'Review Admin')`}" class="px-3 py-1.5 rounded-xl app-btn-sec text-xs font-bold">Lihat</button>
+                ${item.status !== "Aktif"
+                    ? `<button type="button" onclick="setOrderStatus('${item._kind}',${item.id},'Aktif',this)" class="gold-pill-btn px-4 py-1.5 rounded-xl text-xs">✓ Konfirmasi</button>`
+                    : `<button type="button" onclick="setOrderStatus('${item._kind}',${item.id},'Menunggu Verifikasi',this)" class="px-3 py-1.5 rounded-xl bg-amber-600/15 app-accent text-xs font-bold">Tangguhkan</button>`}
+            `}
+            ${!isStaffMode ? `<button type="button" onclick="deleteOrderItem('${item._kind}',${item.id})" class="px-2.5 py-1.5 rounded-xl bg-red-600/15 text-red-500 text-xs"><i class="fa-solid fa-trash"></i></button>` : ""}
+        </div>
+    </div>`;
+}
+
 function buildUnifiedOrdersListHtml(isStaffMode = false) {
     const invItems = (db.invitations || []).map(i => Object.assign({}, i, { _kind: "inv" }));
     const pfItems = (db.portfolios || []).map(p => Object.assign({}, p, { _kind: "pf" }));
@@ -286,39 +324,7 @@ function buildUnifiedOrdersListHtml(isStaffMode = false) {
 
     if (!list.length) return filterBar + `<p class="text-xs app-muted py-6 text-center">Tidak ada data pesanan pada filter ini.</p>`;
 
-    return filterBar + `<div class="space-y-3">` + list.map(item => {
-        const isPf = item._kind === "pf";
-        const hasRev = !!item.pendingRevision;
-        const typeTag = isPf ? (item.docType === "lamaran" ? "SURAT LAMARAN" : "CV") : `UNDANGAN • ${escHtml(item.category)}`;
-        const priceInfo = item.totalPay ? `${fmtRp(item.totalPay)} (kode unik)` : (item.price ? fmtRp(item.price) : "");
-
-        return `<div class="app-card-soft border rounded-2xl p-4 flex flex-col md:flex-row md:items-center justify-between gap-3">
-            <div class="min-w-0">
-                <div class="flex flex-wrap items-center gap-1.5">
-                    <span class="text-[9px] px-2 py-0.5 rounded-full app-accent-bg app-accent font-extrabold">${typeTag}</span>
-                    <span class="text-[10px] px-2 py-0.5 rounded-full font-bold ${item.status==="Aktif"?"bg-emerald-500/20 text-emerald-600":"bg-amber-500/20 app-accent"}">● ${escHtml(item.status)}</span>
-                </div>
-                <h4 class="font-bold text-sm mt-1 truncate">${escHtml(item.title)} <span class="text-xs app-muted font-normal">(@${escHtml(item.owner)}${item.brandName ? ` • ${escHtml(item.brandName)}` : ""})</span></h4>
-                <p class="text-xs app-muted">${escHtml(isPf ? (item.themeName || item.themeId) : item.theme)} ${priceInfo ? `• <strong class="app-accent">${priceInfo}</strong>` : ""} • Revisi: ${item.editCount || 0}/2</p>
-            </div>
-            <div class="flex flex-wrap gap-1.5">
-                ${item.owner ? `<button onclick="openFullChatOverlay('${esc(item.owner)}')" class="px-3 py-1.5 rounded-xl bg-emerald-600/15 border border-emerald-500/40 text-emerald-600 text-xs font-bold" title="Kirim Pesan ke Pemilik Order"><i class="fa-solid fa-comments mr-1"></i>Chat</button>` : ""}
-                ${item.paymentProof ? `<button onclick="viewOrderProof('${item._kind}',${item.id})" class="px-3 py-1.5 rounded-xl bg-blue-600/15 border border-blue-500/40 text-blue-600 text-xs font-bold">Bukti / SS</button>` : ""}
-                <button onclick="${isPf ? `openEditPortfolio(${item.id},true)` : `openEditInvitation(${item.id},true)`}" class="px-3 py-1.5 rounded-xl app-card border app-accent text-xs font-bold"><i class="fa-solid fa-pen mr-1"></i>Edit</button>
-                ${hasRev ? `
-                    <button onclick="${isPf ? `openPortfolioDocPreview(${item.id},true)` : `previewPendingRevision(${item.id})`}" class="px-3 py-1.5 rounded-xl app-btn-sec text-xs font-bold">Cek Revisi</button>
-                    <button onclick="approveOrderRevision('${item._kind}',${item.id},this)" class="gold-pill-btn px-3.5 py-1.5 rounded-xl text-xs">✓ ACC Revisi</button>
-                    <button onclick="rejectOrderRevision('${item._kind}',${item.id},this)" class="px-3 py-1.5 rounded-xl bg-red-600/15 text-red-500 text-xs font-bold">Tolak</button>
-                ` : `
-                    <button onclick="${isPf ? `openPortfolioDocPreview(${item.id},false)` : `openGuestView(${item.id},'Review Admin')`}" class="px-3 py-1.5 rounded-xl app-btn-sec text-xs font-bold">Lihat</button>
-                    ${item.status !== "Aktif"
-                        ? `<button onclick="setOrderStatus('${item._kind}',${item.id},'Aktif',this)" class="gold-pill-btn px-4 py-1.5 rounded-xl text-xs">✓ Konfirmasi</button>`
-                        : `<button onclick="setOrderStatus('${item._kind}',${item.id},'Menunggu Verifikasi',this)" class="px-3 py-1.5 rounded-xl bg-amber-600/15 app-accent text-xs font-bold">Tangguhkan</button>`}
-                `}
-                ${!isStaffMode ? `<button onclick="deleteOrderItem('${item._kind}',${item.id})" class="px-2.5 py-1.5 rounded-xl bg-red-600/15 text-red-500 text-xs"><i class="fa-solid fa-trash"></i></button>` : ""}
-            </div>
-        </div>`;
-    }).join("") + `</div>`;
+    return filterBar + `<div class="space-y-3">` + list.map(item => buildFullOrderCardHtml(item, { isStaffMode })).join("") + `</div>`;
 }
 
 function viewOrderProof(kind, id) {
@@ -388,6 +394,7 @@ function refreshAfterAdminOrderAction(msg) {
     const u = getCurrentUserObj();
     if (u && u.role === "administrasi") renderStaffAdmin();
     else { renderMasterHeaderStats(); renderMasterWorkspaceContent(); }
+    if (window._soloStatsViewState && window._soloStatsViewState.open) renderSoloStatsModal();
     showToast(msg);
 }
 
@@ -664,86 +671,23 @@ function closeSoloStatsModal() {
     if (mod) mod.classList.add("hide");
 }
 
-function _triggerEditProjectFromStats(kind, docId, isAdminDirect) {
+function _openUserFromStatsList(uname) {
+    const clean = String(uname || "").trim().toLowerCase();
+    if (!clean) return;
     closeSoloStatsModal();
-    if (typeof closeUserProfileModalCustom === "function") closeUserProfileModalCustom();
-    else document.getElementById("modal-view-user-profile")?.classList.add("hide");
-
-    if (kind === "pf" && typeof openEditPortfolio === "function") {
-        openEditPortfolio(docId, !!isAdminDirect);
-    } else if (typeof openEditInvitation === "function") {
-        openEditInvitation(docId, !!isAdminDirect);
-    }
-}
-
-function _buildProjectActionButtonsHtml(doc, curU, targetObj) {
-    const isPf = doc._kind === "pf";
-    const isStaffViewer = !!(curU && (curU.role === "master" || curU.role === "administrasi"));
-    const isCabangOwner = !!(curU && curU.role === "cabang" && String(curU.username || "").toLowerCase() === String(doc.owner || "").toLowerCase());
-    const isSelfOwner = !!(curU && String(curU.username || "").toLowerCase() === String(doc.owner || "").toLowerCase());
-    const isAktif = doc.status === "Aktif";
-    const isPay = doc.status === "Menunggu Pembayaran";
-    const edLeft = Math.max(0, 2 - Number(doc.editCount || 0));
-
-    const canEdit = isStaffViewer || isCabangOwner || (isSelfOwner && isAktif && edLeft > 0);
-    const editDirectFlag = !!(isStaffViewer || isCabangOwner);
-    const editBtnLabel = editDirectFlag ? "Edit" : `Edit (${edLeft}x)`;
-
-    const viewBtn = isPf
-        ? `<button type="button" onclick="closeSoloStatsModal();openPortfolioDocPreview(${doc.id},false);" class="px-3 py-1.5 rounded-xl app-btn-sec text-[11px] font-bold"><i class="fa-regular fa-eye mr-1"></i>Lihat</button>`
-        : (isAktif || isStaffViewer
-            ? `<button type="button" onclick="closeSoloStatsModal();openGuestView(${doc.id},'${isStaffViewer ? "Review Admin" : "Tamu Kehormatan"}');" class="px-3 py-1.5 rounded-xl app-btn-sec text-[11px] font-bold"><i class="fa-regular fa-eye mr-1"></i>Lihat</button>`
-            : "");
-
-    const editBtn = canEdit
-        ? `<button type="button" onclick="_triggerEditProjectFromStats('${doc._kind}',${doc.id},${editDirectFlag})" class="px-3 py-1.5 rounded-xl gold-pill-btn text-[11px]"><i class="fa-solid fa-pen mr-1"></i>${editBtnLabel}</button>`
-        : "";
-
-    const extraBtn = isSelfOwner && !isStaffViewer
-        ? (isPay
-            ? `<button type="button" onclick="closeSoloStatsModal();openUnifiedPayment('${isPf ? "portfolio" : "inv"}',${doc.id});" class="px-3 py-1.5 rounded-xl app-accent-bg border gold-border app-accent text-[11px] font-bold"><i class="fa-solid fa-qrcode mr-1"></i>Konfirmasi</button>`
-            : (isAktif && isPf
-                ? `<button type="button" onclick="closeSoloStatsModal();openSempurnakanModal(${doc.id});" class="px-3 py-1.5 rounded-xl app-accent-bg border gold-border app-accent text-[11px] font-bold"><i class="fa-solid fa-file-pdf mr-1"></i>PDF</button>`
-                : (isAktif && !isPf
-                    ? `<button type="button" onclick="closeSoloStatsModal();openGuestListManager(${doc.id});" class="px-3 py-1.5 rounded-xl app-accent-bg border gold-border app-accent text-[11px] font-bold"><i class="fa-solid fa-share-nodes mr-1"></i>Tamu</button>`
-                    : "")))
-        : (isStaffViewer && !isAktif
-            ? `<button type="button" onclick="setOrderStatus('${doc._kind}',${doc.id},'Aktif',this)" class="px-3 py-1.5 rounded-xl bg-emerald-600 text-white text-[11px] font-bold">✓ Konfirmasi</button>`
-            : "");
-
-    return `<div class="flex flex-wrap gap-1.5 pt-2.5 border-t gold-border">${viewBtn}${editBtn}${extraBtn}</div>`;
-}
-
-function _renderSoloProjectCard(doc, curU, targetObj) {
-    const kindLbl = doc._kind === "pf"
-        ? (doc.docType === "lamaran" ? "Surat Lamaran" : "CV")
-        : `Undangan • ${doc.category || ""}`;
-    const stBadge = doc.status === "Aktif"
-        ? "bg-emerald-500/15 text-emerald-600"
-        : "bg-amber-500/15 text-amber-600";
-    const subTheme = doc._kind === "pf" ? (doc.themeName || doc.themeId || "") : (doc.theme || "");
-
-    return `
-        <div class="app-card border rounded-2xl p-3.5 space-y-2 shadow-sm">
-            <div class="min-w-0">
-                <div class="flex items-center justify-between gap-2">
-                    <span class="inline-block text-[9px] px-2 py-0.5 rounded-full font-extrabold ${stBadge}">● ${escHtml(doc.status || "Proses")}</span>
-                    <span class="text-[10px] app-muted truncate">${escHtml(kindLbl)}</span>
-                </div>
-                <strong class="block text-sm font-bold truncate mt-1">${escHtml(doc.title || "Project")}</strong>
-                <span class="text-[11px] app-muted truncate block">${escHtml(subTheme)} ${doc.owner ? `• @${escHtml(doc.owner)}` : ""}</span>
-            </div>
-            ${_buildProjectActionButtonsHtml(doc, curU, targetObj)}
-        </div>
-    `;
+    viewUserProfileModal(clean);
 }
 
 function _renderSoloAccountCard(uItem) {
     const defAv = typeof DEFAULT_AVATAR !== "undefined" ? DEFAULT_AVATAR : "./logo.png";
     const proCheck = uItem.isPro ? `<i class="fa-solid fa-circle-check text-blue-500 text-xs shrink-0" title="Akun Pro"></i>` : "";
     const roleLabel = uItem.role === "cabang" ? "Cabang" : uItem.role === "administrasi" ? "Administrasi" : uItem.role === "master" ? "Master" : "User";
+    const canOpenProfile = !!(uItem.username && (db.users || []).some(x => String(x.username || "").toLowerCase() === String(uItem.username).toLowerCase()));
+    const clickAttr = canOpenProfile ? `onclick="_openUserFromStatsList('${esc(uItem.username)}')"` : "";
+    const hoverCls = canOpenProfile ? "cursor-pointer hover:brightness-95 active:scale-[0.99] transition" : "";
+
     return `
-        <div class="app-card border rounded-2xl p-3 flex items-center gap-3 shadow-sm">
+        <div ${clickAttr} class="app-card border rounded-2xl p-3 flex items-center gap-3 shadow-sm ${hoverCls}">
             <img src="${uItem.avatar || defAv}" class="w-11 h-11 rounded-full object-cover border gold-border bg-zinc-800 shrink-0">
             <div class="flex-1 min-w-0">
                 <div class="flex items-center gap-1.5 min-w-0">
@@ -752,6 +696,7 @@ function _renderSoloAccountCard(uItem) {
                 </div>
                 <p class="text-[11px] app-muted truncate">@${escHtml(uItem.username)} • ${escHtml(roleLabel)}</p>
             </div>
+            ${canOpenProfile ? `<i class="fa-solid fa-chevron-right text-xs app-muted shrink-0"></i>` : ""}
         </div>
     `;
 }
@@ -902,10 +847,11 @@ function renderSoloStatsModal() {
         return;
     }
 
-    // 3. ISI PROJECT SAJA + FITUR EDIT LENGKAP SESUAI FUNGSI AKUN
+    // 3. ISI PROJECT SAJA + FITUR LENGKAP SEPERTI GAMBAR KEDUA
     if (titleEl) titleEl.innerText = "Project";
     const allProj = (typeof _getProjectsForUser === "function") ? _getProjectsForUser(targetObj) : [];
     const isStaffScope = targetObj.role === "master" || targetObj.role === "administrasi";
+    const isStaffViewer = !!(curU && (curU.role === "master" || curU.role === "administrasi"));
 
     if (isStaffScope) {
         const prosesList = allProj.filter(p => p.status !== "Aktif");
@@ -922,13 +868,19 @@ function renderSoloStatsModal() {
         }
 
         bodyEl.innerHTML = shownList.length
-            ? shownList.map(doc => _renderSoloProjectCard(doc, curU, targetObj)).join("")
+            ? shownList.map(doc => buildFullOrderCardHtml(doc, {
+                isStaffMode: !!(curU && curU.role === "administrasi"),
+                closeModalBeforeAction: true
+            })).join("")
             : `<div class="app-card border border-dashed rounded-2xl p-6 text-center text-xs app-muted">Belum ada project pada kategori ini.</div>`;
         return;
     }
 
     bodyEl.innerHTML = allProj.length
-        ? allProj.map(doc => _renderSoloProjectCard(doc, curU, targetObj)).join("")
+        ? allProj.map(doc => buildFullOrderCardHtml(doc, {
+            isStaffMode: !isStaffViewer,
+            closeModalBeforeAction: true
+        })).join("")
         : `<div class="app-card border border-dashed rounded-2xl p-7 text-center text-xs app-muted">Belum ada project yang dibuat.</div>`;
 }
 
