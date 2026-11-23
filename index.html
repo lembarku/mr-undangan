@@ -260,7 +260,6 @@
         </div>
         <div class="flex items-center gap-2">
             <div id="header-actions" class="flex items-center gap-2"></div>
-            <!-- Tombol titik tiga: otomatis tersembunyi di beranda via CSS body.in-home -->
             <button id="header-dots-btn" onclick="toggleSlideMenu(true)" class="w-9 h-9 rounded-full app-card-soft border gold-border app-accent flex items-center justify-center hover:brightness-95 transition" title="Opsi &amp; Pengaturan">
                 <i class="fa-solid fa-ellipsis-vertical text-sm"></i>
             </button>
@@ -273,13 +272,11 @@
         <!-- 1. BERANDA / LANDING PAGE                                 -->
         <!-- ========================================================= -->
         <section id="view-landing" class="space-y-5">
-            <!-- Banner promo full layar HP, auto-scroll, titik-titik tetap ada untuk JS tapi disembunyikan CSS -->
             <div class="promo-banner-fullbleed shadow-sm">
                 <div id="promo-banner-track" class="w-full h-full flex transition-transform duration-700 ease-out"></div>
                 <div id="promo-banner-dots" class="hide"></div>
             </div>
 
-            <!-- ETALASE 1: UNDANGAN DIGITAL -->
             <div id="sec-undangan" class="space-y-3">
                 <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
                     <div>
@@ -291,7 +288,6 @@
                 <div id="landing-inv-shelf" class="h-shelf-track no-scrollbar"></div>
             </div>
 
-            <!-- ETALASE 2: PORTOFOLIO (CV & LAMARAN KERJA) -->
             <div id="sec-portofolio" class="space-y-3 pt-1">
                 <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
                     <div>
@@ -303,7 +299,6 @@
                 <div id="landing-pf-shelf" class="h-shelf-track no-scrollbar"></div>
             </div>
 
-            <!-- ETALASE 3: SERTIFIKAT & PIAGAM (PAJANGAN / NEXT PROJECT) -->
             <div id="sec-sertifikat" class="space-y-3 pt-1">
                 <div class="flex items-center justify-between gap-2">
                     <div>
@@ -317,7 +312,6 @@
                 <div id="landing-cert-shelf" class="h-shelf-track no-scrollbar items-stretch"></div>
             </div>
 
-            <!-- SLIDESHOW TESTIMONI -->
             <div class="app-card border rounded-3xl p-5 space-y-3 shadow-sm">
                 <div class="flex items-center justify-between">
                     <div>
@@ -333,7 +327,6 @@
                 <div id="testimonial-dots" class="flex justify-center gap-1.5"></div>
             </div>
 
-            <!-- FOOTER FITUR-FITUR LENGKAP -->
             <footer class="app-card border rounded-3xl p-6 space-y-5 shadow-sm">
                 <div class="flex flex-wrap items-center justify-between gap-3 border-b gold-border pb-4">
                     <div class="flex items-center gap-2.5">
@@ -959,7 +952,6 @@
 
             <div id="drawer-main-list" class="space-y-2.5 pb-10"></div>
 
-            <!-- Sub-Panel: Pengaturan Tema Warna iOS & Klasik -->
             <div id="drawer-sub-theme" class="hide space-y-3 pb-10">
                 <button onclick="backToMainSlideMenu()" class="text-xs app-accent font-bold"><i class="fa-solid fa-chevron-left mr-1"></i>Pengaturan</button>
                 <p class="text-xs app-muted">Pilih tampilan warna aplikasi (default gaya Pengaturan iOS):</p>
@@ -973,7 +965,6 @@
                 </div>
             </div>
 
-            <!-- Sub-Panel: Tentang Aplikasi -->
             <div id="drawer-sub-about" class="hide space-y-3.5 pb-10">
                 <button onclick="backToMainSlideMenu()" class="text-xs app-accent font-bold"><i class="fa-solid fa-chevron-left mr-1"></i>Pengaturan</button>
                 <div class="app-card border rounded-2xl p-4 space-y-2.5 text-xs leading-relaxed">
@@ -991,7 +982,6 @@
                 </div>
             </div>
 
-            <!-- Sub-Panel: Edit Profil & Label Brand -->
             <div id="drawer-sub-profil" class="hide space-y-3 pb-10">
                 <button onclick="backToMainSlideMenu()" class="text-xs app-accent font-bold"><i class="fa-solid fa-chevron-left mr-1"></i>Pengaturan</button>
                 <div class="flex items-center gap-3 app-card p-3 rounded-2xl border">
@@ -1017,7 +1007,6 @@
                 <button id="btn-save-prof" onclick="saveProfileInfo()" class="w-full gold-pill-btn py-3 rounded-xl text-xs">Simpan Profil</button>
             </div>
 
-            <!-- Sub-Panel: Pengaturan Akun & Password -->
             <div id="drawer-sub-akun" class="hide space-y-3 pb-10">
                 <button onclick="backToMainSlideMenu()" class="text-xs app-accent font-bold"><i class="fa-solid fa-chevron-left mr-1"></i>Pengaturan</button>
                 <div><label class="app-label">Username</label><input type="text" id="set-acc-user" class="app-input"></div>
@@ -1026,7 +1015,6 @@
                 <div class="pt-4 border-t gold-border"><button onclick="confirmLogout()" class="w-full bg-red-600/15 hover:bg-red-600/25 text-red-500 border border-red-500/40 py-3 rounded-xl text-xs font-bold"><i class="fa-solid fa-right-from-bracket mr-1"></i> Keluar (Logout)</button></div>
             </div>
 
-            <!-- Sub-Panel Master: Pengaturan QRIS & Rekening -->
             <div id="drawer-sub-qris" class="hide space-y-3 pb-10">
                 <button onclick="backToMainSlideMenu()" class="text-xs app-accent font-bold"><i class="fa-solid fa-chevron-left mr-1"></i>Pengaturan</button>
                 <div class="app-card border rounded-2xl p-3 space-y-2.5">
@@ -1060,7 +1048,6 @@
     <!-- MODALS                                                    -->
     <!-- ========================================================= -->
 
-    <!-- Modal Pilihan "Buat Berkasmu" -->
     <div id="modal-create-choice" class="hide fixed inset-0 z-[78] bg-black/75 backdrop-blur-sm flex items-center justify-center p-4">
         <div class="app-card border rounded-3xl max-w-sm w-full p-6 space-y-4 shadow-2xl">
             <div class="flex justify-between items-center border-b gold-border pb-2.5">
@@ -1076,7 +1063,6 @@
         </div>
     </div>
 
-    <!-- Modal Pilih Jenis Album Baru -->
     <div id="modal-add-album-choice" class="hide fixed inset-0 z-[78] bg-black/75 backdrop-blur-sm flex items-center justify-center p-4">
         <div class="app-card border rounded-3xl max-w-sm w-full p-6 space-y-4 shadow-2xl">
             <div class="flex justify-between items-center border-b gold-border pb-2.5">
@@ -1090,7 +1076,6 @@
         </div>
     </div>
 
-    <!-- Modal Pilihan Aksi Album Google Drive (Buka / Pengaturan & Hapus) -->
     <div id="modal-drive-album-actions" class="hide fixed inset-0 z-[82] bg-black/75 backdrop-blur-sm flex items-center justify-center p-4">
         <div class="app-card border rounded-3xl max-w-xs w-full p-5 space-y-4 shadow-2xl">
             <div class="flex items-center gap-3 border-b gold-border pb-3">
@@ -1112,7 +1097,6 @@
         </div>
     </div>
 
-    <!-- Modal Form Tambah / Edit Album & Verifikasi Sandi/PIN Lama -->
     <div id="modal-album-form" class="hide fixed inset-0 z-[94] bg-black/80 backdrop-blur-sm flex items-center justify-center p-4">
         <form onsubmit="submitVaultAlbumForm(event)" autocomplete="off" class="app-card border rounded-3xl max-w-sm w-full p-6 space-y-3.5 shadow-2xl">
             <div class="flex justify-between items-center border-b gold-border pb-2.5">
@@ -1149,7 +1133,6 @@
         </form>
     </div>
 
-    <!-- Modal Masukkan PIN 4-Digit Album Rahasia -->
     <div id="modal-pin-gate" class="hide fixed inset-0 z-[82] bg-black/80 backdrop-blur-sm flex items-center justify-center p-4">
         <div class="app-card border rounded-3xl max-w-xs w-full p-6 text-center space-y-4 shadow-2xl">
             <div class="w-12 h-12 rounded-2xl app-accent-bg app-accent border gold-border flex items-center justify-center mx-auto text-xl"><i class="fa-solid fa-lock"></i></div>
@@ -1166,7 +1149,6 @@
         </div>
     </div>
 
-    <!-- Modal Isi Album Rahasia LAYAR PENUH ALA GALERI iPHONE -->
     <div id="modal-secret-album" class="hide fixed inset-0 z-[88] bg-[var(--app-bg)] flex flex-col overflow-hidden">
         <div class="px-4 py-3 app-header border-b flex items-center justify-between gap-2 shrink-0 backdrop-blur-md">
             <div class="flex items-center gap-2.5 min-w-0">
@@ -1183,7 +1165,6 @@
             </button>
         </div>
 
-        <!-- Bar Peringatan Penyimpanan -->
         <div id="sa-storage-bar-wrap" class="hide px-4 py-2.5 app-card-soft border-b gold-border flex flex-wrap items-center justify-between gap-2 text-[11px] shrink-0">
             <div class="flex-1 min-w-[180px] space-y-1">
                 <div class="flex justify-between font-bold"><span id="sa-storage-lbl">Penyimpanan Album Penuh</span><span id="sa-storage-pct" class="app-accent">PENUH</span></div>
@@ -1206,7 +1187,6 @@
             <span id="sa-upload-progress-text" class="font-semibold">Mengunggah foto...</span>
         </div>
 
-        <!-- Tab Galeri Foto & Catatan Kecil Rahasia -->
         <div class="px-4 pt-2.5 flex items-center justify-between gap-2 shrink-0">
             <div class="flex gap-1.5">
                 <button type="button" id="sa-tab-photos" onclick="switchVaultInnerTab('photos')" class="px-3.5 py-1.5 rounded-full text-xs font-bold gold-pill-btn"><i class="fa-regular fa-images mr-1"></i>Galeri Foto</button>
@@ -1218,12 +1198,10 @@
             </label>
         </div>
 
-        <!-- Panel 1: Grid Galeri Kecil Ala iPhone dengan Tanggal Upload -->
         <div id="sa-pane-photos" class="p-3 overflow-y-auto flex-1">
             <div id="sa-photos-grid" class="grid grid-cols-3 sm:grid-cols-5 md:grid-cols-6 gap-1.5"></div>
         </div>
 
-        <!-- Panel 2: Catatan Kecil Minimalis Aman di Dalam Album -->
         <div id="sa-pane-notes" class="hide p-4 overflow-y-auto flex-1 space-y-3 max-w-2xl w-full mx-auto">
             <div id="sa-note-composer" class="app-card border rounded-2xl p-3.5 space-y-2 shadow-sm">
                 <div class="flex items-center justify-between">
@@ -1240,7 +1218,6 @@
         </div>
     </div>
 
-    <!-- Modal Pratinjau A4 CV / Surat Lamaran FULL PAS LAYAR HP (Mendukung Cubit Zoom) -->
     <div id="modal-portfolio-preview" class="hide fixed inset-0 z-[95] bg-black/95 flex flex-col overflow-hidden">
         <div id="pfp-scroll-body" class="flex-1 overflow-y-auto overflow-x-hidden p-2 flex flex-col items-center justify-start">
             <div id="pfp-a4-mount" class="mx-auto"></div>
@@ -1252,7 +1229,6 @@
         </div>
     </div>
 
-    <!-- Modal "Sempurnakan" PDF -->
     <div id="modal-sempurnakan" class="hide fixed inset-0 z-[84] bg-black/85 backdrop-blur-sm flex items-center justify-center p-2.5 sm:p-4">
         <div class="app-card border rounded-3xl max-w-2xl w-full max-h-[92vh] flex flex-col overflow-hidden shadow-2xl">
             <div class="px-5 py-3.5 border-b gold-border flex items-center justify-between shrink-0">
@@ -1286,7 +1262,7 @@
                     </button>
                 </div>
 
-                <div class="app-card-soft border rounded-2xl p-3.5 space-y-2">
+                <div class="app-card-soft border rounded-2xl p-3.5 space-y-2.5">
                     <div class="flex items-center justify-between">
                         <label class="text-xs font-bold app-accent">3. Kata Pengantar Email / WhatsApp Melamar Kerja (Siap Salin)</label>
                         <button type="button" onclick="copyCoverLetterMsg()" class="px-3 py-1 rounded-lg gold-pill-btn text-[10px]"><i class="fa-regular fa-copy mr-1"></i>Salin Teks</button>
@@ -1297,7 +1273,6 @@
         </div>
     </div>
 
-    <!-- MODAL ADMIN CABANG: LINK PORTAL TAMU KLIEN -->
     <div id="modal-client-portal" class="hide fixed inset-0 z-[80] bg-black/80 backdrop-blur-sm flex items-center justify-center p-4">
         <div class="app-card border rounded-3xl max-w-md w-full p-6 space-y-4 shadow-2xl">
             <div class="flex justify-between items-center border-b gold-border pb-3">
@@ -1322,7 +1297,6 @@
         </div>
     </div>
 
-    <!-- MODAL MASTER: VISUAL THEME BUILDER -->
     <div id="modal-theme-builder" class="hide fixed inset-0 z-[80] bg-black/85 backdrop-blur-sm flex items-center justify-center p-2.5 sm:p-4">
         <form onsubmit="submitVisualThemeBuilder(event)" class="app-card border rounded-3xl max-w-2xl w-full max-h-[93vh] flex flex-col overflow-hidden shadow-2xl">
             <div class="px-5 py-3.5 border-b gold-border flex items-center justify-between shrink-0">
