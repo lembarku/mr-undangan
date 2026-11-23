@@ -148,6 +148,23 @@ function ensureUserInLocalDb(userObj) {
     try { localStorage.setItem(USER_CACHE_KEY, JSON.stringify(userObj)); } catch {}
 }
 
+function _activateUserSessionAndRoute(userObj, token = "", welcomeMsg = "") {
+    if (!userObj || !userObj.username) return;
+    currentSessionUser = String(userObj.username).trim().toLowerCase();
+    currentSessionToken = token || "";
+    localStorage.setItem(SESSION_KEY, currentSessionUser);
+    if (currentSessionToken) localStorage.setItem(SESSION_TOKEN_KEY, currentSessionToken);
+    else localStorage.removeItem(SESSION_TOKEN_KEY);
+    localStorage.setItem(DISPLAY_NAME_KEY, (userObj.name || userObj.username).split(" ")[0]);
+    ensureUserInLocalDb(Object.assign({}, userObj, { username: currentSessionUser }));
+    document.getElementById("auth-password").value = "";
+    closeAuthModal();
+    dismissLoginReminder();
+    if (welcomeMsg) showToast(welcomeMsg);
+    routeDashboard();
+    if (typeof scheduleAdaptivePoll === "function") scheduleAdaptivePoll();
+}
+
 async function handleAuthSubmit(e) {
     e.preventDefault();
     const u = document.getElementById("auth-username").value.trim().toLowerCase();
@@ -156,20 +173,8 @@ async function handleAuthSubmit(e) {
     setBtnLoading("auth-submit-btn", true, "Masuk...");
     const res = await apiAction({ action: "login", username: u, password: p });
     if (res && res.ok && res.user) {
-        currentSessionUser = res.user.username;
-        currentSessionToken = res.token || "";
-        localStorage.setItem(SESSION_KEY, currentSessionUser);
-        if (currentSessionToken) localStorage.setItem(SESSION_TOKEN_KEY, currentSessionToken);
-        else localStorage.removeItem(SESSION_TOKEN_KEY);
-        localStorage.setItem(DISPLAY_NAME_KEY, (res.user.name || res.user.username).split(" ")[0]);
-        ensureUserInLocalDb(res.user);
         setBtnLoading("auth-submit-btn", false);
-        document.getElementById("auth-password").value = "";
-        closeAuthModal();
-        dismissLoginReminder();
-        showToast(`Halo, ${res.user.name}! Selamat datang kembali.`);
-        routeDashboard();
-        if (typeof scheduleAdaptivePoll === "function") scheduleAdaptivePoll();
+        _activateUserSessionAndRoute(res.user, res.token || "", `Halo, ${res.user.name}! Selamat datang kembali.`);
         return;
     }
     if (res && res.code === "NOT_FOUND") {
@@ -177,9 +182,17 @@ async function handleAuthSubmit(e) {
         const reg = await apiAction({ action: "register", username: u, password: p });
         setBtnLoading("auth-submit-btn", false);
         if (reg && reg.ok) {
-            document.getElementById("auth-password").value = "";
-            closeAuthModal();
-            showToast("Pendaftaran berhasil! Tinggal tunggu konfirmasi Admin.", "info");
+            const regUser = reg.user || {
+                username: u,
+                name: u,
+                role: "user",
+                status: "Aktif",
+                isPro: false,
+                following: [],
+                followers: [],
+                favorites: []
+            };
+            _activateUserSessionAndRoute(regUser, reg.token || "", `Selamat datang, ${regUser.name || u}! Akun Anda siap digunakan.`);
         } else showToast((reg && reg.message) || "Gagal mendaftar.", "error");
         return;
     }
@@ -772,19 +785,30 @@ async function saveProfileInfo() {
 }
 async function changeUserCredentials() {
     const u = typeof getCurrentUserObj === "function" ? getCurrentUserObj() : null; if (!u) return;
+    const oldU = String(u.username || "").trim().toLowerCase();
     const newU = document.getElementById("set-acc-user").value.trim().toLowerCase();
     const newP = document.getElementById("set-acc-pass").value.trim();
     if (!newU || !newP) return showToast("Isi username dan password baru.", "error");
     if (!(await showConfirm("Ubah Kredensial", "Yakin ingin memperbarui username atau password Anda?"))) return;
     setBtnLoading("btn-save-acc", true, "Menyimpan...");
     const updated = Object.assign({}, u, { username: newU, password: newP });
-    const res = await apiAction({ action: "upsert_user", oldUsername: u.username, user: updated });
+    const res = await apiAction({ action: "upsert_user", oldUsername: oldU, user: updated });
     setBtnLoading("btn-save-acc", false);
     if (!res || !res.ok) return showToast((res && res.message) || "Gagal memperbarui akun.", "error");
-    currentSessionUser = newU;
-    localStorage.setItem(SESSION_KEY, newU);
-    ensureUserInLocalDb(updated);
-    toggleSlideMenu(false); refreshActiveViewSmart(); showToast("Username & password diperbarui!");
+
+    const finalUser = (res.user && res.user.username)
+        ? Object.assign({}, updated, res.user, { username: String(res.user.username).trim().toLowerCase() })
+        : updated;
+
+    currentSessionUser = finalUser.username;
+    localStorage.setItem(SESSION_KEY, currentSessionUser);
+    if (Array.isArray(db.users) && oldU && oldU !== currentSessionUser) {
+        db.users = db.users.filter(x => String(x.username || "").toLowerCase() !== oldU);
+    }
+    ensureUserInLocalDb(finalUser);
+    if (typeof idbSet === "function") idbSet("db_snapshot", db);
+    toggleSlideMenu(false); refreshActiveViewSmart(); renderHeaderActions();
+    showToast("Username & password diperbarui!");
 }
 
 // ================= 5. BERANDA (BANNER + ETALASE RINGAN + CV + 6 SERTIFIKAT BERKELAS) =================
