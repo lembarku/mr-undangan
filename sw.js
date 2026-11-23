@@ -2,7 +2,7 @@
 // MR UNDANGAN — SERVICE WORKER (PWA CACHE & OFFLINE RESILIENCE)
 // File: sw.js
 // =========================================================================
-const CACHE_NAME = 'mr-undangan-cache-v4';
+const CACHE_NAME = 'mr-undangan-cache-v5';
 const STATIC_ASSETS = [
   './',
   './manifest.json',
@@ -70,7 +70,6 @@ self.addEventListener('fetch', (event) => {
       fetch(req)
         .then((res) => {
           if (res && res.ok && res.type === 'basic' && !res.redirected) {
-            // Hindari menumpuk cache untuk URL tamu berparameter (?inv=, ?client=, ?demo=)
             if (!isNavigation || !url.search) {
               const copy = res.clone();
               caches.open(CACHE_NAME).then((cache) => cache.put(req, copy)).catch(() => {});
@@ -106,3 +105,10 @@ self.addEventListener('fetch', (event) => {
     })
   );
 });
+```[cite: 28]
+
+### Langkah Pasang & Uji
+1. Tempel kode di atas ke **`sw.js`** di repositori GitHub dan tunggu *deployment* selesai[cite: 28].
+2. Tutup total tab/aplikasi di HP, lalu buka kembali dan uji klik kartu akun di **Followers/Following**, aksi lengkap di **Project**, tombol *Back* bertahap, serta ubah username / daftar akun[cite: 22, 23, 24, 25, 28].
+
+Silakan kabari hasilnya ya bro!
