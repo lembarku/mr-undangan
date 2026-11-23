@@ -54,7 +54,7 @@ function _ensureChatBackCapture() {
     _chatBackCaptureReady = true;
 
     window.addEventListener("popstate", (e) => {
-        // Serahkan ke handler lapisan atas bila foto lebar atau modal statistik sedang tampil
+        // Jika foto profil melebar atau modal statistik sedang tampil, biarkan handler atas menutupnya dulu
         if (_isChatLayerVisible("expanded-avatar-overlay") || _isChatLayerVisible("solo-profile-stats-modal")) {
             return;
         }
@@ -80,7 +80,6 @@ function _ensureChatBackCapture() {
                 if (ov) ov.classList.remove("hide");
                 renderFullChatOverlay();
             }
-            if (typeof pushBackGuard === "function") pushBackGuard();
             return;
         }
 
@@ -89,7 +88,6 @@ function _ensureChatBackCapture() {
             if (e && e.stopImmediatePropagation) e.stopImmediatePropagation();
             activeMasterChatThread = null;
             renderFullChatOverlay();
-            if (typeof pushBackGuard === "function") pushBackGuard();
             return;
         }
 
@@ -97,7 +95,6 @@ function _ensureChatBackCapture() {
         if (chatOpen) {
             if (e && e.stopImmediatePropagation) e.stopImmediatePropagation();
             closeFullChatOverlay();
-            if (typeof pushBackGuard === "function") pushBackGuard();
         }
     }, true);
 }
