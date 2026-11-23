@@ -440,7 +440,7 @@ function renderMasterWorkspaceContent() {
     if (currentMasterWorkspace === "users_cabang") {
         const list = (db.users || []).filter(u => u.role !== "master");
         box.innerHTML = `<div class="flex flex-wrap justify-between items-center gap-2 mb-4">
-            <p class="text-xs app-muted">Buka profil publik pengguna untuk melihat statistik, followers &amp; following, atau ubah status Akun Pro.</p>
+            <p class="text-xs app-muted">Buka profil publik pengguna untuk melihat statistik, followers, following &amp; project, atau ubah status Akun Pro.</p>
             <div class="flex flex-wrap gap-1.5">
                 <button onclick="openMasterUserModal(null,'user')" class="px-3 py-1.5 rounded-xl app-card-soft border app-accent text-xs font-bold">+ User</button>
                 <button onclick="openMasterUserModal(null,'cabang')" class="px-3 py-1.5 rounded-xl app-card-soft border text-blue-600 text-xs font-bold">+ Cabang</button>
@@ -514,7 +514,7 @@ function renderMasterWorkspaceContent() {
                     <img src="${b.img}" class="w-24 h-10 rounded-lg object-cover bg-black shrink-0">
                     <div class="flex-1 min-w-0"><strong class="text-xs block truncate">${escHtml(b.title)}</strong><span class="text-[10px] app-muted block truncate">${escHtml(b.badge || "Promo")} • ${escHtml(b.subtitle || "")}</span></div>
                     <button type="button" onclick="editPromoBannerItem(${i})" class="px-2.5 py-1 rounded app-btn-sec text-[10px] font-bold">Edit</button>
-                    <button type="button" onclick="deletePromoBannerItem(${i})" class="px-2 py-1 rounded bg-red-600/15 text-[10px] text-red-500"><i class="fa-solid fa-trash"></i></button>
+                    <button type="button" onclick="deletePromoBannerItem(${i})" class="px-2.5 py-1 rounded bg-red-600/15 text-[10px] text-red-500"><i class="fa-solid fa-trash"></i></button>
                 </div>`).join("")}
             </div>
         </div>`;
@@ -548,6 +548,31 @@ function renderMasterWorkspaceContent() {
 }
 
 // ================= 4. BERANDA PROFIL PUBLIK PENGGUNA (RINGAN & PRIVAT) =================
+function openExpandedAvatarLightbox(imgSrc, labelText = "") {
+    const src = imgSrc || DEFAULT_AVATAR;
+    let box = document.getElementById("expanded-avatar-overlay");
+    if (!box) {
+        box = document.createElement("div");
+        box.id = "expanded-avatar-overlay";
+        box.className = "hide fixed inset-0 z-[150] bg-black/95 flex flex-col items-center justify-center p-4";
+        box.onclick = function () { closeExpandedAvatarLightbox(); };
+        document.body.appendChild(box);
+    }
+    box.innerHTML = `
+        <div onclick="event.stopPropagation();" class="w-full max-w-md flex flex-col items-center gap-3">
+            <img src="${src}" alt="Foto Profil" class="w-full max-h-[75vh] object-contain rounded-3xl border-2 border-white/25 shadow-2xl bg-zinc-900">
+            ${labelText ? `<span class="text-xs text-white/85 font-semibold">${escHtml(labelText)}</span>` : ""}
+        </div>
+    `;
+    box.classList.remove("hide");
+    if (typeof pushBackGuard === "function") pushBackGuard();
+}
+
+function closeExpandedAvatarLightbox() {
+    const box = document.getElementById("expanded-avatar-overlay");
+    if (box) box.classList.add("hide");
+}
+
 function viewUserProfileModal(username) {
     const cleanU = String(username || "").trim().toLowerCase();
     const u = (db.users || []).find(x => String(x.username || "").toLowerCase() === cleanU);
@@ -582,6 +607,10 @@ function viewUserProfileModal(username) {
         ? _getFollowingListForUser(u).length
         : (Array.isArray(u.following) ? u.following.length : 0);
 
+    const projectCount = (typeof _getProjectsForUser === "function")
+        ? _getProjectsForUser(u).length
+        : 0;
+
     const canFollowThis = !isSelf && curU && (
         isMasterProfile
             ? (curU.role === "user" || curU.role === "administrasi")
@@ -592,6 +621,7 @@ function viewUserProfileModal(username) {
         : (curU && Array.isArray(curU.following) ? curU.following.map(x => String(x).toLowerCase()) : []);
     const isFollowingThis = canFollowThis && curFollowingList.includes(cleanU);
 
+    const avatarSrc = u.avatar || DEFAULT_AVATAR;
     const bannerStyle = u.banner ? `background-image:url('${u.banner}');` : "";
     const proBadgeHtml = u.isPro ? `<i class="fa-solid fa-circle-check text-blue-500 text-sm"></i>` : "";
     const roleBadgeHtml = u.role === "master"
@@ -621,7 +651,7 @@ function viewUserProfileModal(username) {
                     </div>
                     <div class="px-5 pb-5 relative text-center md:text-left">
                         <div class="flex flex-col md:flex-row items-center md:items-end gap-3 -mt-11 relative z-10">
-                            <img src="${u.avatar || DEFAULT_AVATAR}" class="w-20 h-20 rounded-full object-cover border-4 border-[var(--app-card)] shadow-lg bg-zinc-800" alt="Avatar">
+                            <img src="${avatarSrc}" onclick="openExpandedAvatarLightbox('${esc(avatarSrc)}','${esc(u.name || u.username)}')" class="w-20 h-20 rounded-full object-cover border-4 border-[var(--app-card)] shadow-lg bg-zinc-800 cursor-pointer active:scale-95 transition" alt="Avatar">
                             <div class="min-w-0">
                                 <h2 class="text-lg font-extrabold flex items-center justify-center md:justify-start gap-1.5 mt-1">
                                     <span>${escHtml(u.name || u.username)}</span>
@@ -636,14 +666,18 @@ function viewUserProfileModal(username) {
                 </div>
 
                 <div class="app-card border rounded-2xl p-3 shadow-sm space-y-3">
-                    <div class="flex items-center justify-around divide-x divide-black/10">
-                        <button type="button" ${followersClick} class="flex-1 py-2 px-2 text-center rounded-xl hover:bg-black/5 active:scale-98 transition">
-                            <span class="block text-base font-extrabold tracking-tight">${escHtml(String(followersCount))}</span>
+                    <div class="grid grid-cols-3 divide-x divide-black/10 text-center">
+                        <button type="button" ${followersClick} class="py-2 px-1 rounded-xl hover:bg-black/5 active:scale-98 transition">
+                            <span class="block text-sm sm:text-base font-extrabold tracking-tight">${escHtml(String(followersCount))}</span>
                             <span class="block text-[11px] app-muted font-medium">Followers</span>
                         </button>
-                        <button type="button" onclick="openIgProfileStatsModal('${esc(cleanU)}','following')" class="flex-1 py-2 px-2 text-center rounded-xl hover:bg-black/5 active:scale-98 transition">
-                            <span class="block text-base font-extrabold tracking-tight">${followingCount}</span>
+                        <button type="button" onclick="openIgProfileStatsModal('${esc(cleanU)}','following')" class="py-2 px-1 rounded-xl hover:bg-black/5 active:scale-98 transition">
+                            <span class="block text-sm sm:text-base font-extrabold tracking-tight">${followingCount}</span>
                             <span class="block text-[11px] app-muted font-medium">Following</span>
+                        </button>
+                        <button type="button" onclick="openIgProfileStatsModal('${esc(cleanU)}','project')" class="py-2 px-1 rounded-xl hover:bg-black/5 active:scale-98 transition">
+                            <span class="block text-sm sm:text-base font-extrabold tracking-tight">${projectCount}</span>
+                            <span class="block text-[11px] app-muted font-medium">Project</span>
                         </button>
                     </div>
                     ${followBtnHtml}
@@ -662,12 +696,8 @@ function viewUserProfileModal(username) {
     if (headerBar) {
         headerBar.innerHTML = `
             <div class="flex items-center gap-2.5">
-                <button type="button" onclick="closeUserProfileModalCustom()" class="w-8 h-8 rounded-full app-btn-sec flex items-center justify-center text-xs">
-                    <i class="fa-solid fa-chevron-left"></i>
-                </button>
-                <h3 class="font-extrabold text-sm truncate">Profil @${escHtml(u.username)}</h3>
+                <img src="./logo.png" alt="Mr Undangan" class="w-8 h-8 rounded-lg bg-white p-1 object-contain border border-black/10 shrink-0" onerror="this.style.display='none'">
             </div>
-            <button type="button" onclick="closeUserProfileModalCustom()" class="px-3 py-1.5 rounded-full app-btn-sec text-xs font-bold">Tutup</button>
         `;
     }
 
@@ -676,6 +706,7 @@ function viewUserProfileModal(username) {
 }
 
 function closeUserProfileModalCustom() {
+    closeExpandedAvatarLightbox();
     const modal = document.getElementById("modal-view-user-profile");
     if (modal) {
         modal.style.cssText = "";
