@@ -44,7 +44,7 @@ function _pushChatNavState(stage) {
     } catch {}
 }
 
-function _isElementVisible(id) {
+function _isChatLayerVisible(id) {
     const el = document.getElementById(id);
     return !!(el && !el.classList.contains("hide"));
 }
@@ -54,9 +54,8 @@ function _ensureChatBackCapture() {
     _chatBackCaptureReady = true;
 
     window.addEventListener("popstate", (e) => {
-        // Jika foto profil melebar atau modal Followers/Following/Project terbuka di atas profil,
-        // biarkan handler lapisan atas menutupnya dulu sebelum kembali ke profil/chat.
-        if (_isElementVisible("expanded-avatar-overlay") || _isElementVisible("solo-profile-stats-modal")) {
+        // Serahkan ke handler lapisan atas bila foto lebar atau modal statistik sedang tampil
+        if (_isChatLayerVisible("expanded-avatar-overlay") || _isChatLayerVisible("solo-profile-stats-modal")) {
             return;
         }
 
@@ -67,10 +66,10 @@ function _ensureChatBackCapture() {
 
         // 1. Dari Profil User -> kembali ke Isi Obrolan
         if (profOpen) {
-            e.stopImmediatePropagation();
+            if (e && e.stopImmediatePropagation) e.stopImmediatePropagation();
             if (typeof closeUserProfileModalCustom === "function") {
                 closeUserProfileModalCustom();
-            } else {
+            } else if (profMod) {
                 profMod.classList.add("hide");
             }
             if (window.openedFromChatThread) {
@@ -87,7 +86,7 @@ function _ensureChatBackCapture() {
 
         // 2. Dari Isi Obrolan -> kembali ke Daftar Seluruh Chat
         if (chatOpen && typeof activeMasterChatThread !== "undefined" && activeMasterChatThread) {
-            e.stopImmediatePropagation();
+            if (e && e.stopImmediatePropagation) e.stopImmediatePropagation();
             activeMasterChatThread = null;
             renderFullChatOverlay();
             if (typeof pushBackGuard === "function") pushBackGuard();
@@ -96,7 +95,7 @@ function _ensureChatBackCapture() {
 
         // 3. Dari Daftar Seluruh Chat -> keluar ke halaman asal tanpa menutup aplikasi
         if (chatOpen) {
-            e.stopImmediatePropagation();
+            if (e && e.stopImmediatePropagation) e.stopImmediatePropagation();
             closeFullChatOverlay();
             if (typeof pushBackGuard === "function") pushBackGuard();
         }
@@ -145,7 +144,6 @@ function getAccessibleChatContacts() {
     if (curU.role === "cabang") {
         return all.filter(u => u.role === "master" || u.role === "administrasi");
     }
-    // User biasa: bisa chat semua user/akun lain kecuali cabang
     return all.filter(u => u.role !== "cabang");
 }
 
@@ -188,7 +186,6 @@ function renderChatContactsModalList() {
         return;
     }
 
-    // Tampilan list kontak bergaya daftar obrolan WhatsApp
     box.innerHTML = contacts.map(u => {
         const isAdminRole = u.role === "master" || u.role === "administrasi";
         const roleBadge = u.role === "master"
