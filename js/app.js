@@ -265,7 +265,6 @@ window.addEventListener("popstate", () => {
     if (isVis("modal-create-choice")) { document.getElementById("modal-create-choice")?.classList.add("hide"); pushBackGuard(); return; }
     if (isVis("modal-client-portal")) { document.getElementById("modal-client-portal")?.classList.add("hide"); pushBackGuard(); return; }
 
-    // Biarkan listener capture di js/chat.js mengurus tahapan Profil -> Isi Chat -> Daftar Chat -> Keluar
     if (isVis("full-chat-overlay") || isVis("modal-view-user-profile")) {
         return;
     }
@@ -438,6 +437,15 @@ function _normKey(s) {
     return String(s || "").trim().toLowerCase();
 }
 
+function _fmtIgCount(num) {
+    const n = Math.max(0, Number(num) || 0);
+    if (n >= 1000) {
+        const kVal = (n / 1000).toFixed(1).replace(/\.0$/, "");
+        return `${kVal}K`;
+    }
+    return String(n);
+}
+
 function _getFollowersListForUser(uObj) {
     if (!uObj || !uObj.username) return [];
     const targetKey = _normKey(uObj.username);
@@ -473,8 +481,8 @@ function _getProjectsForUser(uObj) {
 
 function _formatMasterFollowersDisplay() {
     const allUsers = Array.isArray(db.users) ? db.users : [];
-    const realUserCount = allUsers.filter(u => u && u.role !== "master").length;
-    return `18.3k + ${realUserCount}`;
+    const activeRealCount = allUsers.filter(u => u && u.role !== "master" && u.status === "Aktif").length;
+    return _fmtIgCount(18300 + activeRealCount);
 }
 
 function _buildIgStatsRowHtml(targetUserObj) {
@@ -493,7 +501,7 @@ function _buildIgStatsRowHtml(targetUserObj) {
     if (isMasterProfile) {
         followersDisplay = _formatMasterFollowersDisplay();
     } else {
-        followersDisplay = String(_getFollowersListForUser(targetUserObj).length);
+        followersDisplay = _fmtIgCount(_getFollowersListForUser(targetUserObj).length);
     }
 
     const canFollowThis = !isSelf && curU && (
@@ -513,12 +521,12 @@ function _buildIgStatsRowHtml(targetUserObj) {
     const followingColHtml = isCabangProfile
         ? ""
         : `<button type="button" onclick="openIgProfileStatsModal('${esc(uname)}','following')" class="flex-1 py-2 px-1 text-center rounded-xl hover:bg-black/5 active:scale-98 transition">
-            <span class="block text-sm sm:text-base font-extrabold tracking-tight">${followingList.length}</span>
+            <span class="block text-sm sm:text-base font-extrabold tracking-tight">${escHtml(_fmtIgCount(followingList.length))}</span>
             <span class="block text-[11px] app-muted font-medium">Following</span>
         </button>`;
 
     const projectColHtml = `<button type="button" onclick="openIgProfileStatsModal('${esc(uname)}','project')" class="flex-1 py-2 px-1 text-center rounded-xl hover:bg-black/5 active:scale-98 transition">
-        <span class="block text-sm sm:text-base font-extrabold tracking-tight">${projectsList.length}</span>
+        <span class="block text-sm sm:text-base font-extrabold tracking-tight">${escHtml(_fmtIgCount(projectsList.length))}</span>
         <span class="block text-[11px] app-muted font-medium">Project</span>
     </button>`;
 
@@ -585,228 +593,6 @@ async function toggleFollowTargetUser(targetUname) {
         await apiAction({ action: "upsert_user", oldUsername: curU.username, user: curU });
         await apiAction({ action: "upsert_user", oldUsername: targetObj.username, user: targetObj });
     } catch {}
-}
-
-function _ensureIgProfileModalElement() {
-    let mod = document.getElementById("ig-profile-stats-modal");
-    if (!mod) {
-        mod = document.createElement("div");
-        mod.id = "ig-profile-stats-modal";
-        mod.className = "hide fixed inset-0 z-[140] bg-[var(--app-bg)] flex flex-col overflow-hidden";
-        mod.innerHTML = `
-            <div class="px-4 py-3 app-header border-b flex items-center justify-between gap-3 shrink-0 backdrop-blur-md">
-                <div class="flex items-center gap-2.5 min-w-0">
-                    <button type="button" onclick="closeIgProfileFullscreen();pushBackGuard();" class="w-9 h-9 rounded-full app-btn-sec flex items-center justify-center text-sm shrink-0" title="Kembali">
-                        <i class="fa-solid fa-chevron-left"></i>
-                    </button>
-                    <div class="min-w-0">
-                        <h3 id="ig-modal-title" class="font-extrabold text-base truncate">Daftar</h3>
-                        <p id="ig-modal-sub" class="text-[10px] app-muted truncate"></p>
-                    </div>
-                </div>
-                <button type="button" onclick="closeIgProfileFullscreen();pushBackGuard();" class="px-3 py-1.5 rounded-full app-btn-sec text-xs font-bold shrink-0">Tutup</button>
-            </div>
-            <div id="ig-modal-tabs" class="px-4 py-2.5 border-b gold-border flex gap-2 overflow-x-auto no-scrollbar shrink-0 app-card"></div>
-            <div id="ig-modal-body" class="flex-1 overflow-y-auto p-4 space-y-2.5 max-w-2xl w-full mx-auto"></div>
-        `;
-        document.body.appendChild(mod);
-    }
-    return mod;
-}
-
-function _renderUserRowIgHtml(uItem) {
-    const defAv = typeof DEFAULT_AVATAR !== "undefined" ? DEFAULT_AVATAR : "./logo.png";
-    const proCheck = uItem.isPro ? `<i class="fa-solid fa-circle-check text-blue-500 text-xs shrink-0" title="Akun Pro"></i>` : "";
-    const roleLabel = uItem.role === "cabang" ? "Cabang" : uItem.role === "administrasi" ? "Administrasi" : uItem.role === "master" ? "Master" : "User";
-    return `
-        <div class="app-card border rounded-2xl p-3 flex items-center gap-3 shadow-sm">
-            <img src="${uItem.avatar || defAv}" class="w-11 h-11 rounded-full object-cover border gold-border bg-zinc-800 shrink-0">
-            <div class="flex-1 min-w-0">
-                <div class="flex items-center gap-1.5 min-w-0">
-                    <strong class="text-xs sm:text-sm font-bold truncate">${escHtml(uItem.name || uItem.username)}</strong>
-                    ${proCheck}
-                </div>
-                <p class="text-[11px] app-muted truncate">@${escHtml(uItem.username)} • ${escHtml(roleLabel)}</p>
-            </div>
-        </div>
-    `;
-}
-
-function openIgProfileStatsModal(targetUsername, initialTab = "followers") {
-    const tKey = _normKey(targetUsername);
-    const targetObj = (db.users || []).find(u => _normKey(u.username) === tKey);
-    if (!targetObj) return showToast("Data akun tidak ditemukan.", "info");
-
-    if (targetObj.role === "cabang" && initialTab === "followers") {
-        initialTab = "project";
-    }
-
-    window._igProfileSheetState = {
-        open: true,
-        targetUsername: tKey,
-        tab: initialTab,
-        masterCat: "user",
-        projectCat: "proses"
-    };
-
-    const mod = _ensureIgProfileModalElement();
-    renderIgProfileStatsModalContent();
-    mod.classList.remove("hide");
-    pushBackGuard();
-}
-
-function setIgStatsTopTab(tab) {
-    const tKey = window._igProfileSheetState.targetUsername;
-    const targetObj = (db.users || []).find(u => _normKey(u.username) === tKey);
-    if (targetObj && targetObj.role === "cabang" && tab === "followers") return;
-    window._igProfileSheetState.tab = tab;
-    renderIgProfileStatsModalContent();
-}
-
-function setIgMasterFollowerCat(cat) {
-    window._igProfileSheetState.masterCat = cat;
-    renderIgProfileStatsModalContent();
-}
-
-function setIgProjectCat(cat) {
-    window._igProfileSheetState.projectCat = cat;
-    renderIgProfileStatsModalContent();
-}
-
-function renderIgProfileStatsModalContent() {
-    const st = window._igProfileSheetState;
-    const targetObj = (db.users || []).find(u => _normKey(u.username) === _normKey(st.targetUsername));
-    if (!targetObj) return;
-
-    const curU = typeof getCurrentUserObj === "function" ? getCurrentUserObj() : null;
-    const isSelf = !!(curU && _normKey(curU.username) === _normKey(targetObj.username));
-    const isMasterProfile = targetObj.role === "master";
-    const isCabangProfile = targetObj.role === "cabang";
-
-    const titleEl = document.getElementById("ig-modal-title");
-    const subEl = document.getElementById("ig-modal-sub");
-    const tabsEl = document.getElementById("ig-modal-tabs");
-    const bodyEl = document.getElementById("ig-modal-body");
-
-    if (titleEl) titleEl.innerText = `${targetObj.name || targetObj.username}`;
-    if (subEl) subEl.innerText = `@${targetObj.username}`;
-
-    const topTabs = [];
-    if (!isCabangProfile) {
-        topTabs.push({ id: "followers", label: "Followers" });
-        topTabs.push({ id: "following", label: "Following" });
-    }
-    topTabs.push({ id: "project", label: "Project" });
-
-    if (tabsEl) {
-        tabsEl.innerHTML = topTabs.map(t => `<button type="button" onclick="setIgStatsTopTab('${t.id}')" class="px-4 py-1.5 rounded-full text-xs font-extrabold whitespace-nowrap transition ${st.tab === t.id ? "gold-pill-btn shadow-sm" : "app-btn-sec"}">${t.label}</button>`).join("");
-    }
-
-    if (!bodyEl) return;
-
-    if (st.tab === "followers") {
-        if (isMasterProfile && !isSelf) {
-            bodyEl.innerHTML = `
-                <div class="app-card border rounded-3xl p-7 text-center space-y-2 my-6">
-                    <i class="fa-solid fa-lock text-2xl app-accent"></i>
-                    <h4 class="font-extrabold text-sm">Daftar Followers Privat</h4>
-                    <p class="text-xs app-muted">Daftar followers akun Master tidak ditampilkan kepada pengguna lain.</p>
-                </div>
-            `;
-            return;
-        }
-
-        if (isMasterProfile && isSelf) {
-            const allNonMaster = (db.users || []).filter(u => u && u.role !== "master");
-            const catMap = {
-                user: allNonMaster.filter(u => u.role === "user"),
-                administrasi: allNonMaster.filter(u => u.role === "administrasi"),
-                cabang: allNonMaster.filter(u => u.role === "cabang")
-            };
-            const activeCat = catMap[st.masterCat] ? st.masterCat : "user";
-            const filteredUsers = catMap[activeCat] || [];
-
-            bodyEl.innerHTML = `
-                <div class="flex items-center justify-between gap-2 pb-1">
-                    <span class="text-xs font-bold app-muted">Total Followers: <strong class="app-accent">${escHtml(_formatMasterFollowersDisplay())}</strong></span>
-                </div>
-                <div class="flex gap-2 pb-2">
-                    <button type="button" onclick="setIgMasterFollowerCat('user')" class="px-3.5 py-1.5 rounded-xl text-xs font-bold ${activeCat === "user" ? "gold-pill-btn" : "app-btn-sec"}">User (${catMap.user.length})</button>
-                    <button type="button" onclick="setIgMasterFollowerCat('administrasi')" class="px-3.5 py-1.5 rounded-xl text-xs font-bold ${activeCat === "administrasi" ? "gold-pill-btn" : "app-btn-sec"}">Administrasi (${catMap.administrasi.length})</button>
-                    <button type="button" onclick="setIgMasterFollowerCat('cabang')" class="px-3.5 py-1.5 rounded-xl text-xs font-bold ${activeCat === "cabang" ? "gold-pill-btn" : "app-btn-sec"}">Cabang (${catMap.cabang.length})</button>
-                </div>
-                <div class="space-y-2.5">
-                    ${filteredUsers.length ? filteredUsers.map(_renderUserRowIgHtml).join("") : `<div class="app-card border border-dashed rounded-2xl p-6 text-center text-xs app-muted">Belum ada akun pada kategori ini.</div>`}
-                </div>
-            `;
-            return;
-        }
-
-        const fKeys = _getFollowersListForUser(targetObj);
-        const followerObjs = fKeys.map(k => (db.users || []).find(u => _normKey(u.username) === k) || { username: k, name: k, role: "user", avatar: DEFAULT_AVATAR });
-        bodyEl.innerHTML = followerObjs.length
-            ? followerObjs.map(_renderUserRowIgHtml).join("")
-            : `<div class="app-card border border-dashed rounded-2xl p-7 text-center text-xs app-muted">Belum ada followers.</div>`;
-        return;
-    }
-
-    if (st.tab === "following") {
-        const gKeys = _getFollowingListForUser(targetObj);
-        const followingObjs = gKeys.map(k => (db.users || []).find(u => _normKey(u.username) === k) || { username: k, name: k, role: "user", avatar: DEFAULT_AVATAR });
-        bodyEl.innerHTML = followingObjs.length
-            ? followingObjs.map(_renderUserRowIgHtml).join("")
-            : `<div class="app-card border border-dashed rounded-2xl p-7 text-center text-xs app-muted">Belum mengikuti akun mana pun.</div>`;
-        return;
-    }
-
-    const allProj = _getProjectsForUser(targetObj);
-    const isStaffScope = targetObj.role === "master" || targetObj.role === "administrasi";
-
-    if (isStaffScope) {
-        const prosesList = allProj.filter(p => p.status !== "Aktif");
-        const aktifList = allProj.filter(p => p.status === "Aktif");
-        const pCat = st.projectCat === "aktif" ? "aktif" : "proses";
-        const shownList = pCat === "aktif" ? aktifList : prosesList;
-
-        bodyEl.innerHTML = `
-            <div class="flex gap-2 pb-2">
-                <button type="button" onclick="setIgProjectCat('proses')" class="px-3.5 py-1.5 rounded-xl text-xs font-bold ${pCat === "proses" ? "gold-pill-btn" : "app-btn-sec"}">Proses / Belum Diverifikasi (${prosesList.length})</button>
-                <button type="button" onclick="setIgProjectCat('aktif')" class="px-3.5 py-1.5 rounded-xl text-xs font-bold ${pCat === "aktif" ? "gold-pill-btn" : "app-btn-sec"}">Aktif / Sudah Diverifikasi (${aktifList.length})</button>
-            </div>
-            <div class="space-y-2.5">
-                ${shownList.length ? shownList.map(doc => {
-                    const kindLbl = doc._kind === "pf" ? (doc.docType === "lamaran" ? "Surat Lamaran" : "CV") : `Undangan • ${doc.category || ""}`;
-                    const stBadge = doc.status === "Aktif" ? "bg-emerald-500/15 text-emerald-600" : "bg-amber-500/15 text-amber-600";
-                    return `
-                        <div class="app-card border rounded-2xl p-3.5 flex items-center justify-between gap-3 shadow-sm">
-                            <div class="min-w-0">
-                                <span class="inline-block text-[9px] px-2 py-0.5 rounded-full font-extrabold ${stBadge}">${escHtml(doc.status || "Proses")}</span>
-                                <strong class="block text-sm font-bold truncate mt-1">${escHtml(doc.title || "Project")}</strong>
-                                <span class="text-[11px] app-muted truncate block">${escHtml(kindLbl)} ${doc.owner ? `• @${escHtml(doc.owner)}` : ""}</span>
-                            </div>
-                        </div>
-                    `;
-                }).join("") : `<div class="app-card border border-dashed rounded-2xl p-6 text-center text-xs app-muted">Belum ada project pada kategori ini.</div>`}
-            </div>
-        `;
-        return;
-    }
-
-    bodyEl.innerHTML = allProj.length
-        ? allProj.map(doc => {
-            const kindLbl = doc._kind === "pf" ? (doc.docType === "lamaran" ? "Surat Lamaran" : "CV") : `Undangan • ${doc.category || ""}`;
-            const stBadge = doc.status === "Aktif" ? "bg-emerald-500/15 text-emerald-600" : "bg-amber-500/15 text-amber-600";
-            return `
-                <div class="app-card border rounded-2xl p-3.5 flex items-center justify-between gap-3 shadow-sm">
-                    <div class="min-w-0">
-                        <span class="inline-block text-[9px] px-2 py-0.5 rounded-full font-extrabold ${stBadge}">${escHtml(doc.status || "Draf")}</span>
-                        <strong class="block text-sm font-bold truncate mt-1">${escHtml(doc.title || "Project")}</strong>
-                        <span class="text-[11px] app-muted truncate block">${escHtml(kindLbl)}</span>
-                    </div>
-                </div>
-            `;
-        }).join("")
-        : `<div class="app-card border border-dashed rounded-2xl p-7 text-center text-xs app-muted">Belum ada project yang dibuat.</div>`;
 }
 
 // ================= 4. MENU TITIK 3 POPUP PENUH =================
