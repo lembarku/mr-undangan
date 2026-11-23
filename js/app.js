@@ -41,7 +41,7 @@ function openWelcomeInstallModal(force = false) {
     document.getElementById("install-progress-state")?.classList.add("hide");
     document.getElementById("install-done-state")?.classList.add("hide");
     document.getElementById("modal-install-welcome")?.classList.remove("hide");
-    pushBackGuard();
+    mrNavPush({ type: "modal", id: "modal-install-welcome" });
 }
 
 function dismissWelcomeInstall() {
@@ -49,6 +49,7 @@ function dismissWelcomeInstall() {
         localStorage.setItem(PWA_REMIND_KEY, String(Date.now()));
     }
     document.getElementById("modal-install-welcome")?.classList.add("hide");
+    _mrDropTopModalById("modal-install-welcome");
 }
 
 async function acceptWelcomeInstall() {
@@ -110,6 +111,7 @@ function completeInstallAnimationUI() {
 
 function finishAndLaunchApp() {
     document.getElementById("modal-install-welcome")?.classList.add("hide");
+    _mrDropTopModalById("modal-install-welcome");
     try { if (typeof getCleanBaseUrl === "function") window.open(getCleanBaseUrl(), "_self"); } catch {}
     showToast("Selamat menggunakan Mr Undangan!");
 }
@@ -118,9 +120,12 @@ function finishAndLaunchApp() {
 function openAuthModal() {
     document.getElementById("modal-auth")?.classList.remove("hide");
     setTimeout(() => document.getElementById("auth-username")?.focus(), 120);
-    pushBackGuard();
+    mrNavPush({ type: "modal", id: "modal-auth" });
 }
-function closeAuthModal() { document.getElementById("modal-auth")?.classList.add("hide"); }
+function closeAuthModal() {
+    document.getElementById("modal-auth")?.classList.add("hide");
+    _mrDropTopModalById("modal-auth");
+}
 
 function maybeShowLoginReminder() {
     if (currentSessionUser || (typeof clientPortalState !== "undefined" && clientPortalState.active)) return;
@@ -148,23 +153,6 @@ function ensureUserInLocalDb(userObj) {
     try { localStorage.setItem(USER_CACHE_KEY, JSON.stringify(userObj)); } catch {}
 }
 
-function _activateUserSessionAndRoute(userObj, token = "", welcomeMsg = "") {
-    if (!userObj || !userObj.username) return;
-    currentSessionUser = String(userObj.username).trim().toLowerCase();
-    currentSessionToken = token || "";
-    localStorage.setItem(SESSION_KEY, currentSessionUser);
-    if (currentSessionToken) localStorage.setItem(SESSION_TOKEN_KEY, currentSessionToken);
-    else localStorage.removeItem(SESSION_TOKEN_KEY);
-    localStorage.setItem(DISPLAY_NAME_KEY, (userObj.name || userObj.username).split(" ")[0]);
-    ensureUserInLocalDb(Object.assign({}, userObj, { username: currentSessionUser }));
-    document.getElementById("auth-password").value = "";
-    closeAuthModal();
-    dismissLoginReminder();
-    if (welcomeMsg) showToast(welcomeMsg);
-    routeDashboard();
-    if (typeof scheduleAdaptivePoll === "function") scheduleAdaptivePoll();
-}
-
 async function handleAuthSubmit(e) {
     e.preventDefault();
     const u = document.getElementById("auth-username").value.trim().toLowerCase();
@@ -173,8 +161,20 @@ async function handleAuthSubmit(e) {
     setBtnLoading("auth-submit-btn", true, "Masuk...");
     const res = await apiAction({ action: "login", username: u, password: p });
     if (res && res.ok && res.user) {
+        currentSessionUser = res.user.username;
+        currentSessionToken = res.token || "";
+        localStorage.setItem(SESSION_KEY, currentSessionUser);
+        if (currentSessionToken) localStorage.setItem(SESSION_TOKEN_KEY, currentSessionToken);
+        else localStorage.removeItem(SESSION_TOKEN_KEY);
+        localStorage.setItem(DISPLAY_NAME_KEY, (res.user.name || res.user.username).split(" ")[0]);
+        ensureUserInLocalDb(res.user);
         setBtnLoading("auth-submit-btn", false);
-        _activateUserSessionAndRoute(res.user, res.token || "", `Halo, ${res.user.name}! Selamat datang kembali.`);
+        document.getElementById("auth-password").value = "";
+        closeAuthModal();
+        dismissLoginReminder();
+        showToast(`Halo, ${res.user.name}! Selamat datang kembali.`);
+        routeDashboard();
+        if (typeof scheduleAdaptivePoll === "function") scheduleAdaptivePoll();
         return;
     }
     if (res && res.code === "NOT_FOUND") {
@@ -182,17 +182,9 @@ async function handleAuthSubmit(e) {
         const reg = await apiAction({ action: "register", username: u, password: p });
         setBtnLoading("auth-submit-btn", false);
         if (reg && reg.ok) {
-            const regUser = reg.user || {
-                username: u,
-                name: u,
-                role: "user",
-                status: "Aktif",
-                isPro: false,
-                following: [],
-                followers: [],
-                favorites: []
-            };
-            _activateUserSessionAndRoute(regUser, reg.token || "", `Selamat datang, ${regUser.name || u}! Akun Anda siap digunakan.`);
+            document.getElementById("auth-password").value = "";
+            closeAuthModal();
+            showToast("Pendaftaran berhasil! Tinggal tunggu konfirmasi Admin.", "info");
         } else showToast((reg && reg.message) || "Gagal mendaftar.", "error");
         return;
     }
@@ -215,35 +207,345 @@ function logoutSession() {
     if (typeof idbRemove === "function") idbRemove("db_snapshot");
     db.users = []; db.invitations = []; db.portfolios = []; db.chats = [];
     toggleSlideMenu(false);
-    if (typeof closeFullChatOverlay === "function") closeFullChatOverlay();
-    goToLanding();
+    if (typeof closeFullChatOverlay === "function") closeFullChatOverlay(true);
+    _mrResetNavToLanding();
+    goToLanding(true);
     if (typeof fetchPublicCloud === "function") fetchPublicCloud().then(renderLandingPage);
     showToast("Anda telah keluar.", "info");
 }
 
-// ================= 3. NAVIGASI & TOMBOL BACK HP BERTAHAP =================
-let lastBackPressTs = 0, historyGuardReady = false, _backStepSeq = 0;
+// ================= 3. MESIN NAVIGASI BERTAHAP TERPUSAT (DEFAULT GENERAL) =================
+let lastBackPressTs = 0;
+let historyGuardReady = false;
+let _mrHistoryDepth = 0;
+let _mrHomeGuardArmed = false;
+window._mrNavStack = [{ type: "landing" }];
+
+function _isElVis(id) {
+    const el = document.getElementById(id);
+    return !!(el && !el.classList.contains("hide"));
+}
+
+function _mrPushBrowserHistory(meta = {}) {
+    try {
+        _mrHistoryDepth++;
+        history.pushState(Object.assign({ mrNav: true, depth: _mrHistoryDepth, ts: Date.now() }, meta), "");
+    } catch {}
+}
+
+function _mrResetNavToLanding() {
+    window._mrNavStack = [{ type: "landing" }];
+}
 
 function initBackNavigationGuard() {
     if (historyGuardReady) return;
     historyGuardReady = true;
     try {
-        history.replaceState({ mrBase: true, s: 0 }, "");
-        history.pushState({ mrActive: true, s: ++_backStepSeq }, "");
-        history.pushState({ mrActive: true, s: ++_backStepSeq }, "");
+        history.replaceState({ mrRoot: true, depth: 0 }, "");
     } catch {}
+    window._mrNavStack = [{ type: "landing" }];
+    _mrHistoryDepth = 0;
+    _mrHomeGuardArmed = false;
+
+    // Pasang 1 pijakan guard Beranda pada sentuhan pertama user agar 100% sah di browser HP
+    window.addEventListener("pointerdown", () => {
+        if (!_mrHomeGuardArmed && _mrHistoryDepth === 0) {
+            _mrHomeGuardArmed = true;
+            _mrPushBrowserHistory({ mrHomeGuard: true });
+        }
+    }, { capture: true, passive: true });
+}
+
+function mrNavPush(stepObj) {
+    if (!stepObj || !stepObj.type) stepObj = { type: "auto" };
+
+    if (!_mrHomeGuardArmed && _mrHistoryDepth === 0) {
+        _mrHomeGuardArmed = true;
+        _mrPushBrowserHistory({ mrHomeGuard: true });
+    }
+
+    const stack = window._mrNavStack;
+    const top = stack[stack.length - 1];
+    if (top && top.type === stepObj.type) {
+        if (stepObj.type === "landing") return;
+        if (stepObj.type === "view" && top.view === stepObj.view) return;
+        if (stepObj.type === "workspace" && top.name === stepObj.name) return;
+        if (stepObj.type === "chat_list") return;
+        if (stepObj.type === "chat_thread" && top.threadUser === stepObj.threadUser) return;
+        if (stepObj.type === "user_profile" && top.username === stepObj.username) return;
+        if (stepObj.type === "solo_stats" && top.targetUsername === stepObj.targetUsername && top.mode === stepObj.mode) return;
+        if (stepObj.type === "modal" && top.id === stepObj.id) return;
+        if (stepObj.type === "drawer_sub" && top.sec === stepObj.sec) return;
+    }
+
+    stack.push(stepObj);
+    _mrPushBrowserHistory({ stepType: stepObj.type });
 }
 
 function pushBackGuard() {
-    try {
-        history.pushState({ mrActive: true, s: ++_backStepSeq }, "");
-    } catch {}
+    mrNavPush({ type: "auto" });
 }
 
 function pushStepBackGuard(stepTag) {
-    try {
-        history.pushState({ mrActive: true, stepTag: stepTag, s: ++_backStepSeq }, "");
-    } catch {}
+    mrNavPush({ type: "auto", stepTag: stepTag || "" });
+}
+
+function _mrDropTopModalById(id) {
+    const stack = window._mrNavStack;
+    while (stack.length > 1) {
+        const top = stack[stack.length - 1];
+        if ((top.type === "modal" && top.id === id) || (id === "drawer-main" && top.type === "drawer_sub")) {
+            stack.pop();
+        } else {
+            break;
+        }
+    }
+}
+
+function _mrDropTopTransientToken(closedId) {
+    const stack = window._mrNavStack;
+    if (stack.length <= 1) return;
+    const top = stack[stack.length - 1];
+    if (top.type === "auto") { stack.pop(); return; }
+    if (top.type === "drawer_sub" && closedId === "drawer-sub") { stack.pop(); return; }
+    if (top.type === "modal" && top.id === closedId) { stack.pop(); return; }
+    if (top.type === "avatar_lightbox" && closedId === "expanded-avatar-overlay") { stack.pop(); return; }
+}
+
+function _mrHasVisibleDrawerSub() {
+    return ["drawer-sub-theme", "drawer-sub-about", "drawer-sub-profil", "drawer-sub-akun", "drawer-sub-qris"]
+        .some(id => _isElVis(id));
+}
+
+function _mrHideStackableOverlaysOnly() {
+    const solo = document.getElementById("solo-profile-stats-modal");
+    if (solo) solo.classList.add("hide");
+    if (window._soloStatsViewState) window._soloStatsViewState.open = false;
+
+    const av = document.getElementById("expanded-avatar-overlay");
+    if (av) av.classList.add("hide");
+
+    const profMod = document.getElementById("modal-view-user-profile");
+    if (profMod) {
+        profMod.style.cssText = "";
+        profMod.classList.add("hide");
+    }
+
+    const chatOv = document.getElementById("full-chat-overlay");
+    if (chatOv) {
+        chatOv.style.cssText = "";
+        chatOv.classList.add("hide");
+    }
+    document.body.style.overflow = "";
+}
+
+function _mrCloseTransientOverlayIfAny() {
+    if (_isElVis("expanded-avatar-overlay")) {
+        if (typeof closeExpandedAvatarLightbox === "function") closeExpandedAvatarLightbox();
+        else document.getElementById("expanded-avatar-overlay")?.classList.add("hide");
+        return "expanded-avatar-overlay";
+    }
+    if (_isElVis("app-confirm-modal")) {
+        document.getElementById("app-confirm-cancel")?.click();
+        return "app-confirm-modal";
+    }
+    if (_isElVis("modal-image-cropper")) {
+        if (typeof closeImageCropper === "function") closeImageCropper();
+        return "modal-image-cropper";
+    }
+    if (_isElVis("modal-audio-cropper")) {
+        if (typeof closeAudioCropper === "function") closeAudioCropper();
+        return "modal-audio-cropper";
+    }
+    if (_isElVis("modal-proof-viewer")) {
+        document.getElementById("modal-proof-viewer")?.classList.add("hide");
+        return "modal-proof-viewer";
+    }
+    if (_isElVis("ios-vault-lightbox")) {
+        if (typeof closeSecretPhotoLightbox === "function") closeSecretPhotoLightbox();
+        return "ios-vault-lightbox";
+    }
+    if (_isElVis("modal-portfolio-preview")) {
+        document.getElementById("modal-portfolio-preview")?.classList.add("hide");
+        return "modal-portfolio-preview";
+    }
+    if (_isElVis("modal-album-form")) {
+        document.getElementById("modal-album-form")?.classList.add("hide");
+        return "modal-album-form";
+    }
+    if (_isElVis("modal-install-welcome")) {
+        dismissWelcomeInstall();
+        return "modal-install-welcome";
+    }
+    if (_isElVis("modal-secret-album")) {
+        document.getElementById("modal-secret-album")?.classList.add("hide");
+        return "modal-secret-album";
+    }
+    if (_isElVis("modal-chat-contacts")) {
+        document.getElementById("modal-chat-contacts")?.classList.add("hide");
+        return "modal-chat-contacts";
+    }
+    if (_isElVis("modal-auth")) {
+        closeAuthModal();
+        return "modal-auth";
+    }
+    if (_isElVis("modal-sempurnakan")) {
+        document.getElementById("modal-sempurnakan")?.classList.add("hide");
+        return "modal-sempurnakan";
+    }
+    if (_isElVis("modal-pin-gate")) {
+        document.getElementById("modal-pin-gate")?.classList.add("hide");
+        return "modal-pin-gate";
+    }
+    if (_isElVis("modal-drive-album-actions")) {
+        document.getElementById("modal-drive-album-actions")?.classList.add("hide");
+        return "modal-drive-album-actions";
+    }
+    if (_isElVis("modal-theme-builder")) {
+        if (typeof closeThemeBuilderModal === "function") closeThemeBuilderModal();
+        return "modal-theme-builder";
+    }
+    if (_isElVis("modal-client-portal")) {
+        document.getElementById("modal-client-portal")?.classList.add("hide");
+        return "modal-client-portal";
+    }
+    if (_isElVis("modal-master-user")) {
+        document.getElementById("modal-master-user")?.classList.add("hide");
+        return "modal-master-user";
+    }
+    if (_isElVis("modal-create-choice")) {
+        document.getElementById("modal-create-choice")?.classList.add("hide");
+        return "modal-create-choice";
+    }
+    if (_isElVis("modal-add-album-choice")) {
+        document.getElementById("modal-add-album-choice")?.classList.add("hide");
+        return "modal-add-album-choice";
+    }
+    if (_isElVis("modal-share-sosmed")) {
+        if (typeof cancelSocialShareModal === "function") cancelSocialShareModal();
+        return "modal-share-sosmed";
+    }
+    if (document.getElementById("drawer-main")?.classList.contains("open")) {
+        if (_mrHasVisibleDrawerSub()) {
+            backToMainSlideMenu();
+            return "drawer-sub";
+        }
+        toggleSlideMenu(false);
+        return "drawer-main";
+    }
+    if (_isElVis("guest-invitation-overlay") && _isElVis("gv-close-btn")) {
+        if (typeof closeGuestInvitation === "function") closeGuestInvitation();
+        return "guest-invitation-overlay";
+    }
+    if (_isElVis("ig-profile-stats-modal")) {
+        closeIgProfileFullscreen();
+        return "ig-profile-stats-modal";
+    }
+    return "";
+}
+
+function _mrRestoreNavStep(step) {
+    if (!step || step.type === "landing") {
+        _mrHideStackableOverlaysOnly();
+        if (typeof stopPreviewAudio === "function") stopPreviewAudio();
+        if (typeof closeFullChatOverlay === "function") closeFullChatOverlay(true);
+        goToLanding(true);
+        return;
+    }
+
+    if (step.type === "solo_stats") {
+        _mrHideStackableOverlaysOnly();
+        if (typeof window._restoreSoloStatsFromNav === "function") {
+            window._restoreSoloStatsFromNav(step);
+        } else if (typeof openSoloFollowersModal === "function") {
+            if (step.mode === "following") openSoloFollowingModal(step.targetUsername, true);
+            else if (step.mode === "project") openSoloProjectModal(step.targetUsername, true);
+            else openSoloFollowersModal(step.targetUsername, true);
+        }
+        return;
+    }
+
+    if (step.type === "user_profile") {
+        _mrHideStackableOverlaysOnly();
+        if (typeof viewUserProfileModal === "function") {
+            viewUserProfileModal(step.username, true);
+        }
+        return;
+    }
+
+    if (step.type === "chat_thread" || step.type === "chat_list") {
+        _mrHideStackableOverlaysOnly();
+        if (typeof window._restoreChatFromNav === "function") {
+            window._restoreChatFromNav(step);
+        }
+        return;
+    }
+
+    if (step.type === "workspace") {
+        _mrHideStackableOverlaysOnly();
+        if (typeof closeFullChatOverlay === "function") closeFullChatOverlay(true);
+        if (currentViewName !== "master") routeDashboard(true);
+        if (typeof openMasterWorkspace === "function") openMasterWorkspace(step.name || "overview", true);
+        return;
+    }
+
+    if (step.type === "view") {
+        _mrHideStackableOverlaysOnly();
+        if (typeof closeFullChatOverlay === "function") closeFullChatOverlay(true);
+        if (typeof stopPreviewAudio === "function") stopPreviewAudio();
+        if (step.view === "landing") {
+            goToLanding(true);
+        } else if (["profile", "master", "cabang", "staff"].includes(step.view)) {
+            if (step.view === "master") currentMasterWorkspace = "overview";
+            routeDashboard(true);
+        } else if (step.view === "guestlist") {
+            hideAllViews();
+            currentViewName = "guestlist";
+            document.getElementById("view-guestlist")?.classList.remove("hide");
+            renderHeaderActions();
+        } else {
+            routeDashboard(true);
+        }
+        return;
+    }
+
+    _mrHideStackableOverlaysOnly();
+    goToLanding(true);
+}
+
+function _mrHandleFallbackBackStep() {
+    if (_isElVis("solo-profile-stats-modal")) {
+        if (typeof closeSoloStatsModal === "function") closeSoloStatsModal();
+        return true;
+    }
+    if (_isElVis("modal-view-user-profile")) {
+        if (typeof closeUserProfileModalCustom === "function") closeUserProfileModalCustom();
+        else document.getElementById("modal-view-user-profile")?.classList.add("hide");
+        return true;
+    }
+    if (_isElVis("full-chat-overlay")) {
+        if (typeof activeMasterChatThread !== "undefined" && activeMasterChatThread) {
+            activeMasterChatThread = null;
+            if (typeof renderFullChatOverlay === "function") renderFullChatOverlay();
+        } else if (typeof closeFullChatOverlay === "function") {
+            closeFullChatOverlay(true);
+        }
+        return true;
+    }
+    if (["wizard", "portfolio_wizard", "payment", "guestlist"].includes(currentViewName)) {
+        if (typeof stopPreviewAudio === "function") stopPreviewAudio();
+        routeDashboard(true);
+        return true;
+    }
+    if (currentViewName === "master" && typeof currentMasterWorkspace !== "undefined" && currentMasterWorkspace !== "overview") {
+        if (typeof openMasterWorkspace === "function") openMasterWorkspace("overview", true);
+        return true;
+    }
+    if (["profile", "master", "cabang", "staff"].includes(currentViewName)) {
+        goToLanding(true);
+        return true;
+    }
+    return false;
 }
 
 function closeIgProfileFullscreen() {
@@ -252,79 +554,79 @@ function closeIgProfileFullscreen() {
     if (el) el.classList.add("hide");
 }
 
-window.addEventListener("popstate", () => {
-    const isVis = (id) => { const el = document.getElementById(id); return el && !el.classList.contains("hide"); };
-    const drawerOpen = document.getElementById("drawer-main")?.classList.contains("open");
+window.addEventListener("popstate", (e) => {
+    const stateDepth = (e && e.state && typeof e.state.depth === "number")
+        ? e.state.depth
+        : Math.max(0, _mrHistoryDepth - 1);
+    _mrHistoryDepth = Math.max(0, stateDepth);
 
-    if (isVis("expanded-avatar-overlay")) { if (typeof closeExpandedAvatarLightbox === "function") closeExpandedAvatarLightbox(); pushBackGuard(); return; }
-    if (isVis("solo-profile-stats-modal")) { if (typeof closeSoloStatsModal === "function") closeSoloStatsModal(); pushBackGuard(); return; }
-    if (isVis("ig-profile-stats-modal")) { closeIgProfileFullscreen(); pushBackGuard(); return; }
-    if (isVis("ios-vault-lightbox")) { if (typeof closeSecretPhotoLightbox === "function") closeSecretPhotoLightbox(); pushBackGuard(); return; }
-    if (isVis("modal-image-cropper")) { if (typeof closeImageCropper === "function") closeImageCropper(); pushBackGuard(); return; }
-    if (isVis("modal-audio-cropper")) { if (typeof closeAudioCropper === "function") closeAudioCropper(); pushBackGuard(); return; }
-    if (isVis("modal-proof-viewer")) { document.getElementById("modal-proof-viewer")?.classList.add("hide"); pushBackGuard(); return; }
-    if (isVis("modal-theme-builder")) { if (typeof closeThemeBuilderModal === "function") closeThemeBuilderModal(); pushBackGuard(); return; }
-    if (isVis("app-confirm-modal")) { document.getElementById("app-confirm-cancel")?.click(); pushBackGuard(); return; }
-    if (isVis("modal-install-welcome")) { dismissWelcomeInstall(); pushBackGuard(); return; }
-    if (isVis("modal-auth")) { closeAuthModal(); pushBackGuard(); return; }
-    if (isVis("modal-chat-contacts")) { document.getElementById("modal-chat-contacts")?.classList.add("hide"); pushBackGuard(); return; }
-    if (isVis("modal-sempurnakan")) { document.getElementById("modal-sempurnakan")?.classList.add("hide"); pushBackGuard(); return; }
-    if (isVis("modal-portfolio-preview")) { document.getElementById("modal-portfolio-preview")?.classList.add("hide"); pushBackGuard(); return; }
-    if (isVis("modal-drive-album-actions")) { document.getElementById("modal-drive-album-actions")?.classList.add("hide"); pushBackGuard(); return; }
-    if (isVis("modal-pin-gate")) { document.getElementById("modal-pin-gate")?.classList.add("hide"); pushBackGuard(); return; }
-    if (isVis("modal-album-form")) { document.getElementById("modal-album-form")?.classList.add("hide"); pushBackGuard(); return; }
-    if (isVis("modal-add-album-choice")) { document.getElementById("modal-add-album-choice")?.classList.add("hide"); pushBackGuard(); return; }
-    if (isVis("modal-secret-album")) { document.getElementById("modal-secret-album")?.classList.add("hide"); pushBackGuard(); return; }
-    if (isVis("modal-create-choice")) { document.getElementById("modal-create-choice")?.classList.add("hide"); pushBackGuard(); return; }
-    if (isVis("modal-client-portal")) { document.getElementById("modal-client-portal")?.classList.add("hide"); pushBackGuard(); return; }
-
-    if (isVis("full-chat-overlay") || isVis("modal-view-user-profile")) {
-        return;
-    }
-
-    if (isVis("modal-master-user")) { document.getElementById("modal-master-user")?.classList.add("hide"); pushBackGuard(); return; }
-    if (isVis("guest-invitation-overlay") && isVis("gv-close-btn")) { if (typeof closeGuestInvitation === "function") closeGuestInvitation(); pushBackGuard(); return; }
-    if (drawerOpen) { toggleSlideMenu(false); pushBackGuard(); return; }
-    if (isVis("modal-share-sosmed")) { if (typeof cancelSocialShareModal === "function") cancelSocialShareModal(); pushBackGuard(); return; }
-
+    // Mode Portal Client Cabang
     if (typeof clientPortalState !== "undefined" && clientPortalState.active) {
+        const closedT = _mrCloseTransientOverlayIfAny();
+        if (closedT) {
+            _mrDropTopTransientToken(closedT);
+            return;
+        }
         const now = Date.now();
-        if (now - lastBackPressTs < 2400) { history.back(); return; }
+        if (now - lastBackPressTs < 2400) {
+            if (_mrHistoryDepth > 0) {
+                try { history.go(-(_mrHistoryDepth + 1)); } catch {}
+            }
+            return;
+        }
         lastBackPressTs = now;
         showToast("Tekan kembali sekali lagi untuk keluar.", "info");
-        pushBackGuard();
         return;
     }
 
-    if (["wizard", "portfolio_wizard", "payment", "guestlist"].includes(currentViewName)) {
-        if (typeof stopPreviewAudio === "function") stopPreviewAudio();
-        routeDashboard(true);
-        pushBackGuard();
+    // 1. Tutup lapisan/modal transien teratas terlebih dahulu
+    const closedTransient = _mrCloseTransientOverlayIfAny();
+    if (closedTransient) {
+        _mrDropTopTransientToken(closedTransient);
         return;
     }
 
-    if (currentViewName === "master" && typeof currentMasterWorkspace !== "undefined" && currentMasterWorkspace !== "overview") {
-        if (typeof openMasterWorkspace === "function") openMasterWorkspace("overview");
-        pushBackGuard();
+    // 2. Mundur 1 langkah sesuai urutan masuk pada tumpukan navigasi
+    const stack = window._mrNavStack;
+    while (stack.length > 1) {
+        const top = stack[stack.length - 1];
+        if (top.type === "auto" || top.type === "modal" || top.type === "drawer_sub" || top.type === "avatar_lightbox") {
+            stack.pop();
+            if (_mrHandleFallbackBackStep()) return;
+        } else {
+            break;
+        }
+    }
+
+    if (stack.length > 1) {
+        stack.pop();
+        const prevStep = stack[stack.length - 1];
+        _mrRestoreNavStep(prevStep);
         return;
     }
 
-    if (["profile", "master", "cabang", "staff"].includes(currentViewName)) {
-        goToLanding(true);
-        pushBackGuard();
+    // 3. Fallback bila masih berada di luar Beranda
+    if (_mrHandleFallbackBackStep()) {
         return;
     }
 
+    // 4. Sudah berada di Beranda (tempat kembali terakhir) -> konfirmasi 2x untuk keluar
     const now = Date.now();
-    if (now - lastBackPressTs < 2400) { history.back(); return; }
+    if (now - lastBackPressTs < 2400) {
+        if (_mrHistoryDepth > 0) {
+            try { history.go(-(_mrHistoryDepth + 1)); } catch {}
+        }
+        return;
+    }
     lastBackPressTs = now;
     showToast("Tekan kembali sekali lagi untuk keluar aplikasi.", "info");
-    pushBackGuard();
 });
 
 function handleHeaderBrandClick() {
     if (typeof clientPortalState !== "undefined" && clientPortalState.active) { window.scrollTo({ top: 0, behavior: "smooth" }); return; }
-    goToLanding();
+    _mrHideStackableOverlaysOnly();
+    _mrResetNavToLanding();
+    goToLanding(true);
 }
 
 function hideAllViews() {
@@ -387,7 +689,7 @@ function routeDashboard(fromBack = false) {
         renderUserProfile();
     }
     renderHeaderActions();
-    if (!fromBack) pushBackGuard();
+    if (!fromBack) mrNavPush({ type: "view", view: currentViewName });
     window.scrollTo({ top: 0, behavior: "smooth" });
 }
 
@@ -445,7 +747,7 @@ function renderHeaderActions() {
     if (typeof updateChatBadges === "function") updateChatBadges();
 }
 
-// ================= INSTAGRAM-STYLE STATS BAR & FULLSCREEN LIST =================
+// ================= INSTAGRAM-STYLE STATS HELPERS & FOLLOW =================
 function _normKey(s) {
     return String(s || "").trim().toLowerCase();
 }
@@ -509,13 +811,9 @@ function _buildIgStatsRowHtml(targetUserObj) {
 
     const followingList = _getFollowingListForUser(targetUserObj);
     const projectsList = _getProjectsForUser(targetUserObj);
-
-    let followersDisplay = "";
-    if (isMasterProfile) {
-        followersDisplay = _formatMasterFollowersDisplay();
-    } else {
-        followersDisplay = _fmtIgCount(_getFollowersListForUser(targetUserObj).length);
-    }
+    const followersDisplay = isMasterProfile
+        ? _formatMasterFollowersDisplay()
+        : _fmtIgCount(_getFollowersListForUser(targetUserObj).length);
 
     const canFollowThis = !isSelf && curU && (
         isMasterProfile
@@ -524,21 +822,25 @@ function _buildIgStatsRowHtml(targetUserObj) {
     );
     const isFollowingThis = canFollowThis && _getFollowingListForUser(curU).includes(uname);
 
+    const followersClick = (isMasterProfile && !isSelf)
+        ? `onclick="showToast('Daftar followers akun Master bersifat privat.','info')"`
+        : `onclick="if(typeof openSoloFollowersModal==='function')openSoloFollowersModal('${esc(uname)}')"`;
+
     const followersColHtml = isCabangProfile
         ? ""
-        : `<button type="button" onclick="openIgProfileStatsModal('${esc(uname)}','followers')" class="flex-1 py-2 px-1 text-center rounded-xl hover:bg-black/5 active:scale-98 transition">
+        : `<button type="button" ${followersClick} class="flex-1 py-2 px-1 text-center rounded-xl hover:bg-black/5 active:scale-98 transition">
             <span class="block text-sm sm:text-base font-extrabold tracking-tight">${escHtml(followersDisplay)}</span>
             <span class="block text-[11px] app-muted font-medium">Followers</span>
         </button>`;
 
     const followingColHtml = isCabangProfile
         ? ""
-        : `<button type="button" onclick="openIgProfileStatsModal('${esc(uname)}','following')" class="flex-1 py-2 px-1 text-center rounded-xl hover:bg-black/5 active:scale-98 transition">
+        : `<button type="button" onclick="if(typeof openSoloFollowingModal==='function')openSoloFollowingModal('${esc(uname)}')" class="flex-1 py-2 px-1 text-center rounded-xl hover:bg-black/5 active:scale-98 transition">
             <span class="block text-sm sm:text-base font-extrabold tracking-tight">${escHtml(_fmtIgCount(followingList.length))}</span>
             <span class="block text-[11px] app-muted font-medium">Following</span>
         </button>`;
 
-    const projectColHtml = `<button type="button" onclick="openIgProfileStatsModal('${esc(uname)}','project')" class="flex-1 py-2 px-1 text-center rounded-xl hover:bg-black/5 active:scale-98 transition">
+    const projectColHtml = `<button type="button" onclick="if(typeof openSoloProjectModal==='function')openSoloProjectModal('${esc(uname)}')" class="flex-1 py-2 px-1 text-center rounded-xl hover:bg-black/5 active:scale-98 transition">
         <span class="block text-sm sm:text-base font-extrabold tracking-tight">${escHtml(_fmtIgCount(projectsList.length))}</span>
         <span class="block text-[11px] app-muted font-medium">Project</span>
     </button>`;
@@ -594,11 +896,8 @@ async function toggleFollowTargetUser(targetUname) {
     ensureUserInLocalDb(curU);
     ensureUserInLocalDb(targetObj);
     refreshActiveViewSmart();
-    if (typeof viewUserProfileModal === "function" && !document.getElementById("modal-view-user-profile")?.classList.contains("hide")) {
+    if (typeof viewUserProfileModal === "function" && _isElVis("modal-view-user-profile")) {
         viewUserProfileModal(tKey, true);
-    }
-    if (window._igProfileSheetState.open) {
-        renderIgProfileStatsModalContent();
     }
     showToast(nowFollowing ? `Mengikuti @${tKey}` : `Berhenti mengikuti @${tKey}`, "info");
 
@@ -612,20 +911,25 @@ async function toggleFollowTargetUser(targetUname) {
 function toggleSlideMenu(show) {
     const el = document.getElementById("drawer-main"); if (!el) return;
     if (show) {
-        backToMainSlideMenu();
+        backToMainSlideMenu(true);
         el.classList.add("open");
-        pushBackGuard();
+        mrNavPush({ type: "modal", id: "drawer-main" });
     } else {
         el.classList.remove("open");
+        _mrDropTopModalById("drawer-main");
     }
 }
 
-function backToMainSlideMenu() {
+function backToMainSlideMenu(silent = false) {
     const tEl = document.getElementById("drawer-main-title");
     if (tEl) tEl.innerText = "Pengaturan";
     document.getElementById("drawer-main-list")?.classList.remove("hide");
     ["drawer-sub-theme", "drawer-sub-about", "drawer-sub-profil", "drawer-sub-akun", "drawer-sub-qris"]
         .forEach(id => document.getElementById(id)?.classList.add("hide"));
+    if (!silent && Array.isArray(window._mrNavStack) && window._mrNavStack.length > 1) {
+        const top = window._mrNavStack[window._mrNavStack.length - 1];
+        if (top && top.type === "drawer_sub") window._mrNavStack.pop();
+    }
     renderMainSlideMenuList();
 }
 
@@ -727,6 +1031,8 @@ function openSlideSub(sec) {
         }
         document.getElementById("drawer-sub-qris")?.classList.remove("hide");
     }
+
+    mrNavPush({ type: "drawer_sub", sec });
 }
 
 function pickCroppedProfileMedia(inp, type) {
@@ -802,6 +1108,10 @@ async function changeUserCredentials() {
 
     currentSessionUser = finalUser.username;
     localStorage.setItem(SESSION_KEY, currentSessionUser);
+    if (res.token) {
+        currentSessionToken = res.token;
+        localStorage.setItem(SESSION_TOKEN_KEY, res.token);
+    }
     if (Array.isArray(db.users) && oldU && oldU !== currentSessionUser) {
         db.users = db.users.filter(x => String(x.username || "").toLowerCase() !== oldU);
     }
@@ -1107,10 +1417,11 @@ function openCreateChoiceModal(isCabang = false) {
     }
     createChoiceIsCabang = isCabang || (u.role === "cabang");
     document.getElementById("modal-create-choice")?.classList.remove("hide");
-    pushBackGuard();
+    mrNavPush({ type: "modal", id: "modal-create-choice" });
 }
 function chooseCreateDoc(kind) {
     document.getElementById("modal-create-choice")?.classList.add("hide");
+    _mrDropTopModalById("modal-create-choice");
     if (kind === "undangan" && typeof startCreateInvitation === "function") startCreateInvitation(createChoiceIsCabang);
     else if (kind === "cv" && typeof startCreatePortfolio === "function") startCreatePortfolio(createChoiceIsCabang, "cv");
     else if (kind === "lamaran" && typeof startCreatePortfolio === "function") startCreatePortfolio(createChoiceIsCabang, "lamaran");
@@ -1239,17 +1550,38 @@ function switchCabangDocsTab(tab) {
     const tf = document.getElementById("tab-cab-favs"); if (tf) tf.className = `px-4 py-1.5 rounded-full text-xs font-bold ${!isDocs ? "gold-pill-btn" : "app-btn-sec"}`;
 }
 
+function _mountProfileIgStats(sectionId, mountId, userObj) {
+    const sec = document.getElementById(sectionId);
+    if (!sec || !userObj) return;
+    let mount = document.getElementById(mountId);
+    if (!mount) {
+        mount = document.createElement("div");
+        mount.id = mountId;
+        const firstCard = sec.querySelector(".app-card");
+        if (firstCard && firstCard.nextSibling) sec.insertBefore(mount, firstCard.nextSibling);
+        else sec.prepend(mount);
+    }
+    mount.innerHTML = _buildIgStatsRowHtml(userObj);
+}
+
 function renderUserProfile() {
     const u = typeof getCurrentUserObj === "function" ? getCurrentUserObj() : null; if (!u) return;
     const defAv = typeof DEFAULT_AVATAR !== "undefined" ? DEFAULT_AVATAR : "./logo.png";
     const bEl = document.getElementById("prof-banner"); if (bEl) bEl.style.backgroundImage = u.banner ? `url('${u.banner}')` : "";
-    const aEl = document.getElementById("prof-avatar"); if (aEl) aEl.src = u.avatar || defAv;
+    const aEl = document.getElementById("prof-avatar");
+    if (aEl) {
+        aEl.src = u.avatar || defAv;
+        aEl.onclick = () => { if (typeof openExpandedAvatarLightbox === "function") openExpandedAvatarLightbox(u.avatar || defAv, u.name || u.username); };
+        aEl.classList.add("cursor-pointer", "active:scale-95", "transition");
+    }
     const caEl = document.getElementById("prof-composer-avatar"); if (caEl) caEl.src = u.avatar || defAv;
     const nEl = document.getElementById("prof-name"); if (nEl) nEl.innerText = u.name;
     document.getElementById("prof-pro-badge")?.classList.toggle("hide", !u.isPro);
     const uEl = document.getElementById("prof-username"); if (uEl) uEl.innerText = `@${u.username}`;
     const bioEl = document.getElementById("prof-bio"); if (bioEl) bioEl.innerText = u.bio || "";
     const cEl = document.getElementById("prof-contact"); if (cEl) cEl.innerHTML = `${u.phone ? `<span><i class="fa-solid fa-phone app-accent mr-1"></i>${escHtml(u.phone)}</span>` : ""}${u.address ? `<span><i class="fa-solid fa-location-dot app-accent mr-1"></i>${escHtml(u.address)}</span>` : ""}`;
+
+    _mountProfileIgStats("view-profile", "prof-ig-stats-mount", u);
 
     if (typeof renderProfileAlbumHighlights === "function") renderProfileAlbumHighlights("prof-album-highlights", "prof-album-count-lbl", u.username);
 
@@ -1269,7 +1601,12 @@ function renderCabangAdmin() {
     const cab = typeof getCurrentUserObj === "function" ? getCurrentUserObj() : null; if (!cab) return;
     const defAv = typeof DEFAULT_AVATAR !== "undefined" ? DEFAULT_AVATAR : "./logo.png";
     const bEl = document.getElementById("cprof-banner"); if (bEl) bEl.style.backgroundImage = cab.banner ? `url('${cab.banner}')` : "";
-    const aEl = document.getElementById("cprof-avatar"); if (aEl) aEl.src = cab.avatar || defAv;
+    const aEl = document.getElementById("cprof-avatar");
+    if (aEl) {
+        aEl.src = cab.avatar || defAv;
+        aEl.onclick = () => { if (typeof openExpandedAvatarLightbox === "function") openExpandedAvatarLightbox(cab.avatar || defAv, cab.name || cab.username); };
+        aEl.classList.add("cursor-pointer", "active:scale-95", "transition");
+    }
     const caEl = document.getElementById("cabang-composer-avatar"); if (caEl) caEl.src = cab.avatar || defAv;
     const nEl = document.getElementById("cabang-title-name"); if (nEl) nEl.innerText = cab.name;
     document.getElementById("cabang-pro-badge")?.classList.toggle("hide", !cab.isPro);
@@ -1277,6 +1614,8 @@ function renderCabangAdmin() {
     const qEl = document.getElementById("cabang-quota-badge"); if (qEl) qEl.innerText = cab.quota || 0;
     const brandLbl = (cab.brandName && cab.brandName.trim()) ? cab.brandName.trim() : cab.name;
     const brEl = document.getElementById("cabang-brand-badge"); if (brEl) brEl.innerHTML = `<i class="fa-solid fa-tag app-accent mr-1"></i>Label: <strong>${escHtml(brandLbl)}</strong> • Powered by Mr Undangan`;
+
+    _mountProfileIgStats("view-cabang-admin", "cabang-ig-stats-mount", cab);
 
     if (typeof renderProfileAlbumHighlights === "function") renderProfileAlbumHighlights("cabang-album-highlights", "cabang-album-count-lbl", cab.username);
 
@@ -1314,6 +1653,9 @@ function refreshActiveViewSmart() {
         if (currentMasterWorkspace !== "home_editor" && currentMasterWorkspace !== "media" && !isUserTypingIn("master-workspace-body") && typeof renderMasterWorkspaceContent === "function") {
             renderMasterWorkspaceContent();
         }
+    }
+    if (window._soloStatsViewState && window._soloStatsViewState.open && typeof renderSoloStatsModal === "function") {
+        renderSoloStatsModal();
     }
     const gOv = document.getElementById("guest-invitation-overlay");
     if (gOv && !gOv.classList.contains("hide") && typeof activeGuestInv !== "undefined" && activeGuestInv && activeGuestInv.id !== "demo") {
@@ -1405,10 +1747,10 @@ async function bootMrUndanganApp() {
             if (uCached) {
                 const nmEl = document.getElementById("ios-hello-name");
                 if (nmEl && uCached.name) nmEl.innerText = uCached.name.split(" ")[0];
-                routeDashboard(true);
-            } else {
-                goToLanding(true);
             }
+            // Halaman utama aplikasi selalu Beranda (tempat kembali terakhir)
+            _mrResetNavToLanding();
+            goToLanding(true);
             finishSplash(1150);
 
             if (typeof fetchFullCloud === "function") {
@@ -1417,8 +1759,8 @@ async function bootMrUndanganApp() {
                     const uNow = typeof getCurrentUserObj === "function" ? getCurrentUserObj() : null;
                     if (uNow) {
                         ensureUserInLocalDb(uNow);
-                        if (currentViewName === "landing") renderLandingPage();
-                        else refreshActiveViewSmart();
+                        renderHeaderActions();
+                        refreshActiveViewSmart();
                     }
                     if (typeof updateChatBadges === "function") updateChatBadges();
                 });
@@ -1426,6 +1768,7 @@ async function bootMrUndanganApp() {
         } else {
             const pubCached = typeof idbGet === "function" ? await idbGet("public_snapshot") : null;
             if (pubCached && typeof applyPublicDb === "function") applyPublicDb(pubCached);
+            _mrResetNavToLanding();
             goToLanding(true);
             finishSplash(1100);
 
