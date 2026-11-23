@@ -209,14 +209,13 @@ function logoutSession() {
 }
 
 // ================= 3. NAVIGASI & TOMBOL BACK HP BERTAHAP =================
-let lastBackPressTs = 0, historyGuardReady = false, _backStepSeq = 0, _rearmGuardTimer = null;
+let lastBackPressTs = 0, historyGuardReady = false, _backStepSeq = 0;
 
 function initBackNavigationGuard() {
     if (historyGuardReady) return;
     historyGuardReady = true;
     try {
         history.replaceState({ mrBase: true, s: 0 }, "");
-        history.pushState({ mrActive: true, s: ++_backStepSeq }, "");
         history.pushState({ mrActive: true, s: ++_backStepSeq }, "");
         history.pushState({ mrActive: true, s: ++_backStepSeq }, "");
     } catch {}
@@ -226,15 +225,6 @@ function pushBackGuard() {
     try {
         history.pushState({ mrActive: true, s: ++_backStepSeq }, "");
     } catch {}
-}
-
-function _rearmBackGuardAfterPop() {
-    clearTimeout(_rearmGuardTimer);
-    _rearmGuardTimer = setTimeout(() => {
-        try {
-            history.pushState({ mrActive: true, s: ++_backStepSeq }, "");
-        } catch {}
-    }, 35);
 }
 
 function pushStepBackGuard(stepTag) {
@@ -253,100 +243,80 @@ window.addEventListener("popstate", (e) => {
     const isVis = (id) => { const el = document.getElementById(id); return el && !el.classList.contains("hide"); };
     const drawerOpen = document.getElementById("drawer-main")?.classList.contains("open");
 
-    // 1. Foto profil melebar -> kembali ke profil publik
+    // 1. Foto profil melebar -> tutup lapisan foto saja
     if (isVis("expanded-avatar-overlay")) {
         if (e && e.stopImmediatePropagation) e.stopImmediatePropagation();
         if (typeof closeExpandedAvatarLightbox === "function") closeExpandedAvatarLightbox();
-        _rearmBackGuardAfterPop();
         return;
     }
 
-    // 2. Detail Followers / Following / Project -> kembali ke profil publik
+    // 2. Detail Followers / Following / Project -> tutup lapisan statistik saja
     if (isVis("solo-profile-stats-modal")) {
         if (e && e.stopImmediatePropagation) e.stopImmediatePropagation();
         if (typeof closeSoloStatsModal === "function") closeSoloStatsModal();
-        _rearmBackGuardAfterPop();
         return;
     }
 
     if (isVis("ig-profile-stats-modal")) {
         if (e && e.stopImmediatePropagation) e.stopImmediatePropagation();
         closeIgProfileFullscreen();
-        _rearmBackGuardAfterPop();
         return;
     }
 
-    // 3. Profil publik user -> kembali ke obrolan chat (jika dibuka dari chat) atau halaman asal
-    if (isVis("modal-view-user-profile")) {
-        if (e && e.stopImmediatePropagation) e.stopImmediatePropagation();
-        if (typeof closeUserProfileModalCustom === "function") closeUserProfileModalCustom();
-        else document.getElementById("modal-view-user-profile")?.classList.add("hide");
-        if (window.openedFromChatThread) {
-            if (typeof activeMasterChatThread !== "undefined") activeMasterChatThread = window.openedFromChatThread;
-            window.openedFromChatThread = null;
-            const ov = document.getElementById("full-chat-overlay");
-            if (ov) ov.classList.remove("hide");
-            if (typeof renderFullChatOverlay === "function") renderFullChatOverlay();
-        }
-        _rearmBackGuardAfterPop();
+    // Biarkan js/chat.js mengurus tahapan Profil <-> Isi Chat <-> Daftar Chat <-> Keluar
+    if (isVis("full-chat-overlay") || isVis("modal-view-user-profile")) {
         return;
     }
 
-    if (isVis("ios-vault-lightbox")) { if (typeof closeSecretPhotoLightbox === "function") closeSecretPhotoLightbox(); _rearmBackGuardAfterPop(); return; }
-    if (isVis("modal-image-cropper")) { if (typeof closeImageCropper === "function") closeImageCropper(); _rearmBackGuardAfterPop(); return; }
-    if (isVis("modal-audio-cropper")) { if (typeof closeAudioCropper === "function") closeAudioCropper(); _rearmBackGuardAfterPop(); return; }
-    if (isVis("modal-proof-viewer")) { document.getElementById("modal-proof-viewer")?.classList.add("hide"); _rearmBackGuardAfterPop(); return; }
-    if (isVis("modal-theme-builder")) { if (typeof closeThemeBuilderModal === "function") closeThemeBuilderModal(); _rearmBackGuardAfterPop(); return; }
-    if (isVis("app-confirm-modal")) { document.getElementById("app-confirm-cancel")?.click(); _rearmBackGuardAfterPop(); return; }
-    if (isVis("modal-install-welcome")) { dismissWelcomeInstall(); _rearmBackGuardAfterPop(); return; }
-    if (isVis("modal-auth")) { closeAuthModal(); _rearmBackGuardAfterPop(); return; }
-    if (isVis("modal-chat-contacts")) { document.getElementById("modal-chat-contacts")?.classList.add("hide"); _rearmBackGuardAfterPop(); return; }
-    if (isVis("modal-sempurnakan")) { document.getElementById("modal-sempurnakan")?.classList.add("hide"); _rearmBackGuardAfterPop(); return; }
-    if (isVis("modal-portfolio-preview")) { document.getElementById("modal-portfolio-preview")?.classList.add("hide"); _rearmBackGuardAfterPop(); return; }
-    if (isVis("modal-drive-album-actions")) { document.getElementById("modal-drive-album-actions")?.classList.add("hide"); _rearmBackGuardAfterPop(); return; }
-    if (isVis("modal-pin-gate")) { document.getElementById("modal-pin-gate")?.classList.add("hide"); _rearmBackGuardAfterPop(); return; }
-    if (isVis("modal-album-form")) { document.getElementById("modal-album-form")?.classList.add("hide"); _rearmBackGuardAfterPop(); return; }
-    if (isVis("modal-add-album-choice")) { document.getElementById("modal-add-album-choice")?.classList.add("hide"); _rearmBackGuardAfterPop(); return; }
-    if (isVis("modal-secret-album")) { document.getElementById("modal-secret-album")?.classList.add("hide"); _rearmBackGuardAfterPop(); return; }
-    if (isVis("modal-create-choice")) { document.getElementById("modal-create-choice")?.classList.add("hide"); _rearmBackGuardAfterPop(); return; }
-    if (isVis("modal-client-portal")) { document.getElementById("modal-client-portal")?.classList.add("hide"); _rearmBackGuardAfterPop(); return; }
+    if (isVis("ios-vault-lightbox")) { if (typeof closeSecretPhotoLightbox === "function") closeSecretPhotoLightbox(); pushBackGuard(); return; }
+    if (isVis("modal-image-cropper")) { if (typeof closeImageCropper === "function") closeImageCropper(); pushBackGuard(); return; }
+    if (isVis("modal-audio-cropper")) { if (typeof closeAudioCropper === "function") closeAudioCropper(); pushBackGuard(); return; }
+    if (isVis("modal-proof-viewer")) { document.getElementById("modal-proof-viewer")?.classList.add("hide"); pushBackGuard(); return; }
+    if (isVis("modal-theme-builder")) { if (typeof closeThemeBuilderModal === "function") closeThemeBuilderModal(); pushBackGuard(); return; }
+    if (isVis("app-confirm-modal")) { document.getElementById("app-confirm-cancel")?.click(); pushBackGuard(); return; }
+    if (isVis("modal-install-welcome")) { dismissWelcomeInstall(); pushBackGuard(); return; }
+    if (isVis("modal-auth")) { closeAuthModal(); pushBackGuard(); return; }
+    if (isVis("modal-chat-contacts")) { document.getElementById("modal-chat-contacts")?.classList.add("hide"); pushBackGuard(); return; }
+    if (isVis("modal-sempurnakan")) { document.getElementById("modal-sempurnakan")?.classList.add("hide"); pushBackGuard(); return; }
+    if (isVis("modal-portfolio-preview")) { document.getElementById("modal-portfolio-preview")?.classList.add("hide"); pushBackGuard(); return; }
+    if (isVis("modal-drive-album-actions")) { document.getElementById("modal-drive-album-actions")?.classList.add("hide"); pushBackGuard(); return; }
+    if (isVis("modal-pin-gate")) { document.getElementById("modal-pin-gate")?.classList.add("hide"); pushBackGuard(); return; }
+    if (isVis("modal-album-form")) { document.getElementById("modal-album-form")?.classList.add("hide"); pushBackGuard(); return; }
+    if (isVis("modal-add-album-choice")) { document.getElementById("modal-add-album-choice")?.classList.add("hide"); pushBackGuard(); return; }
+    if (isVis("modal-secret-album")) { document.getElementById("modal-secret-album")?.classList.add("hide"); pushBackGuard(); return; }
+    if (isVis("modal-create-choice")) { document.getElementById("modal-create-choice")?.classList.add("hide"); pushBackGuard(); return; }
+    if (isVis("modal-client-portal")) { document.getElementById("modal-client-portal")?.classList.add("hide"); pushBackGuard(); return; }
 
-    // Biarkan listener capture di js/chat.js mengurus tahapan Isi Chat -> Daftar Chat -> Keluar
-    if (isVis("full-chat-overlay")) {
-        _rearmBackGuardAfterPop();
-        return;
-    }
-
-    if (isVis("modal-master-user")) { document.getElementById("modal-master-user")?.classList.add("hide"); _rearmBackGuardAfterPop(); return; }
-    if (isVis("guest-invitation-overlay") && isVis("gv-close-btn")) { if (typeof closeGuestInvitation === "function") closeGuestInvitation(); _rearmBackGuardAfterPop(); return; }
-    if (drawerOpen) { toggleSlideMenu(false); _rearmBackGuardAfterPop(); return; }
-    if (isVis("modal-share-sosmed")) { if (typeof cancelSocialShareModal === "function") cancelSocialShareModal(); _rearmBackGuardAfterPop(); return; }
+    if (isVis("modal-master-user")) { document.getElementById("modal-master-user")?.classList.add("hide"); pushBackGuard(); return; }
+    if (isVis("guest-invitation-overlay") && isVis("gv-close-btn")) { if (typeof closeGuestInvitation === "function") closeGuestInvitation(); pushBackGuard(); return; }
+    if (drawerOpen) { toggleSlideMenu(false); pushBackGuard(); return; }
+    if (isVis("modal-share-sosmed")) { if (typeof cancelSocialShareModal === "function") cancelSocialShareModal(); pushBackGuard(); return; }
 
     if (typeof clientPortalState !== "undefined" && clientPortalState.active) {
         const now = Date.now();
         if (now - lastBackPressTs < 2400) { history.back(); return; }
         lastBackPressTs = now;
         showToast("Tekan kembali sekali lagi untuk keluar.", "info");
-        _rearmBackGuardAfterPop();
+        pushBackGuard();
         return;
     }
 
     if (["wizard", "portfolio_wizard", "payment", "guestlist"].includes(currentViewName)) {
         if (typeof stopPreviewAudio === "function") stopPreviewAudio();
         routeDashboard(true);
-        _rearmBackGuardAfterPop();
+        pushBackGuard();
         return;
     }
 
     if (currentViewName === "master" && typeof currentMasterWorkspace !== "undefined" && currentMasterWorkspace !== "overview") {
         if (typeof openMasterWorkspace === "function") openMasterWorkspace("overview");
-        _rearmBackGuardAfterPop();
+        pushBackGuard();
         return;
     }
 
     if (["profile", "master", "cabang", "staff"].includes(currentViewName)) {
         goToLanding(true);
-        _rearmBackGuardAfterPop();
+        pushBackGuard();
         return;
     }
 
@@ -354,7 +324,7 @@ window.addEventListener("popstate", (e) => {
     if (now - lastBackPressTs < 2400) { history.back(); return; }
     lastBackPressTs = now;
     showToast("Tekan kembali sekali lagi untuk keluar aplikasi.", "info");
-    _rearmBackGuardAfterPop();
+    pushBackGuard();
 }, true);
 
 function handleHeaderBrandClick() {
