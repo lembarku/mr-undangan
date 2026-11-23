@@ -664,6 +664,80 @@ function closeSoloStatsModal() {
     if (mod) mod.classList.add("hide");
 }
 
+function _triggerEditProjectFromStats(kind, docId, isAdminDirect) {
+    closeSoloStatsModal();
+    if (typeof closeUserProfileModalCustom === "function") closeUserProfileModalCustom();
+    else document.getElementById("modal-view-user-profile")?.classList.add("hide");
+
+    if (kind === "pf" && typeof openEditPortfolio === "function") {
+        openEditPortfolio(docId, !!isAdminDirect);
+    } else if (typeof openEditInvitation === "function") {
+        openEditInvitation(docId, !!isAdminDirect);
+    }
+}
+
+function _buildProjectActionButtonsHtml(doc, curU, targetObj) {
+    const isPf = doc._kind === "pf";
+    const isStaffViewer = !!(curU && (curU.role === "master" || curU.role === "administrasi"));
+    const isCabangOwner = !!(curU && curU.role === "cabang" && String(curU.username || "").toLowerCase() === String(doc.owner || "").toLowerCase());
+    const isSelfOwner = !!(curU && String(curU.username || "").toLowerCase() === String(doc.owner || "").toLowerCase());
+    const isAktif = doc.status === "Aktif";
+    const isPay = doc.status === "Menunggu Pembayaran";
+    const edLeft = Math.max(0, 2 - Number(doc.editCount || 0));
+
+    const canEdit = isStaffViewer || isCabangOwner || (isSelfOwner && isAktif && edLeft > 0);
+    const editDirectFlag = !!(isStaffViewer || isCabangOwner);
+    const editBtnLabel = editDirectFlag ? "Edit" : `Edit (${edLeft}x)`;
+
+    const viewBtn = isPf
+        ? `<button type="button" onclick="closeSoloStatsModal();openPortfolioDocPreview(${doc.id},false);" class="px-3 py-1.5 rounded-xl app-btn-sec text-[11px] font-bold"><i class="fa-regular fa-eye mr-1"></i>Lihat</button>`
+        : (isAktif || isStaffViewer
+            ? `<button type="button" onclick="closeSoloStatsModal();openGuestView(${doc.id},'${isStaffViewer ? "Review Admin" : "Tamu Kehormatan"}');" class="px-3 py-1.5 rounded-xl app-btn-sec text-[11px] font-bold"><i class="fa-regular fa-eye mr-1"></i>Lihat</button>`
+            : "");
+
+    const editBtn = canEdit
+        ? `<button type="button" onclick="_triggerEditProjectFromStats('${doc._kind}',${doc.id},${editDirectFlag})" class="px-3 py-1.5 rounded-xl gold-pill-btn text-[11px]"><i class="fa-solid fa-pen mr-1"></i>${editBtnLabel}</button>`
+        : "";
+
+    const extraBtn = isSelfOwner && !isStaffViewer
+        ? (isPay
+            ? `<button type="button" onclick="closeSoloStatsModal();openUnifiedPayment('${isPf ? "portfolio" : "inv"}',${doc.id});" class="px-3 py-1.5 rounded-xl app-accent-bg border gold-border app-accent text-[11px] font-bold"><i class="fa-solid fa-qrcode mr-1"></i>Konfirmasi</button>`
+            : (isAktif && isPf
+                ? `<button type="button" onclick="closeSoloStatsModal();openSempurnakanModal(${doc.id});" class="px-3 py-1.5 rounded-xl app-accent-bg border gold-border app-accent text-[11px] font-bold"><i class="fa-solid fa-file-pdf mr-1"></i>PDF</button>`
+                : (isAktif && !isPf
+                    ? `<button type="button" onclick="closeSoloStatsModal();openGuestListManager(${doc.id});" class="px-3 py-1.5 rounded-xl app-accent-bg border gold-border app-accent text-[11px] font-bold"><i class="fa-solid fa-share-nodes mr-1"></i>Tamu</button>`
+                    : "")))
+        : (isStaffViewer && !isAktif
+            ? `<button type="button" onclick="setOrderStatus('${doc._kind}',${doc.id},'Aktif',this)" class="px-3 py-1.5 rounded-xl bg-emerald-600 text-white text-[11px] font-bold">✓ Konfirmasi</button>`
+            : "");
+
+    return `<div class="flex flex-wrap gap-1.5 pt-2.5 border-t gold-border">${viewBtn}${editBtn}${extraBtn}</div>`;
+}
+
+function _renderSoloProjectCard(doc, curU, targetObj) {
+    const kindLbl = doc._kind === "pf"
+        ? (doc.docType === "lamaran" ? "Surat Lamaran" : "CV")
+        : `Undangan • ${doc.category || ""}`;
+    const stBadge = doc.status === "Aktif"
+        ? "bg-emerald-500/15 text-emerald-600"
+        : "bg-amber-500/15 text-amber-600";
+    const subTheme = doc._kind === "pf" ? (doc.themeName || doc.themeId || "") : (doc.theme || "");
+
+    return `
+        <div class="app-card border rounded-2xl p-3.5 space-y-2 shadow-sm">
+            <div class="min-w-0">
+                <div class="flex items-center justify-between gap-2">
+                    <span class="inline-block text-[9px] px-2 py-0.5 rounded-full font-extrabold ${stBadge}">● ${escHtml(doc.status || "Proses")}</span>
+                    <span class="text-[10px] app-muted truncate">${escHtml(kindLbl)}</span>
+                </div>
+                <strong class="block text-sm font-bold truncate mt-1">${escHtml(doc.title || "Project")}</strong>
+                <span class="text-[11px] app-muted truncate block">${escHtml(subTheme)} ${doc.owner ? `• @${escHtml(doc.owner)}` : ""}</span>
+            </div>
+            ${_buildProjectActionButtonsHtml(doc, curU, targetObj)}
+        </div>
+    `;
+}
+
 function _renderSoloAccountCard(uItem) {
     const defAv = typeof DEFAULT_AVATAR !== "undefined" ? DEFAULT_AVATAR : "./logo.png";
     const proCheck = uItem.isPro ? `<i class="fa-solid fa-circle-check text-blue-500 text-xs shrink-0" title="Akun Pro"></i>` : "";
@@ -765,6 +839,7 @@ function renderSoloStatsModal() {
     if (subBar) { subBar.classList.add("hide"); subBar.innerHTML = ""; }
     if (!bodyEl) return;
 
+    // 1. ISI FOLLOWERS SAJA
     if (st.mode === "followers") {
         if (titleEl) titleEl.innerText = "Followers";
 
@@ -814,6 +889,7 @@ function renderSoloStatsModal() {
         return;
     }
 
+    // 2. ISI FOLLOWING SAJA
     if (st.mode === "following") {
         if (titleEl) titleEl.innerText = "Following";
         const gKeys = (typeof _getFollowingListForUser === "function")
@@ -826,6 +902,7 @@ function renderSoloStatsModal() {
         return;
     }
 
+    // 3. ISI PROJECT SAJA + FITUR EDIT LENGKAP SESUAI FUNGSI AKUN
     if (titleEl) titleEl.innerText = "Project";
     const allProj = (typeof _getProjectsForUser === "function") ? _getProjectsForUser(targetObj) : [];
     const isStaffScope = targetObj.role === "master" || targetObj.role === "administrasi";
@@ -845,37 +922,13 @@ function renderSoloStatsModal() {
         }
 
         bodyEl.innerHTML = shownList.length
-            ? shownList.map(doc => {
-                const kindLbl = doc._kind === "pf" ? (doc.docType === "lamaran" ? "Surat Lamaran" : "CV") : `Undangan • ${doc.category || ""}`;
-                const stBadge = doc.status === "Aktif" ? "bg-emerald-500/15 text-emerald-600" : "bg-amber-500/15 text-amber-600";
-                return `
-                    <div class="app-card border rounded-2xl p-3.5 flex items-center justify-between gap-3 shadow-sm">
-                        <div class="min-w-0">
-                            <span class="inline-block text-[9px] px-2 py-0.5 rounded-full font-extrabold ${stBadge}">${escHtml(doc.status || "Proses")}</span>
-                            <strong class="block text-sm font-bold truncate mt-1">${escHtml(doc.title || "Project")}</strong>
-                            <span class="text-[11px] app-muted truncate block">${escHtml(kindLbl)} ${doc.owner ? `• @${escHtml(doc.owner)}` : ""}</span>
-                        </div>
-                    </div>
-                `;
-            }).join("")
+            ? shownList.map(doc => _renderSoloProjectCard(doc, curU, targetObj)).join("")
             : `<div class="app-card border border-dashed rounded-2xl p-6 text-center text-xs app-muted">Belum ada project pada kategori ini.</div>`;
         return;
     }
 
     bodyEl.innerHTML = allProj.length
-        ? allProj.map(doc => {
-            const kindLbl = doc._kind === "pf" ? (doc.docType === "lamaran" ? "Surat Lamaran" : "CV") : `Undangan • ${doc.category || ""}`;
-            const stBadge = doc.status === "Aktif" ? "bg-emerald-500/15 text-emerald-600" : "bg-amber-500/15 text-amber-600";
-            return `
-                <div class="app-card border rounded-2xl p-3.5 flex items-center justify-between gap-3 shadow-sm">
-                    <div class="min-w-0">
-                        <span class="inline-block text-[9px] px-2 py-0.5 rounded-full font-extrabold ${stBadge}">${escHtml(doc.status || "Draf")}</span>
-                        <strong class="block text-sm font-bold truncate mt-1">${escHtml(doc.title || "Project")}</strong>
-                        <span class="text-[11px] app-muted truncate block">${escHtml(kindLbl)}</span>
-                    </div>
-                </div>
-            `;
-        }).join("")
+        ? allProj.map(doc => _renderSoloProjectCard(doc, curU, targetObj)).join("")
         : `<div class="app-card border border-dashed rounded-2xl p-7 text-center text-xs app-muted">Belum ada project yang dibuat.</div>`;
 }
 
