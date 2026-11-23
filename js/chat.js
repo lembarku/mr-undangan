@@ -10,7 +10,6 @@ const QUICK_REPLIES_STAFF = [
 
 let tempChatAttachment = "";
 let _lastKnownChatCount = -1;
-let _chatBackCaptureReady = false;
 window.openedFromChatThread = null;
 window._chatOriginView = null;
 
@@ -38,83 +37,27 @@ function playSoftChatNotification() {
     } catch {}
 }
 
-function _pushChatNavState(stage) {
-    try {
-        history.pushState({ mrChatStage: stage, ts: Date.now() }, "", window.location.href);
-    } catch {}
-}
-
-function _isChatLayerVisible(id) {
-    const el = document.getElementById(id);
-    return !!(el && !el.classList.contains("hide"));
-}
-
-function _closeProfileAndReturnToChat() {
-    const ov = document.getElementById("full-chat-overlay");
-    if (typeof closeUserProfileModalCustom === "function") {
-        closeUserProfileModalCustom();
-    } else {
-        const profMod = document.getElementById("modal-view-user-profile");
-        if (profMod) {
-            profMod.style.cssText = "";
-            profMod.classList.add("hide");
-        }
-    }
-
-    if (window.openedFromChatThread) {
-        if (typeof activeMasterChatThread !== "undefined") {
-            activeMasterChatThread = window.openedFromChatThread;
-        }
-        window.openedFromChatThread = null;
-        if (ov) {
-            ov.classList.remove("hide");
-            document.body.style.overflow = "hidden";
-        }
-        renderFullChatOverlay();
-        _pushChatNavState("chat_thread");
+function _pushChatNavStep(stepObj) {
+    if (typeof mrNavPush === "function") {
+        mrNavPush(stepObj);
     } else if (typeof pushBackGuard === "function") {
         pushBackGuard();
     }
 }
 
-function _ensureChatBackCapture() {
-    if (_chatBackCaptureReady) return;
-    _chatBackCaptureReady = true;
-
-    window.addEventListener("popstate", (e) => {
-        if (_isChatLayerVisible("expanded-avatar-overlay") || _isChatLayerVisible("solo-profile-stats-modal")) {
-            return;
-        }
-
-        const ov = document.getElementById("full-chat-overlay");
-        const chatOpen = !!(ov && !ov.classList.contains("hide"));
-        const profMod = document.getElementById("modal-view-user-profile");
-        const profOpen = !!(profMod && !profMod.classList.contains("hide"));
-
-        // 1. Dari Profil User -> kembali ke Isi Obrolan
-        if (profOpen) {
-            if (e && e.stopImmediatePropagation) e.stopImmediatePropagation();
-            _closeProfileAndReturnToChat();
-            return;
-        }
-
-        // 2. Dari Isi Obrolan -> kembali ke Daftar Seluruh Chat
-        if (chatOpen && typeof activeMasterChatThread !== "undefined" && activeMasterChatThread) {
-            if (e && e.stopImmediatePropagation) e.stopImmediatePropagation();
-            activeMasterChatThread = null;
-            renderFullChatOverlay();
-            _pushChatNavState("chat_list");
-            return;
-        }
-
-        // 3. Dari Daftar Seluruh Chat -> keluar ke halaman asal tanpa menutup aplikasi
-        if (chatOpen) {
-            if (e && e.stopImmediatePropagation) e.stopImmediatePropagation();
-            closeFullChatOverlay();
-            if (typeof pushBackGuard === "function") pushBackGuard();
-        }
-    }, true);
-}
+// Dipanggil oleh pengendali navigasi terpusat di js/app.js saat tombol Back HP ditekan
+window._restoreChatFromNav = function (stepObj) {
+    const ov = document.getElementById("full-chat-overlay");
+    if (!ov) return;
+    document.body.style.overflow = "hidden";
+    ov.classList.remove("hide");
+    if (stepObj && stepObj.type === "chat_thread" && stepObj.threadUser) {
+        activeMasterChatThread = String(stepObj.threadUser).toLowerCase();
+    } else {
+        activeMasterChatThread = null;
+    }
+    renderFullChatOverlay();
+};
 
 function getChatThreads() {
     const curU = getCurrentUserObj();
@@ -164,7 +107,6 @@ function getAccessibleChatContacts() {
 function openChatContactsModal() {
     const curU = getCurrentUserObj();
     if (!curU) return showToast("Silakan masuk akun terlebih dahulu untuk melihat daftar kontak.", "info");
-    _ensureChatBackCapture();
     const sub = document.getElementById("cc-access-sub");
     if (sub) {
         if (curU.role === "master" || curU.role === "administrasi") {
@@ -183,7 +125,7 @@ function openChatContactsModal() {
         mod.style.zIndex = "135";
         mod.classList.remove("hide");
     }
-    _pushChatNavState("contacts");
+    _pushChatNavStep({ type: "modal", id: "modal-chat-contacts" });
 }
 
 function renderChatContactsModalList() {
@@ -286,7 +228,8 @@ function _renderUserProfileModalFallback(uObj) {
         `;
     }
     mod.classList.remove("hide");
-    mod.style.zIndex = "130";
+    mod.style.zIndex = "135";
+    _pushChatNavStep({ type: "user_profile", username: String(uObj.username || "").toLowerCase() });
     return true;
 }
 
@@ -297,32 +240,21 @@ function _openUserProfileFromChat(threadUser) {
         return;
     }
 
-    _ensureChatBackCapture();
     window.openedFromChatThread = activeMasterChatThread || cleanUser;
 
-    let handled = false;
+    // viewUserProfileModal di js/admin.js sudah otomatis mendorong 1 langkah navigasi
     if (typeof viewUserProfileModal === "function") {
-        try {
-            viewUserProfileModal(cleanUser);
-            handled = true;
-        } catch {}
+        viewUserProfileModal(cleanUser);
+        return;
     }
 
-    const modEl = document.getElementById("modal-view-user-profile");
-    if (modEl && !modEl.classList.contains("hide")) {
-        modEl.style.zIndex = "130";
-        handled = true;
-    } else if (!handled) {
-        const uObj = (db.users || []).find(x => String(x.username || "").toLowerCase() === cleanUser);
-        if (uObj) handled = _renderUserProfileModalFallback(uObj);
+    const uObj = (db.users || []).find(x => String(x.username || "").toLowerCase() === cleanUser);
+    if (uObj && _renderUserProfileModalFallback(uObj)) {
+        return;
     }
 
-    if (handled) {
-        _pushChatNavState("profile");
-    } else {
-        window.openedFromChatThread = null;
-        showToast("Profil pengguna tidak ditemukan.", "info");
-    }
+    window.openedFromChatThread = null;
+    showToast("Profil pengguna tidak ditemukan.", "info");
 }
 
 function _syncWaChatHeader(mode = "list", title = "", avatarUrl = "", threadUser = "") {
@@ -374,19 +306,25 @@ function _syncWaChatHeader(mode = "list", title = "", avatarUrl = "", threadUser
     }
 }
 
-async function openFullChatOverlay(targetThread = null) {
+async function openFullChatOverlay(targetThread = null, skipHistoryPush = false) {
     const ov = document.getElementById("full-chat-overlay"); if (!ov) return;
-    _ensureChatBackCapture();
     if (ov.classList.contains("hide") && typeof currentViewName !== "undefined") {
         window._chatOriginView = currentViewName;
     }
     if (targetThread) activeMasterChatThread = String(targetThread).toLowerCase();
+    else if (ov.classList.contains("hide")) activeMasterChatThread = null;
+
     tempChatAttachment = "";
     document.body.style.overflow = "hidden";
     ov.classList.remove("hide");
 
-    _pushChatNavState("chat_list");
-    if (activeMasterChatThread) _pushChatNavState("chat_thread");
+    if (!skipHistoryPush) {
+        if (activeMasterChatThread) {
+            _pushChatNavStep({ type: "chat_thread", threadUser: activeMasterChatThread });
+        } else {
+            _pushChatNavStep({ type: "chat_list" });
+        }
+    }
 
     const u = getCurrentUserObj();
     if (isStaffUserObj(u) && typeof fetchFullCloud === "function") {
@@ -402,7 +340,7 @@ async function openFullChatOverlay(targetThread = null) {
     if (typeof scheduleAdaptivePoll === "function") scheduleAdaptivePoll();
 }
 
-function closeFullChatOverlay() {
+function closeFullChatOverlay(fromHistory = false) {
     const ov = document.getElementById("full-chat-overlay"); if (!ov) return;
     ov.style.cssText = "";
     ov.classList.add("hide");
@@ -410,26 +348,7 @@ function closeFullChatOverlay() {
     tempChatAttachment = "";
     activeMasterChatThread = null;
     window.openedFromChatThread = null;
-    const origin = window._chatOriginView;
     window._chatOriginView = null;
-    if (origin && typeof currentViewName !== "undefined" && typeof hideAllViews === "function") {
-        currentViewName = origin;
-        hideAllViews();
-        const mapView = {
-            landing: "view-landing",
-            profile: "view-profile",
-            cabang: "view-cabang-admin",
-            master: "view-master-admin",
-            staff: "view-staff-admin",
-            wizard: "view-wizard",
-            portfolio_wizard: "view-portfolio-wizard",
-            payment: "view-payment",
-            guestlist: "view-guestlist"
-        };
-        const targetId = mapView[origin];
-        if (targetId) document.getElementById(targetId)?.classList.remove("hide");
-        if (typeof renderHeaderActions === "function") renderHeaderActions();
-    }
     if (typeof scheduleAdaptivePoll === "function") scheduleAdaptivePoll();
 }
 
@@ -600,12 +519,12 @@ function renderFullChatContentSmart() {
 }
 
 async function openMasterChatThread(tUser) {
-    _ensureChatBackCapture();
-    activeMasterChatThread = tUser;
-    _pushChatNavState("chat_thread");
+    const clean = String(tUser || "").toLowerCase();
+    activeMasterChatThread = clean;
+    _pushChatNavStep({ type: "chat_thread", threadUser: clean });
     renderFullChatOverlay();
     const u = getCurrentUserObj();
-    await apiAction({ action: "mark_chat_read", threadUser: tUser, by: (u && u.role) || "master" });
+    await apiAction({ action: "mark_chat_read", threadUser: clean, by: (u && u.role) || "master" });
     updateChatBadges();
 }
 
