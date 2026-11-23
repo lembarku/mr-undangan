@@ -44,11 +44,22 @@ function _pushChatNavState(stage) {
     } catch {}
 }
 
+function _isElementVisible(id) {
+    const el = document.getElementById(id);
+    return !!(el && !el.classList.contains("hide"));
+}
+
 function _ensureChatBackCapture() {
     if (_chatBackCaptureReady) return;
     _chatBackCaptureReady = true;
 
     window.addEventListener("popstate", (e) => {
+        // Jika foto profil melebar atau modal Followers/Following/Project terbuka di atas profil,
+        // biarkan handler lapisan atas menutupnya dulu sebelum kembali ke profil/chat.
+        if (_isElementVisible("expanded-avatar-overlay") || _isElementVisible("solo-profile-stats-modal")) {
+            return;
+        }
+
         const ov = document.getElementById("full-chat-overlay");
         const chatOpen = !!(ov && !ov.classList.contains("hide"));
         const profMod = document.getElementById("modal-view-user-profile");
@@ -57,7 +68,11 @@ function _ensureChatBackCapture() {
         // 1. Dari Profil User -> kembali ke Isi Obrolan
         if (profOpen) {
             e.stopImmediatePropagation();
-            profMod.classList.add("hide");
+            if (typeof closeUserProfileModalCustom === "function") {
+                closeUserProfileModalCustom();
+            } else {
+                profMod.classList.add("hide");
+            }
             if (window.openedFromChatThread) {
                 if (typeof activeMasterChatThread !== "undefined") {
                     activeMasterChatThread = window.openedFromChatThread;
@@ -66,6 +81,7 @@ function _ensureChatBackCapture() {
                 if (ov) ov.classList.remove("hide");
                 renderFullChatOverlay();
             }
+            if (typeof pushBackGuard === "function") pushBackGuard();
             return;
         }
 
@@ -74,6 +90,7 @@ function _ensureChatBackCapture() {
             e.stopImmediatePropagation();
             activeMasterChatThread = null;
             renderFullChatOverlay();
+            if (typeof pushBackGuard === "function") pushBackGuard();
             return;
         }
 
@@ -81,6 +98,7 @@ function _ensureChatBackCapture() {
         if (chatOpen) {
             e.stopImmediatePropagation();
             closeFullChatOverlay();
+            if (typeof pushBackGuard === "function") pushBackGuard();
         }
     }, true);
 }
