@@ -49,12 +49,39 @@ function _isChatLayerVisible(id) {
     return !!(el && !el.classList.contains("hide"));
 }
 
+function _closeProfileAndReturnToChat() {
+    const ov = document.getElementById("full-chat-overlay");
+    if (typeof closeUserProfileModalCustom === "function") {
+        closeUserProfileModalCustom();
+    } else {
+        const profMod = document.getElementById("modal-view-user-profile");
+        if (profMod) {
+            profMod.style.cssText = "";
+            profMod.classList.add("hide");
+        }
+    }
+
+    if (window.openedFromChatThread) {
+        if (typeof activeMasterChatThread !== "undefined") {
+            activeMasterChatThread = window.openedFromChatThread;
+        }
+        window.openedFromChatThread = null;
+        if (ov) {
+            ov.classList.remove("hide");
+            document.body.style.overflow = "hidden";
+        }
+        renderFullChatOverlay();
+        _pushChatNavState("chat_thread");
+    } else if (typeof pushBackGuard === "function") {
+        pushBackGuard();
+    }
+}
+
 function _ensureChatBackCapture() {
     if (_chatBackCaptureReady) return;
     _chatBackCaptureReady = true;
 
     window.addEventListener("popstate", (e) => {
-        // Jika foto profil melebar atau modal statistik sedang tampil, biarkan handler atas menutupnya dulu
         if (_isChatLayerVisible("expanded-avatar-overlay") || _isChatLayerVisible("solo-profile-stats-modal")) {
             return;
         }
@@ -67,19 +94,7 @@ function _ensureChatBackCapture() {
         // 1. Dari Profil User -> kembali ke Isi Obrolan
         if (profOpen) {
             if (e && e.stopImmediatePropagation) e.stopImmediatePropagation();
-            if (typeof closeUserProfileModalCustom === "function") {
-                closeUserProfileModalCustom();
-            } else if (profMod) {
-                profMod.classList.add("hide");
-            }
-            if (window.openedFromChatThread) {
-                if (typeof activeMasterChatThread !== "undefined") {
-                    activeMasterChatThread = window.openedFromChatThread;
-                }
-                window.openedFromChatThread = null;
-                if (ov) ov.classList.remove("hide");
-                renderFullChatOverlay();
-            }
+            _closeProfileAndReturnToChat();
             return;
         }
 
@@ -88,6 +103,7 @@ function _ensureChatBackCapture() {
             if (e && e.stopImmediatePropagation) e.stopImmediatePropagation();
             activeMasterChatThread = null;
             renderFullChatOverlay();
+            _pushChatNavState("chat_list");
             return;
         }
 
@@ -95,6 +111,7 @@ function _ensureChatBackCapture() {
         if (chatOpen) {
             if (e && e.stopImmediatePropagation) e.stopImmediatePropagation();
             closeFullChatOverlay();
+            if (typeof pushBackGuard === "function") pushBackGuard();
         }
     }, true);
 }
