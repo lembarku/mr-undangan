@@ -5,6 +5,7 @@
 let masterThemeCatFilter = "Pernikahan", masterThemeSearch = "", masterOrdersFilter = "all";
 let tbPhotosDraft = { cover: "", pria: "", wanita: "", couple: "", g1: "", g2: "", g3: "" };
 let pbTempUploadedImg = "";
+window._soloStatsViewState = { open: false, targetUsername: "", mode: "followers", masterCat: "user", projectCat: "proses" };
 
 // ================= 1. DASBOR MASTER ADMIN =================
 function renderMasterAdmin() {
@@ -547,7 +548,7 @@ function renderMasterWorkspaceContent() {
     }
 }
 
-// ================= 4. BERANDA PROFIL PUBLIK PENGGUNA (RINGAN & PRIVAT) =================
+// ================= 4. BERANDA PROFIL PUBLIK & DETAIL TERPISAH =================
 function openExpandedAvatarLightbox(imgSrc, labelText = "") {
     const src = imgSrc || DEFAULT_AVATAR;
     let box = document.getElementById("expanded-avatar-overlay");
@@ -573,6 +574,254 @@ function closeExpandedAvatarLightbox() {
     if (box) box.classList.add("hide");
 }
 
+function _ensureSoloStatsModal() {
+    let mod = document.getElementById("solo-profile-stats-modal");
+    if (!mod) {
+        mod = document.createElement("div");
+        mod.id = "solo-profile-stats-modal";
+        mod.className = "hide fixed inset-0 z-[145] bg-[var(--app-bg)] flex flex-col overflow-hidden";
+        mod.innerHTML = `
+            <div class="px-4 py-3 app-header border-b flex items-center justify-between gap-3 shrink-0 backdrop-blur-md">
+                <div class="flex items-center gap-2.5 min-w-0">
+                    <img src="./logo.png" alt="Mr Undangan" class="w-8 h-8 rounded-lg bg-white p-1 object-contain border border-black/10 shrink-0" onerror="this.style.display='none'">
+                    <div class="min-w-0">
+                        <h3 id="solo-stats-title" class="font-extrabold text-base truncate">Detail</h3>
+                        <p id="solo-stats-sub" class="text-[10px] app-muted truncate"></p>
+                    </div>
+                </div>
+            </div>
+            <div id="solo-stats-subbar" class="px-4 py-2.5 border-b gold-border flex gap-2 overflow-x-auto no-scrollbar shrink-0 app-card hide"></div>
+            <div id="solo-stats-body" class="flex-1 overflow-y-auto p-4 space-y-2.5 max-w-2xl w-full mx-auto"></div>
+        `;
+        document.body.appendChild(mod);
+    }
+    return mod;
+}
+
+function closeSoloStatsModal() {
+    window._soloStatsViewState.open = false;
+    const mod = document.getElementById("solo-profile-stats-modal");
+    if (mod) mod.classList.add("hide");
+}
+
+function _renderSoloAccountCard(uItem) {
+    const defAv = typeof DEFAULT_AVATAR !== "undefined" ? DEFAULT_AVATAR : "./logo.png";
+    const proCheck = uItem.isPro ? `<i class="fa-solid fa-circle-check text-blue-500 text-xs shrink-0" title="Akun Pro"></i>` : "";
+    const roleLabel = uItem.role === "cabang" ? "Cabang" : uItem.role === "administrasi" ? "Administrasi" : uItem.role === "master" ? "Master" : "User";
+    return `
+        <div class="app-card border rounded-2xl p-3 flex items-center gap-3 shadow-sm">
+            <img src="${uItem.avatar || defAv}" class="w-11 h-11 rounded-full object-cover border gold-border bg-zinc-800 shrink-0">
+            <div class="flex-1 min-w-0">
+                <div class="flex items-center gap-1.5 min-w-0">
+                    <strong class="text-xs sm:text-sm font-bold truncate">${escHtml(uItem.name || uItem.username)}</strong>
+                    ${proCheck}
+                </div>
+                <p class="text-[11px] app-muted truncate">@${escHtml(uItem.username)} • ${escHtml(roleLabel)}</p>
+            </div>
+        </div>
+    `;
+}
+
+function openSoloFollowersModal(targetUsername) {
+    const tKey = String(targetUsername || "").trim().toLowerCase();
+    const targetObj = (db.users || []).find(u => String(u.username || "").toLowerCase() === tKey);
+    if (!targetObj) return;
+    if (targetObj.role === "cabang") return;
+
+    window._soloStatsViewState = {
+        open: true,
+        targetUsername: tKey,
+        mode: "followers",
+        masterCat: "user",
+        projectCat: "proses"
+    };
+    const mod = _ensureSoloStatsModal();
+    renderSoloStatsModal();
+    mod.classList.remove("hide");
+    if (typeof pushBackGuard === "function") pushBackGuard();
+}
+
+function openSoloFollowingModal(targetUsername) {
+    const tKey = String(targetUsername || "").trim().toLowerCase();
+    const targetObj = (db.users || []).find(u => String(u.username || "").toLowerCase() === tKey);
+    if (!targetObj) return;
+
+    window._soloStatsViewState = {
+        open: true,
+        targetUsername: tKey,
+        mode: "following",
+        masterCat: "user",
+        projectCat: "proses"
+    };
+    const mod = _ensureSoloStatsModal();
+    renderSoloStatsModal();
+    mod.classList.remove("hide");
+    if (typeof pushBackGuard === "function") pushBackGuard();
+}
+
+function openSoloProjectModal(targetUsername) {
+    const tKey = String(targetUsername || "").trim().toLowerCase();
+    const targetObj = (db.users || []).find(u => String(u.username || "").toLowerCase() === tKey);
+    if (!targetObj) return;
+
+    window._soloStatsViewState = {
+        open: true,
+        targetUsername: tKey,
+        mode: "project",
+        masterCat: "user",
+        projectCat: "proses"
+    };
+    const mod = _ensureSoloStatsModal();
+    renderSoloStatsModal();
+    mod.classList.remove("hide");
+    if (typeof pushBackGuard === "function") pushBackGuard();
+}
+
+function setSoloMasterCat(cat) {
+    window._soloStatsViewState.masterCat = cat;
+    renderSoloStatsModal();
+}
+
+function setSoloProjectCat(cat) {
+    window._soloStatsViewState.projectCat = cat;
+    renderSoloStatsModal();
+}
+
+function renderSoloStatsModal() {
+    const st = window._soloStatsViewState;
+    const targetObj = (db.users || []).find(u => String(u.username || "").toLowerCase() === String(st.targetUsername || "").toLowerCase());
+    if (!targetObj) return;
+
+    const curU = typeof getCurrentUserObj === "function" ? getCurrentUserObj() : null;
+    const isSelf = !!(curU && String(curU.username || "").toLowerCase() === String(targetObj.username || "").toLowerCase());
+    const isMasterProfile = targetObj.role === "master";
+
+    const titleEl = document.getElementById("solo-stats-title");
+    const subEl = document.getElementById("solo-stats-sub");
+    const subBar = document.getElementById("solo-stats-subbar");
+    const bodyEl = document.getElementById("solo-stats-body");
+
+    if (subEl) subEl.innerText = `${targetObj.name || targetObj.username} (@${targetObj.username})`;
+    if (subBar) { subBar.classList.add("hide"); subBar.innerHTML = ""; }
+    if (!bodyEl) return;
+
+    // 1. ISI FOLLOWERS SAJA
+    if (st.mode === "followers") {
+        if (titleEl) titleEl.innerText = "Followers";
+
+        if (isMasterProfile && !isSelf) {
+            bodyEl.innerHTML = `
+                <div class="app-card border rounded-3xl p-7 text-center space-y-2 my-6">
+                    <i class="fa-solid fa-lock text-2xl app-accent"></i>
+                    <h4 class="font-extrabold text-sm">Daftar Followers Privat</h4>
+                    <p class="text-xs app-muted">Daftar followers akun Master tidak dapat dilihat oleh pengguna lain.</p>
+                </div>
+            `;
+            return;
+        }
+
+        if (isMasterProfile && isSelf) {
+            const allNonMaster = (db.users || []).filter(u => u && u.role !== "master");
+            const catMap = {
+                user: allNonMaster.filter(u => u.role === "user"),
+                administrasi: allNonMaster.filter(u => u.role === "administrasi"),
+                cabang: allNonMaster.filter(u => u.role === "cabang")
+            };
+            const activeCat = catMap[st.masterCat] ? st.masterCat : "user";
+            const usersInCat = catMap[activeCat] || [];
+
+            if (subBar) {
+                subBar.classList.remove("hide");
+                subBar.innerHTML = `
+                    <button type="button" onclick="setSoloMasterCat('user')" class="px-3.5 py-1.5 rounded-xl text-xs font-bold ${activeCat === "user" ? "gold-pill-btn" : "app-btn-sec"}">User (${catMap.user.length})</button>
+                    <button type="button" onclick="setSoloMasterCat('administrasi')" class="px-3.5 py-1.5 rounded-xl text-xs font-bold ${activeCat === "administrasi" ? "gold-pill-btn" : "app-btn-sec"}">Administrasi (${catMap.administrasi.length})</button>
+                    <button type="button" onclick="setSoloMasterCat('cabang')" class="px-3.5 py-1.5 rounded-xl text-xs font-bold ${activeCat === "cabang" ? "gold-pill-btn" : "app-btn-sec"}">Cabang (${catMap.cabang.length})</button>
+                `;
+            }
+
+            bodyEl.innerHTML = usersInCat.length
+                ? usersInCat.map(_renderSoloAccountCard).join("")
+                : `<div class="app-card border border-dashed rounded-2xl p-6 text-center text-xs app-muted">Belum ada akun pada kategori ini.</div>`;
+            return;
+        }
+
+        const fKeys = (typeof _getFollowersListForUser === "function")
+            ? _getFollowersListForUser(targetObj)
+            : (Array.isArray(targetObj.followers) ? targetObj.followers : []);
+        const followerObjs = fKeys.map(k => (db.users || []).find(u => String(u.username || "").toLowerCase() === String(k).toLowerCase()) || { username: k, name: k, role: "user", avatar: DEFAULT_AVATAR });
+        bodyEl.innerHTML = followerObjs.length
+            ? followerObjs.map(_renderSoloAccountCard).join("")
+            : `<div class="app-card border border-dashed rounded-2xl p-7 text-center text-xs app-muted">Belum ada followers.</div>`;
+        return;
+    }
+
+    // 2. ISI FOLLOWING SAJA
+    if (st.mode === "following") {
+        if (titleEl) titleEl.innerText = "Following";
+        const gKeys = (typeof _getFollowingListForUser === "function")
+            ? _getFollowingListForUser(targetObj)
+            : (Array.isArray(targetObj.following) ? targetObj.following : []);
+        const followingObjs = gKeys.map(k => (db.users || []).find(u => String(u.username || "").toLowerCase() === String(k).toLowerCase()) || { username: k, name: k, role: "user", avatar: DEFAULT_AVATAR });
+        bodyEl.innerHTML = followingObjs.length
+            ? followingObjs.map(_renderSoloAccountCard).join("")
+            : `<div class="app-card border border-dashed rounded-2xl p-7 text-center text-xs app-muted">Belum mengikuti akun mana pun.</div>`;
+        return;
+    }
+
+    // 3. ISI PROJECT SAJA
+    if (titleEl) titleEl.innerText = "Project";
+    const allProj = (typeof _getProjectsForUser === "function") ? _getProjectsForUser(targetObj) : [];
+    const isStaffScope = targetObj.role === "master" || targetObj.role === "administrasi";
+
+    if (isStaffScope) {
+        const prosesList = allProj.filter(p => p.status !== "Aktif");
+        const aktifList = allProj.filter(p => p.status === "Aktif");
+        const pCat = st.projectCat === "aktif" ? "aktif" : "proses";
+        const shownList = pCat === "aktif" ? aktifList : prosesList;
+
+        if (subBar) {
+            subBar.classList.remove("hide");
+            subBar.innerHTML = `
+                <button type="button" onclick="setSoloProjectCat('proses')" class="px-3.5 py-1.5 rounded-xl text-xs font-bold ${pCat === "proses" ? "gold-pill-btn" : "app-btn-sec"}">Proses / Belum Diverifikasi (${prosesList.length})</button>
+                <button type="button" onclick="setSoloProjectCat('aktif')" class="px-3.5 py-1.5 rounded-xl text-xs font-bold ${pCat === "aktif" ? "gold-pill-btn" : "app-btn-sec"}">Aktif / Sudah Diverifikasi (${aktifList.length})</button>
+            `;
+        }
+
+        bodyEl.innerHTML = shownList.length
+            ? shownList.map(doc => {
+                const kindLbl = doc._kind === "pf" ? (doc.docType === "lamaran" ? "Surat Lamaran" : "CV") : `Undangan • ${doc.category || ""}`;
+                const stBadge = doc.status === "Aktif" ? "bg-emerald-500/15 text-emerald-600" : "bg-amber-500/15 text-amber-600";
+                return `
+                    <div class="app-card border rounded-2xl p-3.5 flex items-center justify-between gap-3 shadow-sm">
+                        <div class="min-w-0">
+                            <span class="inline-block text-[9px] px-2 py-0.5 rounded-full font-extrabold ${stBadge}">${escHtml(doc.status || "Proses")}</span>
+                            <strong class="block text-sm font-bold truncate mt-1">${escHtml(doc.title || "Project")}</strong>
+                            <span class="text-[11px] app-muted truncate block">${escHtml(kindLbl)} ${doc.owner ? `• @${escHtml(doc.owner)}` : ""}</span>
+                        </div>
+                    </div>
+                `;
+            }).join("")
+            : `<div class="app-card border border-dashed rounded-2xl p-6 text-center text-xs app-muted">Belum ada project pada kategori ini.</div>`;
+        return;
+    }
+
+    bodyEl.innerHTML = allProj.length
+        ? allProj.map(doc => {
+            const kindLbl = doc._kind === "pf" ? (doc.docType === "lamaran" ? "Surat Lamaran" : "CV") : `Undangan • ${doc.category || ""}`;
+            const stBadge = doc.status === "Aktif" ? "bg-emerald-500/15 text-emerald-600" : "bg-amber-500/15 text-amber-600";
+            return `
+                <div class="app-card border rounded-2xl p-3.5 flex items-center justify-between gap-3 shadow-sm">
+                    <div class="min-w-0">
+                        <span class="inline-block text-[9px] px-2 py-0.5 rounded-full font-extrabold ${stBadge}">${escHtml(doc.status || "Draf")}</span>
+                        <strong class="block text-sm font-bold truncate mt-1">${escHtml(doc.title || "Project")}</strong>
+                        <span class="text-[11px] app-muted truncate block">${escHtml(kindLbl)}</span>
+                    </div>
+                </div>
+            `;
+        }).join("")
+        : `<div class="app-card border border-dashed rounded-2xl p-7 text-center text-xs app-muted">Belum ada project yang dibuat.</div>`;
+}
+
 function viewUserProfileModal(username) {
     const cleanU = String(username || "").trim().toLowerCase();
     const u = (db.users || []).find(x => String(x.username || "").toLowerCase() === cleanU);
@@ -591,6 +840,7 @@ function viewUserProfileModal(username) {
     const curU = typeof getCurrentUserObj === "function" ? getCurrentUserObj() : null;
     const isSelf = !!(curU && String(curU.username || "").toLowerCase() === cleanU);
     const isMasterProfile = u.role === "master";
+    const isCabangProfile = u.role === "cabang";
 
     let followersCount = 0;
     if (isMasterProfile) {
@@ -638,7 +888,28 @@ function viewUserProfileModal(username) {
 
     const followersClick = (isMasterProfile && !isSelf)
         ? `onclick="showToast('Daftar followers akun Master bersifat privat.','info')"`
-        : `onclick="openIgProfileStatsModal('${esc(cleanU)}','followers')"`;
+        : `onclick="openSoloFollowersModal('${esc(cleanU)}')"`;
+
+    const followersColHtml = isCabangProfile
+        ? ""
+        : `<button type="button" ${followersClick} class="py-2 px-1 rounded-xl hover:bg-black/5 active:scale-98 transition">
+            <span class="block text-sm sm:text-base font-extrabold tracking-tight">${escHtml(String(followersCount))}</span>
+            <span class="block text-[11px] app-muted font-medium">Followers</span>
+        </button>`;
+
+    const followingColHtml = isCabangProfile
+        ? ""
+        : `<button type="button" onclick="openSoloFollowingModal('${esc(cleanU)}')" class="py-2 px-1 rounded-xl hover:bg-black/5 active:scale-98 transition">
+            <span class="block text-sm sm:text-base font-extrabold tracking-tight">${followingCount}</span>
+            <span class="block text-[11px] app-muted font-medium">Following</span>
+        </button>`;
+
+    const projectColHtml = `<button type="button" onclick="openSoloProjectModal('${esc(cleanU)}')" class="py-2 px-1 rounded-xl hover:bg-black/5 active:scale-98 transition">
+        <span class="block text-sm sm:text-base font-extrabold tracking-tight">${projectCount}</span>
+        <span class="block text-[11px] app-muted font-medium">Project</span>
+    </button>`;
+
+    const gridColsClass = isCabangProfile ? "grid-cols-1" : "grid-cols-3";
 
     const bodyEl = document.getElementById("mvp-body");
     if (bodyEl) {
@@ -666,19 +937,10 @@ function viewUserProfileModal(username) {
                 </div>
 
                 <div class="app-card border rounded-2xl p-3 shadow-sm space-y-3">
-                    <div class="grid grid-cols-3 divide-x divide-black/10 text-center">
-                        <button type="button" ${followersClick} class="py-2 px-1 rounded-xl hover:bg-black/5 active:scale-98 transition">
-                            <span class="block text-sm sm:text-base font-extrabold tracking-tight">${escHtml(String(followersCount))}</span>
-                            <span class="block text-[11px] app-muted font-medium">Followers</span>
-                        </button>
-                        <button type="button" onclick="openIgProfileStatsModal('${esc(cleanU)}','following')" class="py-2 px-1 rounded-xl hover:bg-black/5 active:scale-98 transition">
-                            <span class="block text-sm sm:text-base font-extrabold tracking-tight">${followingCount}</span>
-                            <span class="block text-[11px] app-muted font-medium">Following</span>
-                        </button>
-                        <button type="button" onclick="openIgProfileStatsModal('${esc(cleanU)}','project')" class="py-2 px-1 rounded-xl hover:bg-black/5 active:scale-98 transition">
-                            <span class="block text-sm sm:text-base font-extrabold tracking-tight">${projectCount}</span>
-                            <span class="block text-[11px] app-muted font-medium">Project</span>
-                        </button>
+                    <div class="grid ${gridColsClass} divide-x divide-black/10 text-center">
+                        ${followersColHtml}
+                        ${followingColHtml}
+                        ${projectColHtml}
                     </div>
                     ${followBtnHtml}
                 </div>
@@ -706,6 +968,7 @@ function viewUserProfileModal(username) {
 }
 
 function closeUserProfileModalCustom() {
+    closeSoloStatsModal();
     closeExpandedAvatarLightbox();
     const modal = document.getElementById("modal-view-user-profile");
     if (modal) {
