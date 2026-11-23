@@ -440,7 +440,7 @@ function renderMasterWorkspaceContent() {
     if (currentMasterWorkspace === "users_cabang") {
         const list = (db.users || []).filter(u => u.role !== "master");
         box.innerHTML = `<div class="flex flex-wrap justify-between items-center gap-2 mb-4">
-            <p class="text-xs app-muted">Inspeksi profil, album rahasia &amp; PIN, ubah status Akun Pro (Centang Biru), atau tambah Tim Administrasi.</p>
+            <p class="text-xs app-muted">Buka profil publik pengguna untuk melihat statistik, followers &amp; following, atau ubah status Akun Pro.</p>
             <div class="flex flex-wrap gap-1.5">
                 <button onclick="openMasterUserModal(null,'user')" class="px-3 py-1.5 rounded-xl app-card-soft border app-accent text-xs font-bold">+ User</button>
                 <button onclick="openMasterUserModal(null,'cabang')" class="px-3 py-1.5 rounded-xl app-card-soft border text-blue-600 text-xs font-bold">+ Cabang</button>
@@ -469,7 +469,7 @@ function renderMasterWorkspaceContent() {
                         ${u.role !== "administrasi" ? `<button onclick="toggleUserProQuick('${esc(u.username)}',this)" class="px-2 py-1 rounded-lg ${u.isPro ? "bg-blue-600 text-white" : "app-btn-sec"} text-[10px] font-bold" title="Ubah Status Akun Pro">${u.isPro ? "PRO ✓" : "+Pro"}</button>` : ""}
                     </div>
                     <div class="flex gap-1.5">
-                        <button onclick="viewUserProfileModal('${esc(u.username)}')" class="px-2.5 py-1 rounded-lg app-accent-bg app-accent border gold-border text-[11px] font-bold"><i class="fa-regular fa-id-card mr-1"></i>Inspeksi</button>
+                        <button onclick="viewUserProfileModal('${esc(u.username)}')" class="px-2.5 py-1 rounded-lg app-accent-bg app-accent border gold-border text-[11px] font-bold"><i class="fa-regular fa-user mr-1"></i>Profil</button>
                         <button onclick="openMasterUserModal('${esc(u.username)}')" class="px-2.5 py-1 rounded-lg app-btn-sec text-[11px] font-bold">Edit</button>
                         <button onclick="deleteUserRealTime('${esc(u.username)}')" class="px-2.5 py-1 rounded-lg bg-red-600/15 text-red-500 text-[11px]"><i class="fa-solid fa-trash"></i></button>
                     </div>
@@ -547,74 +547,140 @@ function renderMasterWorkspaceContent() {
     }
 }
 
-// ================= 4. INSPEKSI PROFIL USER/CABANG =================
-async function viewUserProfileModal(username) {
-    const u = (db.users || []).find(x => String(x.username || "").toLowerCase() === String(username || "").toLowerCase());
+// ================= 4. BERANDA PROFIL PUBLIK PENGGUNA (RINGAN & PRIVAT) =================
+function viewUserProfileModal(username) {
+    const cleanU = String(username || "").trim().toLowerCase();
+    const u = (db.users || []).find(x => String(x.username || "").toLowerCase() === cleanU);
     if (!u) return showToast("Akun tidak ditemukan.", "error");
-    const invs = (db.invitations || []).filter(i => String(i.owner).toLowerCase() === u.username.toLowerCase());
-    const pfs = (db.portfolios || []).filter(p => String(p.owner).toLowerCase() === u.username.toLowerCase());
 
-    document.getElementById("mvp-body").innerHTML = `<div class="p-8 text-center text-xs app-muted"><i class="fa-solid fa-circle-notch fa-spin app-accent text-lg mb-2 block"></i>Memuat profil, berkas &amp; brankas album...</div>`;
-    document.getElementById("modal-view-user-profile").classList.remove("hide");
-    pushBackGuard();
+    const modal = document.getElementById("modal-view-user-profile");
+    if (!modal) return;
 
-    const v = await loadUserVault(u.username, true);
-    const albums = (v && v.albums) || [];
+    modal.style.cssText = "display:flex !important;position:fixed !important;inset:0 !important;width:100vw !important;height:100vh !important;max-width:100vw !important;max-height:100vh !important;padding:0 !important;margin:0 !important;z-index:135 !important;background:var(--app-bg,#f2f2f7) !important;opacity:1 !important;visibility:visible !important;";
 
-    document.getElementById("mvp-body").innerHTML = `
-        <div class="h-28 bg-gradient-to-r from-zinc-700 to-zinc-900 bg-cover bg-center relative" style="${u.banner ? `background-image:url('${u.banner}')` : ""}"><div class="absolute inset-0 bg-gradient-to-t from-black/75 to-transparent"></div></div>
-        <div class="px-5 pb-5 space-y-4">
-            <div class="flex items-end gap-3.5 -mt-10 relative z-10">
-                <img src="${u.avatar || DEFAULT_AVATAR}" class="w-20 h-20 rounded-full object-cover border-4 border-[var(--app-card)] bg-zinc-800 shadow-lg">
-                <div class="pb-1 min-w-0 flex-1">
-                    <h4 class="font-bold text-base truncate flex items-center gap-1.5">${escHtml(u.name)} ${u.isPro ? '<i class="fa-solid fa-circle-check text-blue-500 text-sm"></i>' : ""}</h4>
-                    <p class="text-xs app-accent font-semibold">@${escHtml(u.username)} • ${escHtml(u.role.toUpperCase())} (${escHtml(u.status)})</p>
-                </div>
-            </div>
+    const cardBox = modal.querySelector(".app-card");
+    if (cardBox) {
+        cardBox.style.cssText = "display:flex !important;flex-direction:column !important;width:100% !important;height:100% !important;max-width:100% !important;max-height:100% !important;border-radius:0 !important;border:none !important;padding:0 !important;margin:0 !important;background:var(--app-bg,#f2f2f7) !important;";
+    }
 
-            <div class="app-card-soft border rounded-2xl p-3.5 text-xs space-y-2">
-                <div class="flex justify-between items-center">
-                    <span><strong class="app-muted">Status Pro:</strong> ${u.isPro ? '<strong class="text-blue-600">AKTIF (Centang Biru • Unlimited)</strong>' : 'Reguler'}</span>
-                    <button onclick="toggleUserProQuick('${esc(u.username)}',this,true)" class="px-2.5 py-1 rounded-lg gold-pill-btn text-[10px]">${u.isPro ? "Jadikan Reguler" : "Jadikan PRO"}</button>
-                </div>
-                <p><strong class="app-muted">Pemakaian Brankas:</strong> ${fmtBytes(v.usedBytes || 0)}</p>
-                ${u.role === "cabang" ? `<div class="flex flex-wrap items-center justify-between gap-2 pt-1 border-t gold-border">
-                    <p><strong class="app-muted">Label Brand:</strong> <strong class="text-blue-600">${escHtml(u.brandName || u.name)}</strong> • Kuota: <strong class="app-accent">${u.quota || 0}</strong></p>
-                    <div class="flex gap-1"><button onclick="topUpCabangRealTime('${esc(u.username)}',5,this,true)" class="px-2.5 py-1 rounded-lg bg-emerald-600 text-white text-[10px] font-bold">+5 Kuota</button><button onclick="topUpCabangRealTime('${esc(u.username)}',10,this,true)" class="px-2.5 py-1 rounded-lg gold-pill-btn text-[10px]">+10 Kuota</button></div>
-                </div>` : ""}
-                <p><strong class="app-muted">HP / Alamat:</strong> ${escHtml(u.phone || "-")} • ${escHtml(u.address || "-")}</p>
-            </div>
+    const curU = typeof getCurrentUserObj === "function" ? getCurrentUserObj() : null;
+    const isSelf = !!(curU && String(curU.username || "").toLowerCase() === cleanU);
+    const isMasterProfile = u.role === "master";
 
-            <div class="space-y-2">
-                <h5 class="text-xs font-bold app-accent uppercase">Sorotan Album &amp; PIN Rahasia (${albums.length})</h5>
-                ${albums.length ? `<div class="space-y-2">${albums.map(alb => `
-                    <div class="app-card-soft border rounded-xl p-2.5 flex items-center justify-between gap-2 text-xs">
-                        <div class="min-w-0 flex items-center gap-2.5">
-                            <span class="w-8 h-8 rounded-lg app-accent-bg app-accent flex items-center justify-center shrink-0"><i class="fa-${alb.type === "secret" ? "solid fa-vault" : "brands fa-google-drive"}"></i></span>
+    let followersCount = 0;
+    if (isMasterProfile) {
+        const allUsers = Array.isArray(db.users) ? db.users : [];
+        const realCount = allUsers.filter(x => x && x.role !== "master").length;
+        followersCount = `18.3k + ${realCount}`;
+    } else if (typeof _getFollowersListForUser === "function") {
+        followersCount = _getFollowersListForUser(u).length;
+    } else {
+        followersCount = Array.isArray(u.followers) ? u.followers.length : 0;
+    }
+
+    const followingCount = (typeof _getFollowingListForUser === "function")
+        ? _getFollowingListForUser(u).length
+        : (Array.isArray(u.following) ? u.following.length : 0);
+
+    const canFollowThis = !isSelf && curU && (
+        isMasterProfile
+            ? (curU.role === "user" || curU.role === "administrasi")
+            : true
+    );
+    const curFollowingList = (curU && typeof _getFollowingListForUser === "function")
+        ? _getFollowingListForUser(curU)
+        : (curU && Array.isArray(curU.following) ? curU.following.map(x => String(x).toLowerCase()) : []);
+    const isFollowingThis = canFollowThis && curFollowingList.includes(cleanU);
+
+    const bannerStyle = u.banner ? `background-image:url('${u.banner}');` : "";
+    const proBadgeHtml = u.isPro ? `<i class="fa-solid fa-circle-check text-blue-500 text-sm"></i>` : "";
+    const roleBadgeHtml = u.role === "master"
+        ? `<span class="text-[9px] px-2 py-0.5 rounded-full bg-amber-500/20 text-amber-600 font-extrabold uppercase">MASTER</span>`
+        : u.role === "administrasi"
+            ? `<span class="text-[9px] px-2 py-0.5 rounded-full bg-emerald-500/20 text-emerald-600 font-extrabold uppercase">ADMINISTRASI</span>`
+            : "";
+
+    const followBtnHtml = canFollowThis
+        ? `<button type="button" onclick="toggleFollowTargetUser('${esc(cleanU)}')" class="w-full py-2.5 rounded-2xl text-xs font-extrabold transition shadow-sm ${isFollowingThis ? "app-btn-sec border" : "gold-pill-btn"}">
+            <i class="fa-solid ${isFollowingThis ? "fa-user-check" : "fa-user-plus"} mr-1.5"></i>${isFollowingThis ? "Following" : "Follow"}
+           </button>`
+        : "";
+
+    const followersClick = (isMasterProfile && !isSelf)
+        ? `onclick="showToast('Daftar followers akun Master bersifat privat.','info')"`
+        : `onclick="openIgProfileStatsModal('${esc(cleanU)}','followers')"`;
+
+    const bodyEl = document.getElementById("mvp-body");
+    if (bodyEl) {
+        bodyEl.className = "flex-1 overflow-y-auto";
+        bodyEl.innerHTML = `
+            <div class="w-full max-w-xl mx-auto p-4 space-y-4">
+                <div class="app-card rounded-3xl border overflow-hidden shadow-sm relative">
+                    <div class="h-32 md:h-40 bg-gradient-to-r from-zinc-700 to-zinc-900 bg-cover bg-center relative" style="${bannerStyle}">
+                        <div class="absolute inset-0 bg-gradient-to-t from-black/65 via-transparent to-black/15"></div>
+                    </div>
+                    <div class="px-5 pb-5 relative text-center md:text-left">
+                        <div class="flex flex-col md:flex-row items-center md:items-end gap-3 -mt-11 relative z-10">
+                            <img src="${u.avatar || DEFAULT_AVATAR}" class="w-20 h-20 rounded-full object-cover border-4 border-[var(--app-card)] shadow-lg bg-zinc-800" alt="Avatar">
                             <div class="min-w-0">
-                                <strong class="block truncate">${escHtml(alb.title)}</strong>
-                                <span class="text-[10px] app-muted">${alb.type === "secret" ? `${(alb.photos||[]).length} foto • ${(alb.notes||[]).length} catatan • ${alb.pinEnabled ? `<strong class="text-red-500">PIN: ${escHtml(alb.pin)}</strong>` : "Tanpa PIN"}` : "Google Drive"}</span>
+                                <h2 class="text-lg font-extrabold flex items-center justify-center md:justify-start gap-1.5 mt-1">
+                                    <span>${escHtml(u.name || u.username)}</span>
+                                    ${proBadgeHtml}
+                                    ${roleBadgeHtml}
+                                </h2>
+                                <p class="text-xs app-accent font-semibold">@${escHtml(u.username)}</p>
+                                ${u.bio ? `<p class="text-xs app-muted mt-1 leading-relaxed max-w-md">${escHtml(u.bio)}</p>` : ""}
                             </div>
                         </div>
-                        <button onclick="document.getElementById('modal-view-user-profile').classList.add('hide');handleHighlightClick('${esc(u.username.toLowerCase())}','${esc(alb.id)}');" class="px-3 py-1.5 rounded-lg app-btn-sec text-[10px] font-bold shrink-0">Buka</button>
                     </div>
-                `).join("")}</div>` : '<p class="text-xs app-muted">Belum memiliki album.</p>'}
-            </div>
+                </div>
 
-            <div class="space-y-2">
-                <h5 class="text-xs font-bold app-accent uppercase">Undangan (${invs.length}) &amp; CV/Lamaran (${pfs.length})</h5>
-                ${(invs.length || pfs.length) ? `<div class="space-y-2">
-                    ${invs.map(inv => `<div class="app-card-soft border rounded-xl p-2.5 flex justify-between items-center gap-2 text-xs"><div class="min-w-0"><strong class="block truncate">${escHtml(inv.title)}</strong><span class="text-[10px] app-muted">Undangan • ${escHtml(inv.status)}</span></div><div class="flex gap-1.5 shrink-0"><button onclick="document.getElementById('modal-view-user-profile').classList.add('hide');openGuestView(${inv.id},'Review Master');" class="px-2.5 py-1 rounded-lg app-btn-sec text-[10px] font-bold">Lihat</button><button onclick="document.getElementById('modal-view-user-profile').classList.add('hide');openEditInvitation(${inv.id},true);" class="px-2.5 py-1 rounded-lg gold-pill-btn text-[10px]">Edit Bebas</button></div></div>`).join("")}
-                    ${pfs.map(pf => `<div class="app-card-soft border rounded-xl p-2.5 flex justify-between items-center gap-2 text-xs"><div class="min-w-0"><strong class="block truncate">${escHtml(pf.title)}</strong><span class="text-[10px] app-muted">${pf.docType === "lamaran" ? "Lamaran" : "CV"} • ${escHtml(pf.status)}</span></div><div class="flex gap-1.5 shrink-0"><button onclick="document.getElementById('modal-view-user-profile').classList.add('hide');openPortfolioDocPreview(${pf.id},false);" class="px-2.5 py-1 rounded-lg app-btn-sec text-[10px] font-bold">Lihat</button><button onclick="document.getElementById('modal-view-user-profile').classList.add('hide');openEditPortfolio(${pf.id},true);" class="px-2.5 py-1 rounded-lg gold-pill-btn text-[10px]">Edit Bebas</button></div></div>`).join("")}
-                </div>` : '<p class="text-xs app-muted">Belum ada berkas dibuat.</p>'}
-            </div>
+                <div class="app-card border rounded-2xl p-3 shadow-sm space-y-3">
+                    <div class="flex items-center justify-around divide-x divide-black/10">
+                        <button type="button" ${followersClick} class="flex-1 py-2 px-2 text-center rounded-xl hover:bg-black/5 active:scale-98 transition">
+                            <span class="block text-base font-extrabold tracking-tight">${escHtml(String(followersCount))}</span>
+                            <span class="block text-[11px] app-muted font-medium">Followers</span>
+                        </button>
+                        <button type="button" onclick="openIgProfileStatsModal('${esc(cleanU)}','following')" class="flex-1 py-2 px-2 text-center rounded-xl hover:bg-black/5 active:scale-98 transition">
+                            <span class="block text-base font-extrabold tracking-tight">${followingCount}</span>
+                            <span class="block text-[11px] app-muted font-medium">Following</span>
+                        </button>
+                    </div>
+                    ${followBtnHtml}
+                </div>
 
-            <div class="flex gap-2 pt-2 border-t gold-border">
-                <button onclick="document.getElementById('modal-view-user-profile').classList.add('hide');openFullChatOverlay('${esc(u.username)}');" class="flex-1 bg-emerald-600 text-white py-2.5 rounded-xl text-xs font-bold"><i class="fa-solid fa-comments mr-1"></i>Chat Akun Ini</button>
-                <button onclick="document.getElementById('modal-view-user-profile').classList.add('hide');openMasterUserModal('${esc(u.username)}');" class="flex-1 gold-pill-btn py-2.5 rounded-xl text-xs">Edit Data Akun</button>
+                <div class="pt-2">
+                    <button type="button" onclick="closeUserProfileModalCustom();if(typeof openFullChatOverlay==='function')openFullChatOverlay('${esc(cleanU)}');" class="w-full py-3 rounded-2xl bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-bold transition shadow-sm flex items-center justify-center gap-2">
+                        <i class="fa-solid fa-comments"></i> Kirim Pesan ke @${escHtml(u.username)}
+                    </button>
+                </div>
             </div>
-        </div>
-    `;
+        `;
+    }
+
+    const headerBar = modal.querySelector(".border-b");
+    if (headerBar) {
+        headerBar.innerHTML = `
+            <div class="flex items-center gap-2.5">
+                <button type="button" onclick="closeUserProfileModalCustom()" class="w-8 h-8 rounded-full app-btn-sec flex items-center justify-center text-xs">
+                    <i class="fa-solid fa-chevron-left"></i>
+                </button>
+                <h3 class="font-extrabold text-sm truncate">Profil @${escHtml(u.username)}</h3>
+            </div>
+            <button type="button" onclick="closeUserProfileModalCustom()" class="px-3 py-1.5 rounded-full app-btn-sec text-xs font-bold">Tutup</button>
+        `;
+    }
+
+    modal.classList.remove("hide");
+    if (typeof pushBackGuard === "function") pushBackGuard();
+}
+
+function closeUserProfileModalCustom() {
+    const modal = document.getElementById("modal-view-user-profile");
+    if (modal) {
+        modal.style.cssText = "";
+        modal.classList.add("hide");
+    }
 }
 
 async function toggleUserProQuick(uname, btn, reopenModal = false) {
