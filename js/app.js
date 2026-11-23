@@ -243,7 +243,7 @@ window.addEventListener("popstate", (e) => {
     const isVis = (id) => { const el = document.getElementById(id); return el && !el.classList.contains("hide"); };
     const drawerOpen = document.getElementById("drawer-main")?.classList.contains("open");
 
-    // Tahap A: Foto profil melebar -> kembali ke Profil Publik
+    // 1. Foto profil melebar -> kembali ke profil publik
     if (isVis("expanded-avatar-overlay")) {
         if (e && e.stopImmediatePropagation) e.stopImmediatePropagation();
         if (typeof closeExpandedAvatarLightbox === "function") closeExpandedAvatarLightbox();
@@ -251,7 +251,7 @@ window.addEventListener("popstate", (e) => {
         return;
     }
 
-    // Tahap B: Detail Followers / Following / Project -> kembali ke Profil Publik
+    // 2. Detail Followers / Following / Project -> kembali ke profil publik
     if (isVis("solo-profile-stats-modal")) {
         if (e && e.stopImmediatePropagation) e.stopImmediatePropagation();
         if (typeof closeSoloStatsModal === "function") closeSoloStatsModal();
@@ -266,7 +266,7 @@ window.addEventListener("popstate", (e) => {
         return;
     }
 
-    // Tahap C: Profil Publik -> kembali ke Obrolan Chat (jika dibuka dari chat) atau halaman asal
+    // 3. Profil publik user -> kembali ke obrolan chat (jika dibuka dari chat) atau halaman asal
     if (isVis("modal-view-user-profile")) {
         if (e && e.stopImmediatePropagation) e.stopImmediatePropagation();
         if (typeof closeUserProfileModalCustom === "function") closeUserProfileModalCustom();
