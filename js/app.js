@@ -342,7 +342,7 @@ function routeDashboard(fromBack = false) {
         if (act.type === "portfolio" && typeof startCreatePortfolio === "function") return startCreatePortfolio(u.role === "cabang", act.docType, act.themeId);
     }
 
-    document.body.classList.add("in-home");
+    document.body.classList.remove("in-home");
     hideAllViews();
     if (u.role === "master") {
         currentViewName = "master";
@@ -358,7 +358,6 @@ function routeDashboard(fromBack = false) {
         renderCabangAdmin();
     } else {
         currentViewName = "profile";
-        document.body.classList.remove("in-home");
         document.getElementById("view-profile")?.classList.remove("hide");
         renderUserProfile();
     }
@@ -385,7 +384,7 @@ function renderHeaderActions() {
         return;
     }
 
-    const isProfileMenu = currentViewName === "profile";
+    const isProfileMenu = ["profile", "master", "cabang", "staff"].includes(currentViewName);
     document.body.classList.toggle("in-home", !isProfileMenu);
 
     if (mainEl) mainEl.innerText = "Mr Undangan";
