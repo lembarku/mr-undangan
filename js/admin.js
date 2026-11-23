@@ -7,10 +7,18 @@ let tbPhotosDraft = { cover: "", pria: "", wanita: "", couple: "", g1: "", g2: "
 let pbTempUploadedImg = "";
 window._soloStatsViewState = { open: false, targetUsername: "", mode: "followers", masterCat: "user", projectCat: "proses" };
 
+function _pushAdminNavStep(stepObj) {
+    if (typeof mrNavPush === "function") {
+        mrNavPush(stepObj);
+    } else if (typeof pushBackGuard === "function") {
+        pushBackGuard();
+    }
+}
+
 // ================= 1. DASBOR MASTER ADMIN =================
 function renderMasterAdmin() {
     renderMasterHeaderStats();
-    openMasterWorkspace(currentMasterWorkspace || "overview");
+    openMasterWorkspace(currentMasterWorkspace || "overview", true);
 }
 
 function _formatInstagramMetric(num) {
@@ -49,11 +57,7 @@ function renderMasterHeaderStats() {
     const aEl = document.getElementById("mprof-avatar");
     if (aEl) {
         aEl.src = m.avatar || DEFAULT_AVATAR;
-        aEl.onclick = () => {
-            if (typeof openExpandedAvatarLightbox === "function") {
-                openExpandedAvatarLightbox(m.avatar || DEFAULT_AVATAR, m.name || m.username);
-            }
-        };
+        aEl.onclick = () => openExpandedAvatarLightbox(m.avatar || DEFAULT_AVATAR, m.name || m.username);
         aEl.classList.add("cursor-pointer", "active:scale-95", "transition");
     }
 
@@ -95,7 +99,7 @@ function renderMasterHeaderStats() {
     }
 }
 
-function openMasterWorkspace(name) {
+function openMasterWorkspace(name, fromNav = false) {
     if (name === "chat") return openFullChatOverlay();
     currentMasterWorkspace = name || "overview";
     pbTempUploadedImg = "";
@@ -112,6 +116,9 @@ function openMasterWorkspace(name) {
     const backBtn = document.getElementById("master-back-overview-btn");
     if (backBtn) backBtn.classList.toggle("hide", currentMasterWorkspace === "overview");
     renderMasterWorkspaceContent();
+    if (!fromNav && currentMasterWorkspace !== "overview") {
+        _pushAdminNavStep({ type: "workspace", name: currentMasterWorkspace });
+    }
 }
 
 function buildMasterAnalyticsHtml() {
@@ -242,7 +249,7 @@ function buildMasterAnalyticsHtml() {
     </div>`;
 }
 
-// ================= 2. HALAMAN ROLE ADMINISTRASI =================
+// ================= 2. HALAMAN ROLE ADMINISTRASI & KARTU PROJECT LENGKAP =================
 function isCabangOwnedDoc(item) {
     if (!item) return false;
     if (item.brandName && String(item.brandName).trim()) return true;
@@ -252,16 +259,25 @@ function isCabangOwnedDoc(item) {
 
 function renderStaffAdmin() {
     const st = getCurrentUserObj(); if (!st) return;
-    document.getElementById("staff-avatar").src = st.avatar || DEFAULT_AVATAR;
-    document.getElementById("staff-name").innerText = st.name || "Tim Administrasi";
-    document.getElementById("staff-username").innerText = `@${st.username}`;
+    const avEl = document.getElementById("staff-avatar");
+    if (avEl) {
+        avEl.src = st.avatar || DEFAULT_AVATAR;
+        avEl.onclick = () => openExpandedAvatarLightbox(st.avatar || DEFAULT_AVATAR, st.name || st.username);
+        avEl.classList.add("cursor-pointer", "active:scale-95", "transition");
+    }
+    const nmEl = document.getElementById("staff-name"); if (nmEl) nmEl.innerText = st.name || "Tim Administrasi";
+    const usEl = document.getElementById("staff-username"); if (usEl) usEl.innerText = `@${st.username}`;
+
+    if (typeof _mountProfileIgStats === "function") {
+        _mountProfileIgStats("view-staff-admin", "staff-ig-stats-mount", st);
+    }
 
     const userInvs = (db.invitations || []).filter(i => !isCabangOwnedDoc(i));
     const userPfs = (db.portfolios || []).filter(p => !isCabangOwnedDoc(p));
     const pendingCnt = userInvs.filter(i => i.status !== "Aktif").length + userPfs.filter(p => p.status !== "Aktif").length;
 
-    document.getElementById("staff-pending-badge").innerText = `${pendingCnt} Menunggu`;
-    document.getElementById("staff-orders-body").innerHTML = buildUnifiedOrdersListHtml(true);
+    const pbEl = document.getElementById("staff-pending-badge"); if (pbEl) pbEl.innerText = `${pendingCnt} Menunggu`;
+    const obEl = document.getElementById("staff-orders-body"); if (obEl) obEl.innerHTML = buildUnifiedOrdersListHtml(true);
     updateChatBadges();
 }
 
@@ -299,6 +315,45 @@ function buildFullOrderCardHtml(item, options = {}) {
                     : `<button type="button" onclick="setOrderStatus('${item._kind}',${item.id},'Menunggu Verifikasi',this)" class="px-3 py-1.5 rounded-xl bg-amber-600/15 app-accent text-xs font-bold">Tangguhkan</button>`}
             `}
             ${!isStaffMode ? `<button type="button" onclick="deleteOrderItem('${item._kind}',${item.id})" class="px-2.5 py-1.5 rounded-xl bg-red-600/15 text-red-500 text-xs"><i class="fa-solid fa-trash"></i></button>` : ""}
+        </div>
+    </div>`;
+}
+
+function buildUserOwnProjectCardHtml(doc, isCabangOwner = false) {
+    const isPf = doc._kind === "pf";
+    const isAktif = doc.status === "Aktif";
+    const isPay = doc.status === "Menunggu Pembayaran";
+    const edLeft = Math.max(0, 2 - Number(doc.editCount || 0));
+    const canEdit = isCabangOwner ? true : (isAktif && edLeft > 0);
+    const editLbl = isCabangOwner ? "Edit" : `Edit (${edLeft}x)`;
+    const typeTag = isPf ? (doc.docType === "lamaran" ? "SURAT LAMARAN" : "CV") : `UNDANGAN • ${escHtml(doc.category)}`;
+    const preClose = "closeSoloStatsModal();closeUserProfileModalCustom();";
+
+    return `<div class="app-card-soft border rounded-2xl p-4 space-y-3 shadow-sm">
+        <div class="min-w-0">
+            <div class="flex flex-wrap items-center gap-1.5">
+                <span class="text-[9px] px-2 py-0.5 rounded-full app-accent-bg app-accent font-extrabold">${typeTag}</span>
+                <span class="text-[10px] px-2 py-0.5 rounded-full font-bold ${isAktif?"bg-emerald-500/20 text-emerald-600":"bg-amber-500/20 app-accent"}">● ${escHtml(doc.status)}</span>
+            </div>
+            <h4 class="font-bold text-sm mt-1 truncate">${escHtml(doc.title)}</h4>
+            <p class="text-xs app-muted">${escHtml(isPf ? (doc.themeName || doc.themeId) : doc.theme)} • Revisi: ${doc.editCount || 0}/2</p>
+        </div>
+        <div class="flex flex-wrap gap-1.5">
+            ${isPf
+                ? `<button type="button" onclick="${preClose}openPortfolioDocPreview(${doc.id},false)" class="px-3 py-1.5 rounded-xl app-btn-sec text-xs font-bold"><i class="fa-regular fa-eye mr-1"></i>Lihat</button>`
+                : (isAktif
+                    ? `<button type="button" onclick="${preClose}openGuestView(${doc.id},'Tamu Kehormatan')" class="px-3 py-1.5 rounded-xl app-btn-sec text-xs font-bold"><i class="fa-regular fa-eye mr-1"></i>Lihat</button>`
+                    : `<button type="button" disabled class="px-3 py-1.5 rounded-xl app-btn-sec opacity-50 text-xs font-bold"><i class="fa-solid fa-lock mr-1"></i>Lihat</button>`)}
+            ${canEdit
+                ? `<button type="button" onclick="${preClose}${isPf ? `openEditPortfolio(${doc.id},${isCabangOwner})` : `openEditInvitation(${doc.id},${isCabangOwner})`}" class="px-3 py-1.5 rounded-xl app-card border app-accent text-xs font-bold"><i class="fa-solid fa-pen mr-1"></i>${editLbl}</button>`
+                : `<button type="button" disabled class="px-3 py-1.5 rounded-xl app-btn-sec opacity-50 text-xs font-bold"><i class="fa-solid fa-lock mr-1"></i>Edit</button>`}
+            ${isPay
+                ? `<button type="button" onclick="${preClose}openUnifiedPayment('${isPf ? "portfolio" : "inv"}',${doc.id})" class="gold-pill-btn px-3.5 py-1.5 rounded-xl text-xs"><i class="fa-solid fa-qrcode mr-1"></i>Konfirmasi</button>`
+                : (isAktif && isPf
+                    ? `<button type="button" onclick="${preClose}openSempurnakanModal(${doc.id})" class="gold-pill-btn px-3.5 py-1.5 rounded-xl text-xs"><i class="fa-solid fa-file-pdf mr-1"></i>Sempurnakan / PDF</button>`
+                    : (isAktif && !isPf
+                        ? `<button type="button" onclick="${preClose}openGuestListManager(${doc.id})" class="gold-pill-btn px-3.5 py-1.5 rounded-xl text-xs"><i class="fa-solid fa-share-nodes mr-1"></i>Tamu (${(doc.guests || []).length})</button>${isCabangOwner ? `<button type="button" onclick="${preClose}openClientPortalShareModal(${doc.id})" class="px-3 py-1.5 rounded-xl bg-blue-600/15 text-blue-600 text-xs font-bold">Link Klien</button>` : ""}`
+                        : ""))}
         </div>
     </div>`;
 }
@@ -350,7 +405,7 @@ function viewOrderProof(kind, id) {
             openLink.classList.toggle("hide", rawUrl.startsWith("data:"));
         }
         modal.classList.remove("hide");
-        if (typeof pushBackGuard === "function") pushBackGuard();
+        _pushAdminNavStep({ type: "modal", id: "modal-proof-viewer" });
         return;
     }
 
@@ -614,7 +669,6 @@ function renderMasterWorkspaceContent() {
         </div>`;
     }
 }
-
 // ================= 4. BERANDA PROFIL PUBLIK & DETAIL TERPISAH =================
 function openExpandedAvatarLightbox(imgSrc, labelText = "") {
     const src = imgSrc || DEFAULT_AVATAR;
@@ -633,12 +687,16 @@ function openExpandedAvatarLightbox(imgSrc, labelText = "") {
         </div>
     `;
     box.classList.remove("hide");
-    if (typeof pushBackGuard === "function") pushBackGuard();
+    _pushAdminNavStep({ type: "avatar_lightbox" });
 }
 
 function closeExpandedAvatarLightbox() {
     const box = document.getElementById("expanded-avatar-overlay");
     if (box) box.classList.add("hide");
+    if (Array.isArray(window._mrNavStack) && window._mrNavStack.length > 1) {
+        const top = window._mrNavStack[window._mrNavStack.length - 1];
+        if (top && top.type === "avatar_lightbox") window._mrNavStack.pop();
+    }
 }
 
 function _ensureSoloStatsModal() {
@@ -671,11 +729,27 @@ function closeSoloStatsModal() {
     if (mod) mod.classList.add("hide");
 }
 
+// Dipanggil oleh pengendali navigasi terpusat di js/app.js saat tombol Back HP ditekan
+window._restoreSoloStatsFromNav = function (stepObj) {
+    if (!stepObj || !stepObj.targetUsername) return;
+    window._soloStatsViewState = {
+        open: true,
+        targetUsername: String(stepObj.targetUsername).toLowerCase(),
+        mode: stepObj.mode || "followers",
+        masterCat: stepObj.masterCat || "user",
+        projectCat: stepObj.projectCat || "proses"
+    };
+    const mod = _ensureSoloStatsModal();
+    renderSoloStatsModal();
+    mod.classList.remove("hide");
+};
+
 function _openUserFromStatsList(uname) {
     const clean = String(uname || "").trim().toLowerCase();
     if (!clean) return;
+    // Sembunyikan layar statistik sementara tanpa menghapus dari _mrNavStack agar Back kembali ke daftar ini
     closeSoloStatsModal();
-    viewUserProfileModal(clean);
+    viewUserProfileModal(clean, false);
 }
 
 function _renderSoloAccountCard(uItem) {
@@ -701,7 +775,7 @@ function _renderSoloAccountCard(uItem) {
     `;
 }
 
-function openSoloFollowersModal(targetUsername) {
+function openSoloFollowersModal(targetUsername, fromNav = false) {
     const tKey = String(targetUsername || "").trim().toLowerCase();
     const targetObj = (db.users || []).find(u => String(u.username || "").toLowerCase() === tKey);
     if (!targetObj) return;
@@ -717,10 +791,10 @@ function openSoloFollowersModal(targetUsername) {
     const mod = _ensureSoloStatsModal();
     renderSoloStatsModal();
     mod.classList.remove("hide");
-    if (typeof pushBackGuard === "function") pushBackGuard();
+    if (!fromNav) _pushAdminNavStep({ type: "solo_stats", targetUsername: tKey, mode: "followers", masterCat: "user", projectCat: "proses" });
 }
 
-function openSoloFollowingModal(targetUsername) {
+function openSoloFollowingModal(targetUsername, fromNav = false) {
     const tKey = String(targetUsername || "").trim().toLowerCase();
     const targetObj = (db.users || []).find(u => String(u.username || "").toLowerCase() === tKey);
     if (!targetObj) return;
@@ -735,10 +809,10 @@ function openSoloFollowingModal(targetUsername) {
     const mod = _ensureSoloStatsModal();
     renderSoloStatsModal();
     mod.classList.remove("hide");
-    if (typeof pushBackGuard === "function") pushBackGuard();
+    if (!fromNav) _pushAdminNavStep({ type: "solo_stats", targetUsername: tKey, mode: "following", masterCat: "user", projectCat: "proses" });
 }
 
-function openSoloProjectModal(targetUsername) {
+function openSoloProjectModal(targetUsername, fromNav = false) {
     const tKey = String(targetUsername || "").trim().toLowerCase();
     const targetObj = (db.users || []).find(u => String(u.username || "").toLowerCase() === tKey);
     if (!targetObj) return;
@@ -753,17 +827,47 @@ function openSoloProjectModal(targetUsername) {
     const mod = _ensureSoloStatsModal();
     renderSoloStatsModal();
     mod.classList.remove("hide");
-    if (typeof pushBackGuard === "function") pushBackGuard();
+    if (!fromNav) _pushAdminNavStep({ type: "solo_stats", targetUsername: tKey, mode: "project", masterCat: "user", projectCat: "proses" });
+}
+
+function _syncTopSoloStatsNavState() {
+    if (!Array.isArray(window._mrNavStack) || !window._mrNavStack.length) return;
+    const top = window._mrNavStack[window._mrNavStack.length - 1];
+    if (top && top.type === "solo_stats") {
+        top.masterCat = window._soloStatsViewState.masterCat;
+        top.projectCat = window._soloStatsViewState.projectCat;
+    }
 }
 
 function setSoloMasterCat(cat) {
     window._soloStatsViewState.masterCat = cat;
+    _syncTopSoloStatsNavState();
     renderSoloStatsModal();
 }
 
 function setSoloProjectCat(cat) {
     window._soloStatsViewState.projectCat = cat;
+    _syncTopSoloStatsNavState();
     renderSoloStatsModal();
+}
+
+function _buildPublicReadOnlyProjectCardHtml(doc) {
+    const isPf = doc._kind === "pf";
+    const isAktif = doc.status === "Aktif";
+    const typeTag = isPf ? (doc.docType === "lamaran" ? "SURAT LAMARAN" : "CV") : `UNDANGAN • ${escHtml(doc.category)}`;
+    const preClose = "closeSoloStatsModal();closeUserProfileModalCustom();";
+
+    return `<div class="app-card-soft border rounded-2xl p-4 flex items-center justify-between gap-3 shadow-sm">
+        <div class="min-w-0">
+            <div class="flex flex-wrap items-center gap-1.5">
+                <span class="text-[9px] px-2 py-0.5 rounded-full app-accent-bg app-accent font-extrabold">${typeTag}</span>
+                <span class="text-[10px] px-2 py-0.5 rounded-full font-bold ${isAktif?"bg-emerald-500/20 text-emerald-600":"bg-amber-500/20 app-accent"}">● ${escHtml(doc.status || "Proses")}</span>
+            </div>
+            <h4 class="font-bold text-sm mt-1 truncate">${escHtml(doc.title || "Project")}</h4>
+            <p class="text-xs app-muted truncate">${escHtml(isPf ? (doc.themeName || doc.themeId) : doc.theme)}</p>
+        </div>
+        ${isAktif ? `<button type="button" onclick="${preClose}${isPf ? `openPortfolioDocPreview(${doc.id},false)` : `openGuestView(${doc.id},'Tamu Kehormatan')`}" class="px-3.5 py-1.5 rounded-xl app-btn-sec text-xs font-bold shrink-0"><i class="fa-regular fa-eye mr-1"></i>Lihat</button>` : ""}
+    </div>`;
 }
 
 function renderSoloStatsModal() {
@@ -847,13 +951,18 @@ function renderSoloStatsModal() {
         return;
     }
 
-    // 3. ISI PROJECT SAJA + FITUR LENGKAP SEPERTI GAMBAR KEDUA
+    // 3. ISI PROJECT LENGKAP SESUAI FUNGSI MASING-MASING AKUN
     if (titleEl) titleEl.innerText = "Project";
-    const allProj = (typeof _getProjectsForUser === "function") ? _getProjectsForUser(targetObj) : [];
+    let allProj = (typeof _getProjectsForUser === "function") ? _getProjectsForUser(targetObj) : [];
     const isStaffScope = targetObj.role === "master" || targetObj.role === "administrasi";
     const isStaffViewer = !!(curU && (curU.role === "master" || curU.role === "administrasi"));
+    const isAdminOnlyViewer = !!(curU && curU.role === "administrasi");
 
-    if (isStaffScope) {
+    if (isAdminOnlyViewer) {
+        allProj = allProj.filter(x => !isCabangOwnedDoc(x));
+    }
+
+    if (isStaffScope && isStaffViewer) {
         const prosesList = allProj.filter(p => p.status !== "Aktif");
         const aktifList = allProj.filter(p => p.status === "Aktif");
         const pCat = st.projectCat === "aktif" ? "aktif" : "proses";
@@ -869,22 +978,36 @@ function renderSoloStatsModal() {
 
         bodyEl.innerHTML = shownList.length
             ? shownList.map(doc => buildFullOrderCardHtml(doc, {
-                isStaffMode: !!(curU && curU.role === "administrasi"),
+                isStaffMode: isAdminOnlyViewer,
                 closeModalBeforeAction: true
             })).join("")
             : `<div class="app-card border border-dashed rounded-2xl p-6 text-center text-xs app-muted">Belum ada project pada kategori ini.</div>`;
         return;
     }
 
+    if (isStaffViewer) {
+        bodyEl.innerHTML = allProj.length
+            ? allProj.map(doc => buildFullOrderCardHtml(doc, {
+                isStaffMode: isAdminOnlyViewer,
+                closeModalBeforeAction: true
+            })).join("")
+            : `<div class="app-card border border-dashed rounded-2xl p-7 text-center text-xs app-muted">Belum ada project yang dibuat.</div>`;
+        return;
+    }
+
+    if (isSelf) {
+        bodyEl.innerHTML = allProj.length
+            ? allProj.map(doc => buildUserOwnProjectCardHtml(doc, curU.role === "cabang")).join("")
+            : `<div class="app-card border border-dashed rounded-2xl p-7 text-center text-xs app-muted">Belum ada project yang dibuat.</div>`;
+        return;
+    }
+
     bodyEl.innerHTML = allProj.length
-        ? allProj.map(doc => buildFullOrderCardHtml(doc, {
-            isStaffMode: !isStaffViewer,
-            closeModalBeforeAction: true
-        })).join("")
+        ? allProj.map(_buildPublicReadOnlyProjectCardHtml).join("")
         : `<div class="app-card border border-dashed rounded-2xl p-7 text-center text-xs app-muted">Belum ada project yang dibuat.</div>`;
 }
 
-function viewUserProfileModal(username) {
+function viewUserProfileModal(username, fromNav = false) {
     const cleanU = String(username || "").trim().toLowerCase();
     const u = (db.users || []).find(x => String(x.username || "").toLowerCase() === cleanU);
     if (!u) return showToast("Akun tidak ditemukan.", "error");
@@ -938,7 +1061,9 @@ function viewUserProfileModal(username) {
         ? `<span class="text-[9px] px-2 py-0.5 rounded-full bg-amber-500/20 text-amber-600 font-extrabold uppercase">MASTER</span>`
         : u.role === "administrasi"
             ? `<span class="text-[9px] px-2 py-0.5 rounded-full bg-emerald-500/20 text-emerald-600 font-extrabold uppercase">ADMINISTRASI</span>`
-            : "";
+            : u.role === "cabang"
+                ? `<span class="text-[9px] px-2 py-0.5 rounded-full bg-blue-500/20 text-blue-600 font-extrabold uppercase">CABANG</span>`
+                : "";
 
     const followBtnHtml = canFollowThis
         ? `<button type="button" onclick="toggleFollowTargetUser('${esc(cleanU)}')" class="w-full py-2.5 rounded-2xl text-xs font-extrabold transition shadow-sm ${isFollowingThis ? "app-btn-sec border" : "gold-pill-btn"}">
@@ -1005,11 +1130,11 @@ function viewUserProfileModal(username) {
                     ${followBtnHtml}
                 </div>
 
-                <div class="pt-2">
+                ${!isSelf ? `<div class="pt-2">
                     <button type="button" onclick="closeUserProfileModalCustom();if(typeof openFullChatOverlay==='function')openFullChatOverlay('${esc(cleanU)}');" class="w-full py-3 rounded-2xl bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-bold transition shadow-sm flex items-center justify-center gap-2">
                         <i class="fa-solid fa-comments"></i> Kirim Pesan ke @${escHtml(u.username)}
                     </button>
-                </div>
+                </div>` : ""}
             </div>
         `;
     }
@@ -1024,7 +1149,7 @@ function viewUserProfileModal(username) {
     }
 
     modal.classList.remove("hide");
-    if (typeof pushBackGuard === "function") pushBackGuard();
+    if (!fromNav) _pushAdminNavStep({ type: "user_profile", username: cleanU });
 }
 
 function closeUserProfileModalCustom() {
@@ -1044,7 +1169,7 @@ async function toggleUserProQuick(uname, btn, reopenModal = false) {
     await apiAction({ action: "upsert_user", oldUsername: uname, user: Object.assign({}, u, { isPro: nextPro }) });
     renderMasterHeaderStats();
     renderMasterWorkspaceContent();
-    if (reopenModal) viewUserProfileModal(uname);
+    if (reopenModal) viewUserProfileModal(uname, true);
     showToast(nextPro ? `@${uname} ditingkatkan ke Akun PRO (Centang Biru)!` : `Status Pro @${uname} dinonaktifkan.`, "info");
 }
 
@@ -1064,7 +1189,7 @@ function openMasterUserModal(username = null, defaultRole = "user") {
     document.getElementById("mmu-quota").value = isEdit ? (u.quota || 0) : 5;
     document.getElementById("mmu-quota-wrap").classList.toggle("hide", document.getElementById("mmu-role").value !== "cabang");
     document.getElementById("modal-master-user").classList.remove("hide");
-    pushBackGuard();
+    _pushAdminNavStep({ type: "modal", id: "modal-master-user" });
 }
 async function submitMasterUserModal(e) {
     e.preventDefault(); setBtnLoading("btn-mmu-save", true, "Menyimpan...");
@@ -1085,6 +1210,7 @@ async function submitMasterUserModal(e) {
     setBtnLoading("btn-mmu-save", false);
     if (!res || !res.ok) return showToast((res && res.message) || "Gagal menyimpan akun.", "error");
     document.getElementById("modal-master-user").classList.add("hide");
+    if (typeof _mrDropTopModalById === "function") _mrDropTopModalById("modal-master-user");
     renderMasterHeaderStats(); renderMasterWorkspaceContent(); showToast("Akun berhasil disimpan!");
 }
 async function approveUserRealTime(uname, btn) { const u = db.users.find(x => x.username === uname); if (!u) return; setBtnLoading(btn, true, "..."); await apiAction({ action: "upsert_user", oldUsername: uname, user: Object.assign({}, u, { status: "Aktif" }) }); renderMasterHeaderStats(); renderMasterWorkspaceContent(); showToast(`Akun @${uname} aktif!`); }
@@ -1094,7 +1220,7 @@ async function topUpCabangRealTime(uname, amt, btn, reopenModal = false) {
     await apiAction({ action: "topup_quota", username: uname, amount: amt });
     renderMasterHeaderStats();
     renderMasterWorkspaceContent();
-    if (reopenModal) viewUserProfileModal(uname);
+    if (reopenModal) viewUserProfileModal(uname, true);
     showToast(`+${amt} kuota ditambahkan!`);
 }
 
@@ -1281,9 +1407,12 @@ function openThemeBuilderModal(cat = null, themeName = null, isDuplicate = false
 
     switchThemeBuilderTab("design"); updateThemeBuilderPreview();
     document.getElementById("modal-theme-builder").classList.remove("hide");
-    pushBackGuard();
+    _pushAdminNavStep({ type: "modal", id: "modal-theme-builder" });
 }
-function closeThemeBuilderModal() { document.getElementById("modal-theme-builder").classList.add("hide"); }
+function closeThemeBuilderModal() {
+    document.getElementById("modal-theme-builder").classList.add("hide");
+    if (typeof _mrDropTopModalById === "function") _mrDropTopModalById("modal-theme-builder");
+}
 function applyQuickColorPalette(key) {
     const map = { maroon:{bg:"#5c0a12",card:"#4a080f",text:"#fdf6ec",accent:"#f3d285"}, black:{bg:"#070709",card:"#121216",text:"#f4f4f5",accent:"#ffffff"}, emerald:{bg:"#04362a",card:"#074738",text:"#ecfdf5",accent:"#facc15"}, ivory:{bg:"#f7f4ef",card:"#ffffff",text:"#3b352f",accent:"#8c7658"}, navy:{bg:"#172433",card:"#1f3146",text:"#f1f5f9",accent:"#dbeafe"} };
     const p = map[key]; if (!p) return;
