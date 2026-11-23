@@ -312,6 +312,7 @@ function hideAllViews() {
 
 function goToLanding(fromBack = false) {
     currentViewName = "landing";
+    document.body.classList.add("in-home");
     hideAllViews();
     document.getElementById("view-landing")?.classList.remove("hide");
     renderHeaderActions();
@@ -341,6 +342,7 @@ function routeDashboard(fromBack = false) {
         if (act.type === "portfolio" && typeof startCreatePortfolio === "function") return startCreatePortfolio(u.role === "cabang", act.docType, act.themeId);
     }
 
+    document.body.classList.add("in-home");
     hideAllViews();
     if (u.role === "master") {
         currentViewName = "master";
@@ -356,6 +358,7 @@ function routeDashboard(fromBack = false) {
         renderCabangAdmin();
     } else {
         currentViewName = "profile";
+        document.body.classList.remove("in-home");
         document.getElementById("view-profile")?.classList.remove("hide");
         renderUserProfile();
     }
@@ -373,18 +376,25 @@ function renderHeaderActions() {
     const defAv = typeof DEFAULT_AVATAR !== "undefined" ? DEFAULT_AVATAR : "./logo.png";
 
     if (typeof clientPortalState !== "undefined" && clientPortalState.active) {
+        document.body.classList.add("in-home");
         if (mainEl) mainEl.innerText = clientPortalState.brandName || "Mitra Cabang";
         if (subEl) subEl.innerText = "Powered by Mr Undangan";
         document.getElementById("floating-chat-wrap")?.classList.add("hide");
-        if (dotsBtn) dotsBtn.classList.add("hide");
+        if (dotsBtn) { dotsBtn.classList.add("hide"); dotsBtn.style.display = "none"; }
         if (box) box.innerHTML = `<button onclick="cycleAppThemeQuick()" class="w-9 h-9 rounded-full app-card-soft border gold-border app-accent flex items-center justify-center text-xs" title="Ubah Warna Tampilan"><i class="fa-solid fa-palette"></i></button>`;
         return;
     }
 
+    const isProfileMenu = currentViewName === "profile";
+    document.body.classList.toggle("in-home", !isProfileMenu);
+
     if (mainEl) mainEl.innerText = "Mr Undangan";
     if (subEl) subEl.innerText = "Powered by Kausar.pictures";
     document.getElementById("floating-chat-wrap")?.classList.remove("hide");
-    if (dotsBtn) dotsBtn.classList.remove("hide");
+    if (dotsBtn) {
+        dotsBtn.classList.toggle("hide", !isProfileMenu);
+        dotsBtn.style.display = isProfileMenu ? "" : "none";
+    }
 
     const u = typeof getCurrentUserObj === "function" ? getCurrentUserObj() : null;
     if (footLoginBtn) footLoginBtn.classList.toggle("hide", !!u);
