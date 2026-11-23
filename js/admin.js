@@ -1,24 +1,3 @@
-<div class="grid grid-cols-4 gap-2 text-center mt-3 md:mt-0">
-    <div class="app-card-soft px-3 py-2 rounded-2xl border"><span id="stat-users" ...>0</span><span ...>Akun</span></div>
-    <div class="app-card-soft px-3 py-2 rounded-2xl border"><span id="stat-pending" ...>0</span><span ...>Antrean</span></div>
-    <div class="app-card-soft px-3 py-2 rounded-2xl border"><span id="stat-active" ...>0</span><span ...>Aktif</span></div>
-    <div class="app-card-soft px-3 py-2 rounded-2xl border"><span id="stat-pro" ...>0</span><span ...>Akun Pro</span></div>
-</div>
-```[cite: 28]
-
-Karena elemen 4 kotak itu dirender dan diperbarui langsung di dalam **`js/admin.js`** (`renderMasterHeaderStats`), kita ubah **hanya 1 file `js/admin.js`** agar:
-1. 4 kotak tersebut langsung digantikan dengan **3 list metrik Instagram elegan** sejajar di bawah nama/bio:
-   * **Followers:** Menampilkan angka dummy `18.3k + <jumlah real user>` (saat diklik Master membuka halaman penuh terpisah dengan 3 kategori: User, Administrasi, Cabang lengkap dengan centang biru jika Pro; privat jika dilihat akun lain)[cite: 24, 25].
-   * **Following:** Menampilkan jumlah & daftar yang diikuti[cite: 24].
-   * **Project:** Menampilkan total seluruh project (saat diklik membuka halaman penuh terbagi 2 kategori: Proses & Aktif)[cite: 24].
-2. Tombol di luar berfungsi masing-masing membuka halamannya sendiri secara terpisah tanpa digabung tab di dalamnya[cite: 24].
-3. Tombol kembali HP mundur bertahap dengan mulus tanpa menutup aplikasi[cite: 24, 25].
-
----
-
-### Kode Utuh `js/admin.js` (Ganti Seluruh Isi `js/admin.js`)
-
-```javascript
 // =========================================================================
 // MR UNDANGAN — MASTER ADMIN (GRAFIK, INSPEKSI, THEME BUILDER) & STAFF
 // File: js/admin.js
@@ -40,16 +19,35 @@ function _formatMasterFollowersNum() {
     return `18.3k + ${realCount}`;
 }
 
+function _findMasterStatsBox() {
+    const masterSec = document.getElementById("view-master-admin");
+    if (!masterSec) return null;
+    const existingWrap = masterSec.querySelector(".ig-master-stats-wrap");
+    if (existingWrap) return existingWrap;
+    const statUsersEl = masterSec.querySelector("#stat-users");
+    if (statUsersEl && statUsersEl.parentElement && statUsersEl.parentElement.parentElement) {
+        return statUsersEl.parentElement.parentElement;
+    }
+    return masterSec.querySelector(".grid.grid-cols-4");
+}
+
 function renderMasterHeaderStats() {
     const m = getCurrentUserObj(); if (!m) return;
+
     const bEl = document.getElementById("mprof-banner");
     if (bEl) bEl.style.backgroundImage = m.banner ? `url('${m.banner}')` : "";
+
     const aEl = document.getElementById("mprof-avatar");
     if (aEl) {
         aEl.src = m.avatar || DEFAULT_AVATAR;
-        aEl.onclick = () => openExpandedAvatarLightbox(m.avatar || DEFAULT_AVATAR, m.name || m.username);
+        aEl.onclick = () => {
+            if (typeof openExpandedAvatarLightbox === "function") {
+                openExpandedAvatarLightbox(m.avatar || DEFAULT_AVATAR, m.name || m.username);
+            }
+        };
         aEl.classList.add("cursor-pointer", "active:scale-95", "transition");
     }
+
     const nEl = document.getElementById("mprof-name");
     if (nEl) nEl.innerText = m.name || "Master Admin";
     const uEl = document.getElementById("mprof-username");
@@ -57,10 +55,7 @@ function renderMasterHeaderStats() {
     const bioEl = document.getElementById("mprof-bio");
     if (bioEl) bioEl.innerText = m.bio || "Mr Undangan founder";
 
-    // Ubah area 4 kotak statistik menjadi baris list Instagram elegan (Followers, Following, Project)
-    const statsContainer = document.querySelector("#view-master-admin .grid.grid-cols-4") 
-        || document.querySelector("#view-master-admin .ig-master-stats-wrap");
-
+    const statsContainer = _findMasterStatsBox();
     if (statsContainer) {
         statsContainer.className = "ig-master-stats-wrap w-full mt-3 md:mt-0";
         const followingCount = (typeof _getFollowingListForUser === "function")
@@ -103,8 +98,10 @@ function openMasterWorkspace(name) {
         home_editor: "Edit Banner Promosi Beranda (12 : 4.4)",
         media: "Stok Musik & Slideshow Testimoni"
     };
-    document.getElementById("master-active-panel-title").innerText = titles[currentMasterWorkspace] || "Panel Master";
-    document.getElementById("master-back-overview-btn").classList.toggle("hide", currentMasterWorkspace === "overview");
+    const tEl = document.getElementById("master-active-panel-title");
+    if (tEl) tEl.innerText = titles[currentMasterWorkspace] || "Panel Master";
+    const backBtn = document.getElementById("master-back-overview-btn");
+    if (backBtn) backBtn.classList.toggle("hide", currentMasterWorkspace === "overview");
     renderMasterWorkspaceContent();
 }
 
@@ -759,7 +756,6 @@ function renderSoloStatsModal() {
     if (subBar) { subBar.classList.add("hide"); subBar.innerHTML = ""; }
     if (!bodyEl) return;
 
-    // 1. ISI FOLLOWERS SAJA
     if (st.mode === "followers") {
         if (titleEl) titleEl.innerText = "Followers";
 
@@ -809,7 +805,6 @@ function renderSoloStatsModal() {
         return;
     }
 
-    // 2. ISI FOLLOWING SAJA
     if (st.mode === "following") {
         if (titleEl) titleEl.innerText = "Following";
         const gKeys = (typeof _getFollowingListForUser === "function")
@@ -822,7 +817,6 @@ function renderSoloStatsModal() {
         return;
     }
 
-    // 3. ISI PROJECT SAJA
     if (titleEl) titleEl.innerText = "Project";
     const allProj = (typeof _getProjectsForUser === "function") ? _getProjectsForUser(targetObj) : [];
     const isStaffScope = targetObj.role === "master" || targetObj.role === "administrasi";
