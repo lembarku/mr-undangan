@@ -13,10 +13,19 @@ function renderMasterAdmin() {
     openMasterWorkspace(currentMasterWorkspace || "overview");
 }
 
+function _formatInstagramMetric(num) {
+    const n = Math.max(0, Number(num) || 0);
+    if (n >= 1000) {
+        const kVal = (n / 1000).toFixed(1).replace(/\.0$/, "");
+        return `${kVal}K`;
+    }
+    return String(n);
+}
+
 function _formatMasterFollowersNum() {
     const allUsers = Array.isArray(db.users) ? db.users : [];
-    const realCount = allUsers.filter(u => u && u.role !== "master").length;
-    return `18.3k + ${realCount}`;
+    const activeRealCount = allUsers.filter(u => u && u.role !== "master" && u.status === "Aktif").length;
+    return _formatInstagramMetric(18300 + activeRealCount);
 }
 
 function _findMasterStatsBox() {
@@ -73,11 +82,11 @@ function renderMasterHeaderStats() {
                         <span class="block text-[11px] app-muted font-medium">Followers</span>
                     </button>
                     <button type="button" onclick="openSoloFollowingModal('${esc(m.username)}')" class="py-2 px-1 rounded-xl hover:bg-black/5 active:scale-98 transition">
-                        <span class="block text-sm sm:text-base font-extrabold tracking-tight">${followingCount}</span>
+                        <span class="block text-sm sm:text-base font-extrabold tracking-tight">${escHtml(_formatInstagramMetric(followingCount))}</span>
                         <span class="block text-[11px] app-muted font-medium">Following</span>
                     </button>
                     <button type="button" onclick="openSoloProjectModal('${esc(m.username)}')" class="py-2 px-1 rounded-xl hover:bg-black/5 active:scale-98 transition">
-                        <span class="block text-sm sm:text-base font-extrabold tracking-tight">${allProj.length}</span>
+                        <span class="block text-sm sm:text-base font-extrabold tracking-tight">${escHtml(_formatInstagramMetric(allProj.length))}</span>
                         <span class="block text-[11px] app-muted font-medium">Project</span>
                     </button>
                 </div>
@@ -894,9 +903,9 @@ function viewUserProfileModal(username) {
     if (isMasterProfile) {
         followersCount = _formatMasterFollowersNum();
     } else if (typeof _getFollowersListForUser === "function") {
-        followersCount = _getFollowersListForUser(u).length;
+        followersCount = _formatInstagramMetric(_getFollowersListForUser(u).length);
     } else {
-        followersCount = Array.isArray(u.followers) ? u.followers.length : 0;
+        followersCount = _formatInstagramMetric(Array.isArray(u.followers) ? u.followers.length : 0);
     }
 
     const followingCount = (typeof _getFollowingListForUser === "function")
@@ -946,12 +955,12 @@ function viewUserProfileModal(username) {
     const followingColHtml = isCabangProfile
         ? ""
         : `<button type="button" onclick="openSoloFollowingModal('${esc(cleanU)}')" class="py-2 px-1 rounded-xl hover:bg-black/5 active:scale-98 transition">
-            <span class="block text-sm sm:text-base font-extrabold tracking-tight">${followingCount}</span>
+            <span class="block text-sm sm:text-base font-extrabold tracking-tight">${escHtml(_formatInstagramMetric(followingCount))}</span>
             <span class="block text-[11px] app-muted font-medium">Following</span>
         </button>`;
 
     const projectColHtml = `<button type="button" onclick="openSoloProjectModal('${esc(cleanU)}')" class="py-2 px-1 rounded-xl hover:bg-black/5 active:scale-98 transition">
-        <span class="block text-sm sm:text-base font-extrabold tracking-tight">${projectCount}</span>
+        <span class="block text-sm sm:text-base font-extrabold tracking-tight">${escHtml(_formatInstagramMetric(projectCount))}</span>
         <span class="block text-[11px] app-muted font-medium">Project</span>
     </button>`;
 
