@@ -342,22 +342,25 @@ function routeDashboard(fromBack = false) {
         if (act.type === "portfolio" && typeof startCreatePortfolio === "function") return startCreatePortfolio(u.role === "cabang", act.docType, act.themeId);
     }
 
-    document.body.classList.remove("in-home");
     hideAllViews();
     if (u.role === "master") {
         currentViewName = "master";
+        document.body.classList.remove("in-home");
         document.getElementById("view-master-admin")?.classList.remove("hide");
         if (typeof renderMasterAdmin === "function") renderMasterAdmin();
     } else if (u.role === "administrasi") {
         currentViewName = "staff";
+        document.body.classList.remove("in-home");
         document.getElementById("view-staff-admin")?.classList.remove("hide");
         if (typeof renderStaffAdmin === "function") renderStaffAdmin();
     } else if (u.role === "cabang") {
         currentViewName = "cabang";
+        document.body.classList.remove("in-home");
         document.getElementById("view-cabang-admin")?.classList.remove("hide");
         renderCabangAdmin();
     } else {
         currentViewName = "profile";
+        document.body.classList.remove("in-home");
         document.getElementById("view-profile")?.classList.remove("hide");
         renderUserProfile();
     }
@@ -379,7 +382,10 @@ function renderHeaderActions() {
         if (mainEl) mainEl.innerText = clientPortalState.brandName || "Mitra Cabang";
         if (subEl) subEl.innerText = "Powered by Mr Undangan";
         document.getElementById("floating-chat-wrap")?.classList.add("hide");
-        if (dotsBtn) { dotsBtn.classList.add("hide"); dotsBtn.style.display = "none"; }
+        if (dotsBtn) {
+            dotsBtn.classList.add("hide");
+            dotsBtn.style.setProperty("display", "none", "important");
+        }
         if (box) box.innerHTML = `<button onclick="cycleAppThemeQuick()" class="w-9 h-9 rounded-full app-card-soft border gold-border app-accent flex items-center justify-center text-xs" title="Ubah Warna Tampilan"><i class="fa-solid fa-palette"></i></button>`;
         return;
     }
@@ -391,8 +397,13 @@ function renderHeaderActions() {
     if (subEl) subEl.innerText = "Powered by Kausar.pictures";
     document.getElementById("floating-chat-wrap")?.classList.remove("hide");
     if (dotsBtn) {
-        dotsBtn.classList.toggle("hide", !isProfileMenu);
-        dotsBtn.style.display = isProfileMenu ? "" : "none";
+        if (isProfileMenu) {
+            dotsBtn.classList.remove("hide");
+            dotsBtn.style.setProperty("display", "inline-flex", "important");
+        } else {
+            dotsBtn.classList.add("hide");
+            dotsBtn.style.setProperty("display", "none", "important");
+        }
     }
 
     const u = typeof getCurrentUserObj === "function" ? getCurrentUserObj() : null;
