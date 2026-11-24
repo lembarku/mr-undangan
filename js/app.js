@@ -1,5 +1,5 @@
 // =========================================================================
-// MR UNDANGAN — MAIN CONTROLLER (SPLASH HALO, BERANDA, PROFIL, MENU)
+// LEMBARKU — MAIN CONTROLLER (SPLASH HALO, BERANDA, PROFIL, MENU)
 // File: js/app.js
 // =========================================================================
 const USER_CACHE_KEY = "MR_UNDANGAN_USER_OBJ";
@@ -10,6 +10,12 @@ let activeInvShelfCat = "Pernikahan", activePfShelfCat = "cv";
 let invShelfLock = false, pfShelfLock = false;
 window.pendingActionAfterLogin = null;
 window._igProfileSheetState = { open: false, targetUsername: "", tab: "followers", masterCat: "user", projectCat: "proses" };
+
+function _normAppUserKey(uname) {
+    const k = String(uname || "").trim().toLowerCase();
+    const founderU = (typeof FOUNDER_USERNAME !== "undefined" && FOUNDER_USERNAME) ? FOUNDER_USERNAME : "kausar.af";
+    return k === "master" ? founderU : k;
+}
 
 // ================= 1. PWA INSTALL WELCOME MODAL & ANIMASI PEMASANGAN =================
 if ("serviceWorker" in navigator) navigator.serviceWorker.register("./sw.js").catch(() => {});
@@ -113,7 +119,7 @@ function finishAndLaunchApp() {
     document.getElementById("modal-install-welcome")?.classList.add("hide");
     _mrDropTopModalById("modal-install-welcome");
     try { if (typeof getCleanBaseUrl === "function") window.open(getCleanBaseUrl(), "_self"); } catch {}
-    showToast("Selamat menggunakan Mr Undangan!");
+    showToast("Selamat menggunakan Lembarku!");
 }
 
 // ================= 2. POPUP LOGIN TENGAH & PENGINGAT LOGIN =================
@@ -147,21 +153,24 @@ function dismissLoginReminder() {
 function ensureUserInLocalDb(userObj) {
     if (!userObj || !userObj.username) return;
     if (!Array.isArray(db.users)) db.users = [];
-    const idx = db.users.findIndex(x => String(x.username || "").toLowerCase() === String(userObj.username).toLowerCase());
-    if (idx >= 0) db.users[idx] = Object.assign({}, db.users[idx], userObj);
-    else db.users.push(userObj);
-    try { localStorage.setItem(USER_CACHE_KEY, JSON.stringify(userObj)); } catch {}
+    const normU = _normAppUserKey(userObj.username);
+    const cleanObj = Object.assign({}, userObj, { username: normU });
+    const idx = db.users.findIndex(x => _normAppUserKey(x.username) === normU);
+    if (idx >= 0) db.users[idx] = Object.assign({}, db.users[idx], cleanObj);
+    else db.users.push(cleanObj);
+    try { localStorage.setItem(USER_CACHE_KEY, JSON.stringify(cleanObj)); } catch {}
 }
 
 async function handleAuthSubmit(e) {
     e.preventDefault();
-    const u = document.getElementById("auth-username").value.trim().toLowerCase();
+    const rawU = document.getElementById("auth-username").value.trim().toLowerCase();
+    const u = _normAppUserKey(rawU);
     const p = document.getElementById("auth-password").value.trim();
     if (!u || !p) return;
     setBtnLoading("auth-submit-btn", true, "Masuk...");
     const res = await apiAction({ action: "login", username: u, password: p });
     if (res && res.ok && res.user) {
-        currentSessionUser = res.user.username;
+        currentSessionUser = _normAppUserKey(res.user.username);
         currentSessionToken = res.token || "";
         localStorage.setItem(SESSION_KEY, currentSessionUser);
         if (currentSessionToken) localStorage.setItem(SESSION_TOKEN_KEY, currentSessionToken);
@@ -651,7 +660,7 @@ function routeDashboard(fromBack = false) {
     if (!u) {
         try {
             const cachedU = JSON.parse(localStorage.getItem(USER_CACHE_KEY) || "null");
-            if (cachedU && String(cachedU.username).toLowerCase() === String(currentSessionUser).toLowerCase()) {
+            if (cachedU && _normAppUserKey(cachedU.username) === _normAppUserKey(currentSessionUser)) {
                 ensureUserInLocalDb(cachedU);
                 u = cachedU;
             }
@@ -699,12 +708,15 @@ function renderHeaderActions() {
     const mainEl = document.getElementById("header-brand-main");
     const subEl = document.getElementById("header-brand-sub");
     const footLoginBtn = document.getElementById("footer-login-cta");
-    const defAv = typeof DEFAULT_AVATAR !== "undefined" ? DEFAULT_AVATAR : "./logo.png";
+    const defAv = typeof DEFAULT_AVATAR !== "undefined" ? DEFAULT_AVATAR : "./lembarku-logo.png";
 
     if (typeof clientPortalState !== "undefined" && clientPortalState.active) {
         document.body.classList.add("in-home");
         if (mainEl) mainEl.innerText = clientPortalState.brandName || "Mitra Cabang";
-        if (subEl) subEl.innerText = "Powered by Mr Undangan";
+        if (subEl) {
+            subEl.innerText = "Powered by Lembarku";
+            subEl.classList.remove("hide");
+        }
         document.getElementById("floating-chat-wrap")?.classList.add("hide");
         if (dotsBtn) {
             dotsBtn.classList.add("hide");
@@ -717,8 +729,11 @@ function renderHeaderActions() {
     const isProfileMenu = ["profile", "master", "cabang", "staff"].includes(currentViewName);
     document.body.classList.toggle("in-home", !isProfileMenu);
 
-    if (mainEl) mainEl.innerText = "Mr Undangan";
-    if (subEl) subEl.innerText = "Powered by Kausar.pictures";
+    if (mainEl) mainEl.innerText = "Lembarku";
+    if (subEl) {
+        subEl.innerText = "";
+        subEl.classList.add("hide");
+    }
     document.getElementById("floating-chat-wrap")?.classList.remove("hide");
     if (dotsBtn) {
         if (isProfileMenu) {
@@ -749,7 +764,7 @@ function renderHeaderActions() {
 
 // ================= INSTAGRAM-STYLE STATS HELPERS & FOLLOW =================
 function _normKey(s) {
-    return String(s || "").trim().toLowerCase();
+    return _normAppUserKey(s);
 }
 
 function _fmtIgCount(num) {
@@ -823,7 +838,7 @@ function _buildIgStatsRowHtml(targetUserObj) {
     const isFollowingThis = canFollowThis && _getFollowingListForUser(curU).includes(uname);
 
     const followersClick = (isMasterProfile && !isSelf)
-        ? `onclick="showToast('Daftar followers akun Master bersifat privat.','info')"`
+        ? `onclick="showToast('Daftar followers akun Founder bersifat privat.','info')"`
         : `onclick="if(typeof openSoloFollowersModal==='function')openSoloFollowersModal('${esc(uname)}')"`;
 
     const followersColHtml = isCabangProfile
@@ -876,7 +891,7 @@ async function toggleFollowTargetUser(targetUname) {
     const targetObj = (db.users || []).find(u => _normKey(u.username) === tKey);
     if (!targetObj) return;
     if (targetObj.role === "master" && curU.role !== "user" && curU.role !== "administrasi") {
-        return showToast("Hanya User dan Admin yang dapat mengikuti akun Master.", "info");
+        return showToast("Hanya User dan Admin yang dapat mengikuti akun Founder.", "info");
     }
 
     const myKey = _normKey(curU.username);
@@ -960,7 +975,7 @@ function renderMainSlideMenuList() {
         html += menuRowItem("fa-music", "Stok Musik & Testimoni", "Kelola daftar lagu & ulasan beranda", "toggleSlideMenu(false);routeDashboard();openMasterWorkspace('media');");
         html += menuRowItem("fa-qrcode", "QRIS DANA & Rekening", "Mode QRIS Tetap / Dinamis & rekening", "openSlideSub('qris')");
         html += menuRowItem("fa-comments", "Live Chat Pelanggan", "Balas pesan, mulai chat baru & pengajuan PIN", "toggleSlideMenu(false);openFullChatOverlay();");
-        html += menuRowItem("fa-user-pen", "Edit Profil Master", "Foto profil, sampul & bio", "openSlideSub('profil')");
+        html += menuRowItem("fa-user-pen", "Edit Profil Founder", "Foto profil, sampul & bio", "openSlideSub('profil')");
         html += menuRowItem("fa-shield-halved", "Keamanan Akun & Keluar", "Ubah username, sandi atau logout", "openSlideSub('akun')");
     } else if (u.role === "administrasi") {
         html += menuRowItem("fa-clipboard-check", "Antrean Konfirmasi & Edit User", "Konfirmasi berkas, revisi & edit proyek user", "toggleSlideMenu(false);routeDashboard();");
@@ -988,7 +1003,7 @@ function openSlideSub(sec) {
         .forEach(id => document.getElementById(id)?.classList.add("hide"));
 
     const u = typeof getCurrentUserObj === "function" ? getCurrentUserObj() : null;
-    const defAv = typeof DEFAULT_AVATAR !== "undefined" ? DEFAULT_AVATAR : "./logo.png";
+    const defAv = typeof DEFAULT_AVATAR !== "undefined" ? DEFAULT_AVATAR : "./lembarku-logo.png";
     const tKey = typeof APP_THEME_KEY !== "undefined" ? APP_THEME_KEY : "MR_UNDANGAN_APP_THEME";
     const tEl = document.getElementById("drawer-main-title");
 
@@ -997,7 +1012,7 @@ function openSlideSub(sec) {
         if (typeof applyAppTheme === "function") applyAppTheme(localStorage.getItem(tKey) || "light", false);
         document.getElementById("drawer-sub-theme")?.classList.remove("hide");
     } else if (sec === "about") {
-        if (tEl) tEl.innerText = "Tentang Mr Undangan";
+        if (tEl) tEl.innerText = "Tentang Lembarku";
         document.getElementById("drawer-sub-about")?.classList.remove("hide");
     } else if (sec === "profil" && u) {
         if (tEl) tEl.innerText = u.role === "cabang" ? "Profil & Label Brand" : "Pengaturan Profil";
@@ -1057,7 +1072,7 @@ function pickCroppedProfileMedia(inp, type) {
 }
 async function removeProfileMedia(type) {
     const u = typeof getCurrentUserObj === "function" ? getCurrentUserObj() : null; if (!u) return;
-    const defAv = typeof DEFAULT_AVATAR !== "undefined" ? DEFAULT_AVATAR : "./logo.png";
+    const defAv = typeof DEFAULT_AVATAR !== "undefined" ? DEFAULT_AVATAR : "./lembarku-logo.png";
     if (!u[type]) return showToast("Foto sudah kosong.", "info");
     if (!(await showConfirm("Hapus Foto", `Hapus ${type === "avatar" ? "foto profil" : "sampul profil"} ini?`, "fa-solid fa-trash", "Ya, Hapus"))) return;
     showLoading("Menghapus...");
@@ -1091,8 +1106,8 @@ async function saveProfileInfo() {
 }
 async function changeUserCredentials() {
     const u = typeof getCurrentUserObj === "function" ? getCurrentUserObj() : null; if (!u) return;
-    const oldU = String(u.username || "").trim().toLowerCase();
-    const newU = document.getElementById("set-acc-user").value.trim().toLowerCase();
+    const oldU = _normAppUserKey(u.username);
+    const newU = _normAppUserKey(document.getElementById("set-acc-user").value.trim().toLowerCase());
     const newP = document.getElementById("set-acc-pass").value.trim();
     if (!newU || !newP) return showToast("Isi username dan password baru.", "error");
     if (!(await showConfirm("Ubah Kredensial", "Yakin ingin memperbarui username atau password Anda?"))) return;
@@ -1103,7 +1118,7 @@ async function changeUserCredentials() {
     if (!res || !res.ok) return showToast((res && res.message) || "Gagal memperbarui akun.", "error");
 
     const finalUser = (res.user && res.user.username)
-        ? Object.assign({}, updated, res.user, { username: String(res.user.username).trim().toLowerCase() })
+        ? Object.assign({}, updated, res.user, { username: _normAppUserKey(res.user.username) })
         : updated;
 
     currentSessionUser = finalUser.username;
@@ -1113,7 +1128,7 @@ async function changeUserCredentials() {
         localStorage.setItem(SESSION_TOKEN_KEY, res.token);
     }
     if (Array.isArray(db.users) && oldU && oldU !== currentSessionUser) {
-        db.users = db.users.filter(x => String(x.username || "").toLowerCase() !== oldU);
+        db.users = db.users.filter(x => _normAppUserKey(x.username) !== oldU);
     }
     ensureUserInLocalDb(finalUser);
     if (typeof idbSet === "function") idbSet("db_snapshot", db);
@@ -1141,7 +1156,7 @@ function _getSafeBanners() {
         title: "Buat Undangan Digital, CV & Lamaran Praktis",
         subtitle: "Pilih desain, isi data, dan bagikan tautan undangan atau unduh PDF langsung dari HP.",
         ctaText: "Mulai Buat",
-        img: "./logo.png",
+        img: "./lembarku-logo.png",
         targetSection: "sec-undangan"
     }];
 }
@@ -1155,11 +1170,11 @@ function renderPromoBannerSlider() {
 
     track.innerHTML = slides.map((s, idx) => `
         <div onclick="handlePromoBannerClick(${idx})" class="min-w-full h-full relative flex items-end sm:items-center px-4 py-3.5 md:px-14 cursor-pointer select-none">
-            <img src="${s.img || "./logo.png"}" class="absolute inset-0 w-full h-full object-cover opacity-75">
+            <img src="${s.img || "./lembarku-logo.png"}" class="absolute inset-0 w-full h-full object-cover opacity-75">
             <div class="absolute inset-0 bg-gradient-to-r from-black/85 via-black/50 to-black/20"></div>
             <div class="relative z-10 max-w-xl space-y-1 sm:space-y-2 text-white">
                 <span class="inline-block px-2.5 py-0.5 rounded-full bg-amber-400 text-black font-extrabold text-[9px] uppercase tracking-wider">${escHtml(s.badge || "PROMO")}</span>
-                <h2 class="text-sm sm:text-2xl md:text-3xl font-extrabold leading-tight drop-shadow">${escHtml(s.title || "Mr Undangan")}</h2>
+                <h2 class="text-sm sm:text-2xl md:text-3xl font-extrabold leading-tight drop-shadow">${escHtml(s.title || "Lembarku")}</h2>
                 <p class="text-[10px] sm:text-xs text-zinc-200 line-clamp-2 max-w-md">${escHtml(s.subtitle || "")}</p>
                 ${s.ctaText ? `<span class="inline-block mt-1 gold-pill-btn px-3.5 py-1.5 rounded-lg text-[10px] sm:text-xs shadow">${escHtml(s.ctaText)} <i class="fa-solid fa-arrow-right ml-1"></i></span>` : ""}
             </div>
@@ -1511,9 +1526,9 @@ function buildFilmPosterDocCardHtml(doc, isCabang = false) {
 }
 
 function getUserCombinedDocs(username) {
-    const uname = String(username || "").toLowerCase();
-    const invs = (db.invitations || []).filter(i => String(i.owner || "").toLowerCase() === uname).map(i => Object.assign({}, i, { _kind: "inv" }));
-    const pfs = (db.portfolios || []).filter(p => String(p.owner || "").toLowerCase() === uname).map(p => Object.assign({}, p, { _kind: "pf" }));
+    const uname = _normAppUserKey(username);
+    const invs = (db.invitations || []).filter(i => _normAppUserKey(i.owner) === uname).map(i => Object.assign({}, i, { _kind: "inv" }));
+    const pfs = (db.portfolios || []).filter(p => _normAppUserKey(p.owner) === uname).map(p => Object.assign({}, p, { _kind: "pf" }));
     return [...invs, ...pfs].sort((a, b) => Number(b.createdAt || b.id || 0) - Number(a.createdAt || a.id || 0));
 }
 
@@ -1566,7 +1581,7 @@ function _mountProfileIgStats(sectionId, mountId, userObj) {
 
 function renderUserProfile() {
     const u = typeof getCurrentUserObj === "function" ? getCurrentUserObj() : null; if (!u) return;
-    const defAv = typeof DEFAULT_AVATAR !== "undefined" ? DEFAULT_AVATAR : "./logo.png";
+    const defAv = typeof DEFAULT_AVATAR !== "undefined" ? DEFAULT_AVATAR : "./lembarku-logo.png";
     const bEl = document.getElementById("prof-banner"); if (bEl) bEl.style.backgroundImage = u.banner ? `url('${u.banner}')` : "";
     const aEl = document.getElementById("prof-avatar");
     if (aEl) {
@@ -1599,7 +1614,7 @@ function renderUserProfile() {
 
 function renderCabangAdmin() {
     const cab = typeof getCurrentUserObj === "function" ? getCurrentUserObj() : null; if (!cab) return;
-    const defAv = typeof DEFAULT_AVATAR !== "undefined" ? DEFAULT_AVATAR : "./logo.png";
+    const defAv = typeof DEFAULT_AVATAR !== "undefined" ? DEFAULT_AVATAR : "./lembarku-logo.png";
     const bEl = document.getElementById("cprof-banner"); if (bEl) bEl.style.backgroundImage = cab.banner ? `url('${cab.banner}')` : "";
     const aEl = document.getElementById("cprof-avatar");
     if (aEl) {
@@ -1613,7 +1628,7 @@ function renderCabangAdmin() {
     const uEl = document.getElementById("cabang-username"); if (uEl) uEl.innerText = `@${cab.username}`;
     const qEl = document.getElementById("cabang-quota-badge"); if (qEl) qEl.innerText = cab.quota || 0;
     const brandLbl = (cab.brandName && cab.brandName.trim()) ? cab.brandName.trim() : cab.name;
-    const brEl = document.getElementById("cabang-brand-badge"); if (brEl) brEl.innerHTML = `<i class="fa-solid fa-tag app-accent mr-1"></i>Label: <strong>${escHtml(brandLbl)}</strong> • Powered by Mr Undangan`;
+    const brEl = document.getElementById("cabang-brand-badge"); if (brEl) brEl.innerHTML = `<i class="fa-solid fa-tag app-accent mr-1"></i>Label: <strong>${escHtml(brandLbl)}</strong> • Powered by Lembarku`;
 
     _mountProfileIgStats("view-cabang-admin", "cabang-ig-stats-mount", cab);
 
@@ -1738,7 +1753,7 @@ async function bootMrUndanganApp() {
 
             try {
                 const savedU = JSON.parse(localStorage.getItem(USER_CACHE_KEY) || "null");
-                if (savedU && String(savedU.username).toLowerCase() === String(currentSessionUser).toLowerCase()) {
+                if (savedU && _normAppUserKey(savedU.username) === _normAppUserKey(currentSessionUser)) {
                     ensureUserInLocalDb(savedU);
                 }
             } catch {}
