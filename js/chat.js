@@ -1,5 +1,5 @@
 // =========================================================================
-// MR UNDANGAN — LIVE CHAT, KONTAK BARU (+), NOTIFIKASI & HAPUS HISTORY (js/chat.js)
+// LEMBARKU — LIVE CHAT, KONTAK BARU (+), NOTIFIKASI & HAPUS HISTORY (js/chat.js)
 // =========================================================================
 const QUICK_REPLIES_STAFF = [
     "Halo Kak, ada yang bisa kami bantu?",
@@ -15,6 +15,12 @@ window._chatOriginView = null;
 
 function isStaffUserObj(u) {
     return !!(u && (u.role === "master" || u.role === "administrasi"));
+}
+
+function _normChatKey(uname) {
+    const k = String(uname || "").trim().toLowerCase();
+    const founderU = (typeof FOUNDER_USERNAME !== "undefined" && FOUNDER_USERNAME) ? FOUNDER_USERNAME : "kausar.af";
+    return k === "master" ? founderU : k;
 }
 
 function playSoftChatNotification() {
@@ -52,7 +58,7 @@ window._restoreChatFromNav = function (stepObj) {
     document.body.style.overflow = "hidden";
     ov.classList.remove("hide");
     if (stepObj && stepObj.type === "chat_thread" && stepObj.threadUser) {
-        activeMasterChatThread = String(stepObj.threadUser).toLowerCase();
+        activeMasterChatThread = _normChatKey(stepObj.threadUser);
     } else {
         activeMasterChatThread = null;
     }
@@ -64,8 +70,8 @@ function getChatThreads() {
     const isAdministrasiOnly = curU && curU.role === "administrasi";
     const map = {};
     (db.chats || []).forEach(c => {
-        const key = String(c.threadUser || c.sender || "tamu").toLowerCase();
-        const u = (db.users || []).find(x => String(x.username || "").toLowerCase() === key);
+        const key = _normChatKey(c.threadUser || c.sender || "tamu");
+        const u = (db.users || []).find(x => _normChatKey(x.username) === key);
         const role = (u && u.role) || (key.startsWith("tamu_") ? "tamu" : "user");
         if (isAdministrasiOnly && (role === "cabang" || role === "master")) return;
 
@@ -92,8 +98,8 @@ function getChatThreads() {
 function getAccessibleChatContacts() {
     const curU = getCurrentUserObj();
     if (!curU || !curU.username) return [];
-    const myKey = String(curU.username).toLowerCase();
-    const all = (db.users || []).filter(u => u && u.username && String(u.username).toLowerCase() !== myKey);
+    const myKey = _normChatKey(curU.username);
+    const all = (db.users || []).filter(u => u && u.username && _normChatKey(u.username) !== myKey);
 
     if (curU.role === "master" || curU.role === "administrasi") {
         return all;
@@ -112,7 +118,7 @@ function openChatContactsModal() {
         if (curU.role === "master" || curU.role === "administrasi") {
             sub.innerText = "Semua Kontak Pengguna & Admin";
         } else if (curU.role === "cabang") {
-            sub.innerText = "Kontak Admin (Master Admin & Tim Administrasi)";
+            sub.innerText = "Kontak Admin (Founder & Tim Administrasi)";
         } else {
             sub.innerText = "Daftar Kontak Pengguna & Admin";
         }
@@ -145,7 +151,7 @@ function renderChatContactsModalList() {
     box.innerHTML = contacts.map(u => {
         const isAdminRole = u.role === "master" || u.role === "administrasi";
         const roleBadge = u.role === "master"
-            ? `<span class="text-[9px] px-1.5 py-0.5 rounded-full bg-amber-500/20 text-amber-600 font-extrabold">MASTER</span>`
+            ? `<span class="text-[9px] px-1.5 py-0.5 rounded-full bg-amber-500/20 text-amber-600 font-extrabold">FOUNDER</span>`
             : u.role === "administrasi"
                 ? `<span class="text-[9px] px-1.5 py-0.5 rounded-full bg-emerald-500/20 text-emerald-600 font-extrabold">ADMIN</span>`
                 : u.role === "cabang"
@@ -153,7 +159,7 @@ function renderChatContactsModalList() {
                     : "";
         const subLine = u.bio
             ? escHtml(u.bio)
-            : (isAdminRole ? "Layanan Resmi Mr Undangan" : `@${escHtml(u.username)}`);
+            : (isAdminRole ? "Layanan Resmi Lembarku" : `@${escHtml(u.username)}`);
 
         return `
             <div onclick="startDirectChatWithContact('${esc(u.username)}')" class="px-4 py-3 hover:bg-black/5 active:bg-black/10 cursor-pointer flex items-center gap-3.5 transition">
@@ -179,13 +185,14 @@ function renderChatContactsModalList() {
 
 function startDirectChatWithContact(username) {
     document.getElementById("modal-chat-contacts")?.classList.add("hide");
-    openFullChatOverlay(String(username || "").toLowerCase());
+    if (typeof _mrDropTopModalById === "function") _mrDropTopModalById("modal-chat-contacts");
+    openFullChatOverlay(_normChatKey(username));
 }
 
 async function deleteChatThreadHistory(targetUser) {
     const curU = getCurrentUserObj();
-    if (!curU || curU.role !== "master") return showToast("Hanya Master Admin yang dapat menghapus riwayat chat.", "error");
-    const tUser = String(targetUser || activeMasterChatThread || "").trim().toLowerCase();
+    if (!curU || curU.role !== "master") return showToast("Hanya Founder yang dapat menghapus riwayat chat.", "error");
+    const tUser = _normChatKey(targetUser || activeMasterChatThread || "");
     if (!tUser) return;
     if (!(await showConfirm("Hapus Riwayat Chat", `Hapus seluruh riwayat pesan dengan @${tUser} secara permanen?`, "fa-solid fa-trash", "Ya, Hapus Riwayat"))) return;
 
@@ -193,7 +200,7 @@ async function deleteChatThreadHistory(targetUser) {
     const res = await apiAction({ action: "delete_chat_thread", threadUser: tUser });
     hideLoading();
     if (res && res.ok) {
-        db.chats = (db.chats || []).filter(c => String(c.threadUser || c.sender || "").trim().toLowerCase() !== tUser);
+        db.chats = (db.chats || []).filter(c => _normChatKey(c.threadUser || c.sender || "") !== tUser);
         if (activeMasterChatThread === tUser) activeMasterChatThread = null;
         renderFullChatOverlay();
         updateChatBadges();
@@ -206,6 +213,7 @@ async function deleteChatThreadHistory(targetUser) {
 function _renderUserProfileModalFallback(uObj) {
     const mod = document.getElementById("modal-view-user-profile");
     if (!mod || !uObj) return false;
+    const roleLabel = uObj.role === "master" ? "Founder" : (uObj.role || "user");
     const body = mod.querySelector("#mvp-body");
     if (body) {
         body.innerHTML = `
@@ -215,7 +223,7 @@ function _renderUserProfileModalFallback(uObj) {
                     <div class="min-w-0">
                         <strong class="text-base font-extrabold block truncate">${escHtml(uObj.name || uObj.username)}</strong>
                         <span class="app-accent font-semibold block truncate">@${escHtml(uObj.username)}</span>
-                        <span class="text-[10px] app-muted uppercase font-bold">Role: ${escHtml(uObj.role || "user")}</span>
+                        <span class="text-[10px] app-muted uppercase font-bold">Role: ${escHtml(roleLabel)}</span>
                     </div>
                 </div>
                 ${uObj.bio ? `<p class="app-card-soft border rounded-2xl p-3">${escHtml(uObj.bio)}</p>` : ""}
@@ -229,12 +237,12 @@ function _renderUserProfileModalFallback(uObj) {
     }
     mod.classList.remove("hide");
     mod.style.zIndex = "135";
-    _pushChatNavStep({ type: "user_profile", username: String(uObj.username || "").toLowerCase() });
+    _pushChatNavStep({ type: "user_profile", username: _normChatKey(uObj.username) });
     return true;
 }
 
 function _openUserProfileFromChat(threadUser) {
-    const cleanUser = String(threadUser || "").trim().toLowerCase();
+    const cleanUser = _normChatKey(threadUser);
     if (!cleanUser || cleanUser.startsWith("tamu_")) {
         showToast("Pengunjung Tamu tidak memiliki profil terdaftar.", "info");
         return;
@@ -248,7 +256,7 @@ function _openUserProfileFromChat(threadUser) {
         return;
     }
 
-    const uObj = (db.users || []).find(x => String(x.username || "").toLowerCase() === cleanUser);
+    const uObj = (db.users || []).find(x => _normChatKey(x.username) === cleanUser);
     if (uObj && _renderUserProfileModalFallback(uObj)) {
         return;
     }
@@ -281,11 +289,11 @@ function _syncWaChatHeader(mode = "list", title = "", avatarUrl = "", threadUser
                     ? `<img id="wa-thread-avatar" src="${avatarUrl || DEFAULT_AVATAR}" class="w-10 h-10 rounded-full object-cover border border-white/60 bg-zinc-800 shrink-0">
                        <div class="min-w-0 flex-1">
                            <h3 id="wa-thread-name" class="text-base font-extrabold text-white tracking-tight truncate">${escHtml(title || "Pengguna")}</h3>
-                           <span class="text-[10px] text-white/80 block -mt-0.5">Ketuk untuk lihat profil</span>
+                           <span class="text-[10px] text-white/80 block -mt-0.5">${isRealUser ? "Ketuk untuk lihat profil" : "Layanan Resmi Lembarku"}</span>
                        </div>`
-                    : `<img src="./logo.png" class="w-9 h-9 rounded-xl bg-white p-1 object-contain border border-black/10 shrink-0">
+                    : `<img src="./lembarku-logo.png" class="w-9 h-9 rounded-xl bg-white p-1 object-contain border border-black/10 shrink-0">
                        <div class="min-w-0 flex-1">
-                           <h3 class="text-lg font-extrabold text-white tracking-tight">Mr Undangan</h3>
+                           <h3 class="text-lg font-extrabold text-white tracking-tight">Lembarku</h3>
                        </div>`
                 }
             </div>
@@ -311,7 +319,7 @@ async function openFullChatOverlay(targetThread = null, skipHistoryPush = false)
     if (ov.classList.contains("hide") && typeof currentViewName !== "undefined") {
         window._chatOriginView = currentViewName;
     }
-    if (targetThread) activeMasterChatThread = String(targetThread).toLowerCase();
+    if (targetThread) activeMasterChatThread = _normChatKey(targetThread);
     else if (ov.classList.contains("hide")) activeMasterChatThread = null;
 
     tempChatAttachment = "";
@@ -405,7 +413,7 @@ function renderFullChatOverlay() {
         const isMaster = u.role === "master";
         const threads = getChatThreads();
         if (!activeMasterChatThread) {
-            _syncWaChatHeader("list", "Mr Undangan");
+            _syncWaChatHeader("list", "Lembarku");
             body.innerHTML = `
                 <div class="flex-1 overflow-y-auto divide-y divide-black/10 pb-24">${threads.length ? threads.map(th => {
                     const last = th.messages[th.messages.length - 1];
@@ -432,7 +440,7 @@ function renderFullChatOverlay() {
                 ${_buildPlusContactButtonHtml()}
             `;
         } else {
-            const uObj = (db.users || []).find(x => String(x.username || "").toLowerCase() === activeMasterChatThread);
+            const uObj = (db.users || []).find(x => _normChatKey(x.username) === activeMasterChatThread);
             const th = threads.find(t => t.threadUser === activeMasterChatThread) || {
                 threadUser: activeMasterChatThread,
                 displayName: (uObj && uObj.name) || activeMasterChatThread,
@@ -449,7 +457,7 @@ function renderFullChatOverlay() {
             renderFullChatMessagesOnly();
         }
     } else {
-        _syncWaChatHeader("thread", "Admin Mr Undangan", "./logo.png", "");
+        _syncWaChatHeader("thread", "Admin Lembarku", "./lembarku-logo.png", "");
         const plusHtml = u ? _buildPlusContactButtonHtml() : "";
         body.innerHTML = `
             <div id="fchat-messages-scroll" class="flex-1 overflow-y-auto p-3.5 space-y-2.5"></div>
@@ -457,7 +465,7 @@ function renderFullChatOverlay() {
             ${buildChatComposerHtml("sendUserChatMessage(event)", "chat-input-text", "btn-chat-send", "Ketik pesan...")}
         `;
         renderFullChatMessagesOnly();
-        apiAction({ action: "mark_chat_read", threadUser: (currentSessionUser || guestChatId).toLowerCase(), by: "user" }).then(updateChatBadges);
+        apiAction({ action: "mark_chat_read", threadUser: _normChatKey(currentSessionUser || guestChatId), by: "user" }).then(updateChatBadges);
     }
 }
 
@@ -469,8 +477,8 @@ function fillQuickReply(txt) {
 function renderFullChatMessagesOnly() {
     const el = document.getElementById("fchat-messages-scroll"); if (!el) return;
     const u = getCurrentUserObj(), isStaff = isStaffUserObj(u);
-    const thread = isStaff ? activeMasterChatThread : (currentSessionUser || guestChatId).toLowerCase();
-    const msgs = (db.chats || []).filter(c => String(c.threadUser || c.sender).toLowerCase() === thread);
+    const thread = isStaff ? activeMasterChatThread : _normChatKey(currentSessionUser || guestChatId);
+    const msgs = (db.chats || []).filter(c => _normChatKey(c.threadUser || c.sender) === thread);
 
     let lastStaffReplyTs = 0;
     msgs.forEach(m => {
@@ -495,7 +503,7 @@ function renderFullChatMessagesOnly() {
         }
 
         const bubbleCls = isMe ? "app-card border-2 gold-border rounded-br-sm" : "app-card border rounded-bl-sm";
-        const senderLbl = isMe ? "Anda" : (m.role === "master" ? "Master Admin" : m.role === "administrasi" ? "Tim Administrasi" : (m.senderName || "Pengguna"));
+        const senderLbl = isMe ? "Anda" : (m.role === "master" ? "Founder" : m.role === "administrasi" ? "Tim Administrasi" : (m.senderName || "Pengguna"));
 
         return `<div class="flex ${isMe ? "justify-end" : "justify-start"}">
             <div class="max-w-[84%] px-3.5 py-2.5 rounded-2xl text-xs leading-relaxed shadow-sm ${bubbleCls}">
@@ -519,7 +527,7 @@ function renderFullChatContentSmart() {
 }
 
 async function openMasterChatThread(tUser) {
-    const clean = String(tUser || "").toLowerCase();
+    const clean = _normChatKey(tUser);
     activeMasterChatThread = clean;
     _pushChatNavStep({ type: "chat_thread", threadUser: clean });
     renderFullChatOverlay();
@@ -539,7 +547,7 @@ async function sendMasterThreadReply(e) {
     const localMsg = {
         clientMsgId: cid,
         threadUser: activeMasterChatThread,
-        senderName: u && u.role === "administrasi" ? `Admin (${u.name})` : "Master Admin",
+        senderName: u && u.role === "administrasi" ? `Admin (${u.name})` : "Founder",
         role: (u && u.role) || "master",
         text,
         image,
@@ -573,7 +581,7 @@ async function sendUserChatMessage(e) {
     const cid = "cm_" + Date.now() + "_" + Math.random().toString(36).slice(2, 6);
     const localMsg = {
         clientMsgId: cid,
-        threadUser: (currentSessionUser || guestChatId).toLowerCase(),
+        threadUser: _normChatKey(currentSessionUser || guestChatId),
         senderName: (u && u.name) || "Pengunjung",
         role: (u && u.role) || "user",
         text,
@@ -610,14 +618,14 @@ function updateChatBadges() {
         count = (db.chats || []).filter(c => {
             if (c.readByMaster || c.role === "master" || c.role === "administrasi") return false;
             if (isAdministrasiOnly) {
-                const key = String(c.threadUser || c.sender || "").toLowerCase();
-                const owner = (db.users || []).find(x => String(x.username || "").toLowerCase() === key);
+                const key = _normChatKey(c.threadUser || c.sender || "");
+                const owner = (db.users || []).find(x => _normChatKey(x.username) === key);
                 if (owner && (owner.role === "cabang" || owner.role === "master")) return false;
             }
             return true;
         }).length;
     } else {
-        count = (db.chats || []).filter(c => String(c.threadUser).toLowerCase() === (currentSessionUser || guestChatId).toLowerCase() && !c.readByUser && (c.role === "master" || c.role === "administrasi")).length;
+        count = (db.chats || []).filter(c => _normChatKey(c.threadUser) === _normChatKey(currentSessionUser || guestChatId) && !c.readByUser && (c.role === "master" || c.role === "administrasi")).length;
     }
 
     if (_lastKnownChatCount >= 0 && count > _lastKnownChatCount) {
