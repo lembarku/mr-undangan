@@ -1,10 +1,17 @@
 // =========================================================================
-// LEMBARKU — FOUNDER PANEL (GRAFIK, INSPEKSI, THEME BUILDER) & STAFF
-// File: js/admin.js
+// LEMBARKU — FOUNDER PANEL FULL-SCREEN, ANALITIK PWA, FOLLOWERS & PROJECT
+// File: js/admin.js (V14.3)
 // =========================================================================
 let masterThemeCatFilter = "Pernikahan", masterThemeSearch = "", masterOrdersFilter = "all";
 let tbPhotosDraft = { cover: "", pria: "", wanita: "", couple: "", g1: "", g2: "", g3: "" };
 let pbTempUploadedImg = "";
+let _soloFollowersSearch = "";
+let _soloProjectSearch = "";
+let _soloProjectTypeFilter = "all";
+let _publicProjectsCache = {};
+let _adminStockAudio = null;
+let _adminStockPlayingUrl = "";
+
 window._soloStatsViewState = { open: false, targetUsername: "", mode: "followers", masterCat: "user", projectCat: "proses" };
 
 function _normAdminUserKey(uname) {
@@ -21,10 +28,76 @@ function _pushAdminNavStep(stepObj) {
     }
 }
 
-// ================= 1. DASBOR FOUNDER =================
+function _adminStepBackOrClose(fallbackCloseFn) {
+    if (Array.isArray(window._mrNavStack) && window._mrNavStack.length > 1) {
+        try {
+            history.back();
+            return;
+        } catch {}
+    }
+    if (typeof fallbackCloseFn === "function") fallbackCloseFn();
+}
+
+function stopAdminStockSongPreview() {
+    if (_adminStockAudio) {
+        _adminStockAudio.dataset.wantPlay = "0";
+        _adminStockAudio.onerror = null;
+        _adminStockAudio.onended = null;
+        try { _adminStockAudio.pause(); } catch {}
+        _adminStockAudio = null;
+    }
+    _adminStockPlayingUrl = "";
+    document.querySelectorAll("[data-stock-play-btn]").forEach(btn => {
+        btn.innerHTML = `<i class="fa-solid fa-play"></i>`;
+    });
+}
+
+function toggleAdminStockSongPreview(idx, btnEl) {
+    const item = (db.musicLibrary || [])[idx];
+    if (!item || !item.url) return showToast("URL lagu tidak valid.", "error");
+    const rawUrl = String(item.url).trim();
+
+    if (_adminStockAudio && !_adminStockAudio.paused && _adminStockPlayingUrl === rawUrl) {
+        stopAdminStockSongPreview();
+        return;
+    }
+
+    stopAdminStockSongPreview();
+    _adminStockPlayingUrl = rawUrl;
+    if (btnEl) btnEl.innerHTML = `<i class="fa-solid fa-circle-notch fa-spin"></i>`;
+
+    const candidates = typeof getSafeAudioCandidates === "function"
+        ? getSafeAudioCandidates(rawUrl)
+        : (typeof getAudioUrlCandidates === "function" ? getAudioUrlCandidates(rawUrl) : [rawUrl]);
+
+    const el = new Audio();
+    el.preload = "auto";
+    el.setAttribute("playsinline", "");
+    el.onplaying = () => {
+        if (btnEl && _adminStockPlayingUrl === rawUrl) {
+            btnEl.innerHTML = `<i class="fa-solid fa-stop"></i>`;
+        }
+    };
+    el.onended = () => stopAdminStockSongPreview();
+    _adminStockAudio = el;
+
+    if (typeof playAudioElementWithFallback === "function") {
+        playAudioElementWithFallback(el, candidates, () => {
+            stopAdminStockSongPreview();
+            showToast("Gagal memutar lagu. Pastikan file audio valid.", "error");
+        }, rawUrl);
+    } else {
+        el.src = candidates[0] || rawUrl;
+        el.play().catch(() => {
+            stopAdminStockSongPreview();
+            showToast("Gagal memutar lagu.", "error");
+        });
+    }
+}
+
+// ================= 1. DASBOR PROFIL FOUNDER & WORKSPACE FULL-SCREEN =================
 function renderMasterAdmin() {
     renderMasterHeaderStats();
-    openMasterWorkspace(currentMasterWorkspace || "overview", true);
 }
 
 function _formatInstagramMetric(num) {
@@ -76,28 +149,32 @@ function renderMasterHeaderStats() {
 
     const statsContainer = _findMasterStatsBox();
     if (statsContainer) {
-        statsContainer.className = "ig-master-stats-wrap w-full mt-3 md:mt-0";
+        statsContainer.className = "ig-master-stats-wrap w-full md:w-auto md:min-w-[290px] mt-3 md:mt-0";
         const followingCount = (typeof _getFollowingListForUser === "function")
             ? _getFollowingListForUser(m).length
             : (Array.isArray(m.following) ? m.following.length : 0);
         const allProj = (typeof _getProjectsForUser === "function")
             ? _getProjectsForUser(m)
             : [...(db.invitations || []), ...(db.portfolios || [])];
+        const pendingUsersCnt = (db.users || []).filter(u => u && u.role !== "master" && u.status !== "Aktif").length;
+        const pendingProjCnt = allProj.filter(p => p && p.status !== "Aktif").length;
 
         statsContainer.innerHTML = `
             <div class="app-card-soft border rounded-2xl p-2 shadow-sm">
                 <div class="grid grid-cols-3 divide-x divide-black/10 text-center">
-                    <button type="button" onclick="openSoloFollowersModal('${esc(m.username)}')" class="py-2 px-1 rounded-xl hover:bg-black/5 active:scale-98 transition">
+                    <button type="button" onclick="openSoloFollowersModal('${esc(m.username)}')" class="py-2 px-1 rounded-xl hover:bg-black/5 active:scale-98 transition relative">
                         <span class="block text-sm sm:text-base font-extrabold tracking-tight">${escHtml(_formatMasterFollowersNum())}</span>
                         <span class="block text-[11px] app-muted font-medium">Followers</span>
+                        ${pendingUsersCnt > 0 ? `<span class="absolute top-1 right-1.5 min-w-[16px] h-4 px-1 rounded-full bg-amber-500 text-black text-[9px] font-extrabold flex items-center justify-center">${pendingUsersCnt}</span>` : ""}
                     </button>
                     <button type="button" onclick="openSoloFollowingModal('${esc(m.username)}')" class="py-2 px-1 rounded-xl hover:bg-black/5 active:scale-98 transition">
                         <span class="block text-sm sm:text-base font-extrabold tracking-tight">${escHtml(_formatInstagramMetric(followingCount))}</span>
                         <span class="block text-[11px] app-muted font-medium">Following</span>
                     </button>
-                    <button type="button" onclick="openSoloProjectModal('${esc(m.username)}')" class="py-2 px-1 rounded-xl hover:bg-black/5 active:scale-98 transition">
+                    <button type="button" onclick="openSoloProjectModal('${esc(m.username)}')" class="py-2 px-1 rounded-xl hover:bg-black/5 active:scale-98 transition relative">
                         <span class="block text-sm sm:text-base font-extrabold tracking-tight">${escHtml(_formatInstagramMetric(allProj.length))}</span>
                         <span class="block text-[11px] app-muted font-medium">Project</span>
+                        ${pendingProjCnt > 0 ? `<span class="absolute top-1 right-1.5 min-w-[16px] h-4 px-1 rounded-full bg-red-500 text-white text-[9px] font-extrabold flex items-center justify-center">${pendingProjCnt}</span>` : ""}
                     </button>
                 </div>
             </div>
@@ -106,24 +183,45 @@ function renderMasterHeaderStats() {
 }
 
 function openMasterWorkspace(name, fromNav = false) {
+    const curU = getCurrentUserObj();
     if (name === "chat") return openFullChatOverlay();
+    if (name === "orders" && curU) return openSoloProjectModal(curU.username);
+    if (name === "users_cabang" && curU) return openSoloFollowersModal(curU.username);
+
     currentMasterWorkspace = name || "overview";
     pbTempUploadedImg = "";
-    const titles = {
-        overview: "Grafik & Analitik Bisnis",
-        orders: "Verifikasi Konfirmasi, Revisi & Edit Proyek",
-        themes: "Kelola Tema Undangan & Harga CV/Lamaran",
-        users_cabang: "Kelola Akun User, Cabang, Pro & Tim Administrasi",
-        home_editor: "Edit Banner Promosi Beranda (12 : 4.4)",
-        media: "Stok Musik & Slideshow Testimoni"
+    stopAdminStockSongPreview();
+
+    const meta = {
+        overview: { title: "Grafik & Analitik Bisnis", sub: "Omzet, tren pesanan & pemasangan aplikasi (PWA)" },
+        themes: { title: "Kelola Tema & Harga", sub: "Foto template, nama contoh & harga CV/Lamaran" },
+        home_editor: { title: "Edit Banner Promosi (12:4.4)", sub: "Atur slide promosi utama di Beranda" },
+        media: { title: "Stok Musik & Testimoni", sub: "Upload lagu dari perangkat & ulasan pelanggan" }
     };
+    const info = meta[currentMasterWorkspace] || { title: "Panel Founder", sub: "Pengaturan Mandiri Lembarku" };
     const tEl = document.getElementById("master-active-panel-title");
-    if (tEl) tEl.innerText = titles[currentMasterWorkspace] || "Panel Founder";
-    const backBtn = document.getElementById("master-back-overview-btn");
-    if (backBtn) backBtn.classList.toggle("hide", currentMasterWorkspace === "overview");
+    const sEl = document.getElementById("master-active-panel-sub");
+    if (tEl) tEl.innerText = info.title;
+    if (sEl) sEl.innerText = info.sub;
+
     renderMasterWorkspaceContent();
-    if (!fromNav && currentMasterWorkspace !== "overview") {
+    const modal = document.getElementById("modal-master-workspace");
+    if (modal) {
+        modal.classList.remove("hide");
+        const sc = modal.querySelector(".lbk-fs-scroll");
+        if (sc) sc.scrollTop = 0;
+    }
+    if (!fromNav) {
         _pushAdminNavStep({ type: "workspace", name: currentMasterWorkspace });
+    }
+}
+
+function closeMasterWorkspaceFullscreen(fromNav = false) {
+    stopAdminStockSongPreview();
+    document.getElementById("modal-master-workspace")?.classList.add("hide");
+    if (!fromNav && Array.isArray(window._mrNavStack) && window._mrNavStack.length > 1) {
+        const top = window._mrNavStack[window._mrNavStack.length - 1];
+        if (top && top.type === "workspace") window._mrNavStack.pop();
     }
 }
 
@@ -146,6 +244,7 @@ function buildMasterAnalyticsHtml() {
         const dt = new Date(now.getFullYear(), now.getMonth() - k, 1);
         months.push({
             key: `${dt.getFullYear()}-${dt.getMonth()}`,
+            ymKey: `${dt.getFullYear()}-${String(dt.getMonth() + 1).padStart(2, "0")}`,
             label: dt.toLocaleDateString("id-ID", { month: "short" }),
             orders: 0,
             rev: 0
@@ -177,35 +276,104 @@ function buildMasterAnalyticsHtml() {
     const uStaff = users.filter(u => u.role === "administrasi").length;
     const maxU = Math.max(1, uReg, uPro, uCab, uStaff);
 
+    // Data Pemasangan & Pencopotan Aplikasi (PWA)
+    const appSt = (db.appStats && typeof db.appStats === "object") ? db.appStats : {};
+    const activeInstalled = Number(appSt.activeInstalled || 0);
+    const totalInstalled = Number(appSt.totalInstalled || 0);
+    const totalUninstalled = Number(appSt.totalUninstalled || 0);
+    const appHistMap = {};
+    (Array.isArray(appSt.history) ? appSt.history : []).forEach(h => {
+        if (h && h.key) appHistMap[h.key] = h;
+    });
+    const pwaMonths = months.map(m => {
+        const rec = appHistMap[m.ymKey] || { installs: 0, uninstalls: 0 };
+        return {
+            label: m.label,
+            installs: Number(rec.installs || 0),
+            uninstalls: Number(rec.uninstalls || 0)
+        };
+    });
+    const maxPwa = Math.max(1, ...pwaMonths.map(x => Math.max(x.installs, x.uninstalls)));
+    const retentionPct = totalInstalled > 0 ? Math.round((activeInstalled / totalInstalled) * 100) : 100;
+
     const pendingUsers = users.filter(u => u.status !== "Aktif");
     const logs = (db.adminLogs || []).slice(0, 6);
 
     return `<div class="space-y-5">
         <div class="grid grid-cols-2 sm:grid-cols-4 gap-3">
-            <div class="app-card-soft border rounded-2xl p-3.5 space-y-1">
+            <div class="app-card border rounded-2xl p-3.5 space-y-1 shadow-sm">
                 <span class="text-[10px] app-muted font-bold uppercase block">Omzet Aktif</span>
                 <strong class="text-base sm:text-lg font-extrabold app-accent block truncate">${fmtRp(totalRev)}</strong>
                 <span class="text-[10px] app-muted">${invActive.length} Undangan • ${cvActive.length + lamActive.length} CV/Lam</span>
             </div>
-            <div class="app-card-soft border rounded-2xl p-3.5 space-y-1">
+            <div class="app-card border rounded-2xl p-3.5 space-y-1 shadow-sm">
                 <span class="text-[10px] app-muted font-bold uppercase block">Omzet Undangan</span>
                 <strong class="text-base sm:text-lg font-extrabold block truncate">${fmtRp(revInv)}</strong>
                 <span class="text-[10px] text-emerald-600 font-semibold">${invActive.length} aktif</span>
             </div>
-            <div class="app-card-soft border rounded-2xl p-3.5 space-y-1">
+            <div class="app-card border rounded-2xl p-3.5 space-y-1 shadow-sm">
                 <span class="text-[10px] app-muted font-bold uppercase block">Omzet CV &amp; Lamaran</span>
                 <strong class="text-base sm:text-lg font-extrabold block truncate">${fmtRp(revPf)}</strong>
                 <span class="text-[10px] text-blue-600 font-semibold">${cvActive.length + lamActive.length} aktif</span>
             </div>
-            <div class="app-card-soft border rounded-2xl p-3.5 space-y-1">
+            <div class="app-card border rounded-2xl p-3.5 space-y-1 shadow-sm">
                 <span class="text-[10px] app-muted font-bold uppercase block">Pendaftar Baru</span>
                 <strong class="text-base sm:text-lg font-extrabold text-amber-500 block">${pendingUsers.length} Akun</strong>
-                <span class="text-[10px] app-muted">Gunakan titik 3 untuk kelola</span>
+                <span class="text-[10px] app-muted">Kelola di Followers</span>
+            </div>
+        </div>
+
+        <div class="app-card border rounded-3xl p-4 sm:p-5 space-y-4 shadow-sm">
+            <div class="flex flex-wrap items-center justify-between gap-2">
+                <div>
+                    <h4 class="text-xs font-extrabold uppercase app-accent"><i class="fa-solid fa-mobile-screen-button mr-1.5"></i>Statistik Install &amp; Uninstall Aplikasi (PWA)</h4>
+                    <p class="text-[10px] app-muted mt-0.5">Pelacakan perangkat yang memasang ikon Lembarku dan yang terindikasi mencopot aplikasi</p>
+                </div>
+                <span class="text-[10px] px-2.5 py-1 rounded-full bg-emerald-500/15 text-emerald-600 font-extrabold">Retensi: ${retentionPct}%</span>
+            </div>
+
+            <div class="grid grid-cols-3 gap-2.5 text-center">
+                <div class="app-card-soft border rounded-2xl p-3">
+                    <span class="text-[10px] app-muted font-bold uppercase block">Aktif Terpasang</span>
+                    <strong class="text-xl font-extrabold text-emerald-600 block mt-0.5">${activeInstalled}</strong>
+                </div>
+                <div class="app-card-soft border rounded-2xl p-3">
+                    <span class="text-[10px] app-muted font-bold uppercase block">Total Install</span>
+                    <strong class="text-xl font-extrabold text-blue-600 block mt-0.5">${totalInstalled}</strong>
+                </div>
+                <div class="app-card-soft border rounded-2xl p-3">
+                    <span class="text-[10px] app-muted font-bold uppercase block">Uninstall</span>
+                    <strong class="text-xl font-extrabold text-red-500 block mt-0.5">${totalUninstalled}</strong>
+                </div>
+            </div>
+
+            <div class="space-y-2">
+                <div class="flex items-center justify-between text-[10px] app-muted px-1">
+                    <span>Tren 6 Bulan Terakhir</span>
+                    <div class="flex items-center gap-3 font-bold">
+                        <span class="flex items-center gap-1"><span class="w-2.5 h-2.5 rounded-sm bg-emerald-500 inline-block"></span>Install</span>
+                        <span class="flex items-center gap-1"><span class="w-2.5 h-2.5 rounded-sm bg-red-500 inline-block"></span>Uninstall</span>
+                    </div>
+                </div>
+                <div class="h-36 flex items-end justify-between gap-2 pt-3 px-2 app-card-soft border rounded-2xl pb-2">
+                    ${pwaMonths.map(pm => {
+                        const hIn = pm.installs > 0 ? Math.max(12, Math.round((pm.installs / maxPwa) * 100)) : 5;
+                        const hUn = pm.uninstalls > 0 ? Math.max(12, Math.round((pm.uninstalls / maxPwa) * 100)) : 5;
+                        return `<div class="flex-1 flex flex-col items-center gap-1 h-full justify-end">
+                            <div class="flex items-end gap-1 h-24 w-full justify-center">
+                                <div class="w-3 sm:w-4 rounded-t-md bg-emerald-500 transition-all" style="height:${hIn}%" title="${pm.label} Install: ${pm.installs}"></div>
+                                <div class="w-3 sm:w-4 rounded-t-md bg-red-500/85 transition-all" style="height:${hUn}%" title="${pm.label} Uninstall: ${pm.uninstalls}"></div>
+                            </div>
+                            <span class="text-[9.5px] font-bold">${pm.installs}/${pm.uninstalls}</span>
+                            <span class="text-[9.5px] app-muted font-semibold">${pm.label}</span>
+                        </div>`;
+                    }).join("")}
+                </div>
             </div>
         </div>
 
         <div class="grid md:grid-cols-2 gap-4">
-            <div class="app-card-soft border rounded-2xl p-4 space-y-3">
+            <div class="app-card border rounded-3xl p-4 space-y-3 shadow-sm">
                 <div class="flex items-center justify-between">
                     <h4 class="text-xs font-extrabold uppercase app-accent">Tren Pesanan (6 Bulan)</h4>
                     <span class="text-[10px] app-muted">Total: ${allDocs.length} berkas</span>
@@ -222,7 +390,7 @@ function buildMasterAnalyticsHtml() {
                 </div>
             </div>
 
-            <div class="app-card-soft border rounded-2xl p-4 space-y-4">
+            <div class="app-card border rounded-3xl p-4 space-y-4 shadow-sm">
                 <h4 class="text-xs font-extrabold uppercase app-accent">Komposisi Produk &amp; Akun</h4>
                 <div class="flex items-center gap-5">
                     <svg width="96" height="96" viewBox="0 0 96 96" class="shrink-0 -rotate-90">
@@ -248,14 +416,14 @@ function buildMasterAnalyticsHtml() {
             </div>
         </div>
 
-        <div class="app-card-soft border rounded-2xl p-4 space-y-2.5">
+        <div class="app-card border rounded-3xl p-4 space-y-2.5 shadow-sm">
             <h4 class="text-xs font-extrabold uppercase app-accent">Aktivitas Verifikasi &amp; Edit Terbaru</h4>
-            ${logs.length ? logs.map(l => `<div class="app-card border rounded-xl px-3 py-2 flex items-center justify-between gap-2 text-[11px]"><div class="min-w-0"><strong class="app-accent">@${escHtml(l.actor)}</strong> <span class="text-[9px] uppercase px-1.5 py-0.5 rounded app-btn-sec font-bold mr-1">${escHtml(l.role)}</span><span>${escHtml(l.msg)}</span></div><span class="text-[10px] app-muted shrink-0">${escHtml(l.time)}</span></div>`).join("") : '<p class="text-xs app-muted">Belum ada catatan aktivitas verifikasi.</p>'}
+            ${logs.length ? logs.map(l => `<div class="app-card-soft border rounded-xl px-3 py-2 flex items-center justify-between gap-2 text-[11px]"><div class="min-w-0"><strong class="app-accent">@${escHtml(l.actor)}</strong> <span class="text-[9px] uppercase px-1.5 py-0.5 rounded app-btn-sec font-bold mr-1">${escHtml(l.role)}</span><span>${escHtml(l.msg)}</span></div><span class="text-[10px] app-muted shrink-0">${escHtml(l.time)}</span></div>`).join("") : '<p class="text-xs app-muted">Belum ada catatan aktivitas verifikasi.</p>'}
         </div>
     </div>`;
 }
 
-// ================= 2. HALAMAN ROLE ADMINISTRASI & KARTU PROJECT LENGKAP =================
+// ================= 2. ROLE ADMINISTRASI & KARTU PROJECT LENGKAP =================
 function isCabangOwnedDoc(item) {
     if (!item) return false;
     if (item.brandName && String(item.brandName).trim()) return true;
@@ -283,8 +451,7 @@ function renderStaffAdmin() {
     const pendingCnt = userInvs.filter(i => i.status !== "Aktif").length + userPfs.filter(p => p.status !== "Aktif").length;
 
     const pbEl = document.getElementById("staff-pending-badge"); if (pbEl) pbEl.innerText = `${pendingCnt} Menunggu`;
-    const obEl = document.getElementById("staff-orders-body"); if (obEl) obEl.innerHTML = buildUnifiedOrdersListHtml(true);
-    updateChatBadges();
+    if (typeof updateChatBadges === "function") updateChatBadges();
 }
 
 function buildFullOrderCardHtml(item, options = {}) {
@@ -297,11 +464,12 @@ function buildFullOrderCardHtml(item, options = {}) {
     const typeTag = isPf ? (item.docType === "lamaran" ? "SURAT LAMARAN" : "CV") : `UNDANGAN • ${escHtml(item.category)}`;
     const priceInfo = item.totalPay ? `${fmtRp(item.totalPay)} (kode unik)` : (item.price ? fmtRp(item.price) : "");
 
-    return `<div class="app-card-soft border rounded-2xl p-4 flex flex-col md:flex-row md:items-center justify-between gap-3 shadow-sm">
+    return `<div class="app-card border rounded-2xl p-4 flex flex-col md:flex-row md:items-center justify-between gap-3 shadow-sm">
         <div class="min-w-0">
             <div class="flex flex-wrap items-center gap-1.5">
                 <span class="text-[9px] px-2 py-0.5 rounded-full app-accent-bg app-accent font-extrabold">${typeTag}</span>
                 <span class="text-[10px] px-2 py-0.5 rounded-full font-bold ${item.status==="Aktif"?"bg-emerald-500/20 text-emerald-600":"bg-amber-500/20 app-accent"}">● ${escHtml(item.status)}</span>
+                ${hasRev ? `<span class="text-[9px] px-2 py-0.5 rounded-full bg-purple-500/20 text-purple-600 font-extrabold">REVISI MASUK</span>` : ""}
             </div>
             <h4 class="font-bold text-sm mt-1 truncate">${escHtml(item.title)} <span class="text-xs app-muted font-normal">(@${escHtml(item.owner)}${item.brandName ? ` • ${escHtml(item.brandName)}` : ""})</span></h4>
             <p class="text-xs app-muted">${escHtml(isPf ? (item.themeName || item.themeId) : item.theme)} ${priceInfo ? `• <strong class="app-accent">${priceInfo}</strong>` : ""} • Revisi: ${item.editCount || 0}/2</p>
@@ -309,7 +477,7 @@ function buildFullOrderCardHtml(item, options = {}) {
         <div class="flex flex-wrap gap-1.5">
             ${item.owner ? `<button type="button" onclick="${preCloseJs}openFullChatOverlay('${esc(item.owner)}')" class="px-3 py-1.5 rounded-xl bg-emerald-600/15 border border-emerald-500/40 text-emerald-600 text-xs font-bold" title="Kirim Pesan ke Pemilik Order"><i class="fa-solid fa-comments mr-1"></i>Chat</button>` : ""}
             ${item.paymentProof ? `<button type="button" onclick="viewOrderProof('${item._kind}',${item.id})" class="px-3 py-1.5 rounded-xl bg-blue-600/15 border border-blue-500/40 text-blue-600 text-xs font-bold">Bukti / SS</button>` : ""}
-            <button type="button" onclick="${preCloseJs}${isPf ? `openEditPortfolio(${item.id},true)` : `openEditInvitation(${item.id},true)`}" class="px-3 py-1.5 rounded-xl app-card border app-accent text-xs font-bold"><i class="fa-solid fa-pen mr-1"></i>Edit</button>
+            <button type="button" onclick="${preCloseJs}${isPf ? `openEditPortfolio(${item.id},true)` : `openEditInvitation(${item.id},true)`}" class="px-3 py-1.5 rounded-xl app-card-soft border app-accent text-xs font-bold"><i class="fa-solid fa-pen mr-1"></i>Edit</button>
             ${hasRev ? `
                 <button type="button" onclick="${preCloseJs}${isPf ? `openPortfolioDocPreview(${item.id},true)` : `previewPendingRevision(${item.id})`}" class="px-3 py-1.5 rounded-xl app-btn-sec text-xs font-bold">Cek Revisi</button>
                 <button type="button" onclick="approveOrderRevision('${item._kind}',${item.id},this)" class="gold-pill-btn px-3.5 py-1.5 rounded-xl text-xs">✓ ACC Revisi</button>
@@ -335,7 +503,7 @@ function buildUserOwnProjectCardHtml(doc, isCabangOwner = false) {
     const typeTag = isPf ? (doc.docType === "lamaran" ? "SURAT LAMARAN" : "CV") : `UNDANGAN • ${escHtml(doc.category)}`;
     const preClose = "closeSoloStatsModal();closeUserProfileModalCustom();";
 
-    return `<div class="app-card-soft border rounded-2xl p-4 space-y-3 shadow-sm">
+    return `<div class="app-card border rounded-2xl p-4 space-y-3 shadow-sm">
         <div class="min-w-0">
             <div class="flex flex-wrap items-center gap-1.5">
                 <span class="text-[9px] px-2 py-0.5 rounded-full app-accent-bg app-accent font-extrabold">${typeTag}</span>
@@ -351,7 +519,7 @@ function buildUserOwnProjectCardHtml(doc, isCabangOwner = false) {
                     ? `<button type="button" onclick="${preClose}openGuestView(${doc.id},'Tamu Kehormatan')" class="px-3 py-1.5 rounded-xl app-btn-sec text-xs font-bold"><i class="fa-regular fa-eye mr-1"></i>Lihat</button>`
                     : `<button type="button" disabled class="px-3 py-1.5 rounded-xl app-btn-sec opacity-50 text-xs font-bold"><i class="fa-solid fa-lock mr-1"></i>Lihat</button>`)}
             ${canEdit
-                ? `<button type="button" onclick="${preClose}${isPf ? `openEditPortfolio(${doc.id},${isCabangOwner})` : `openEditInvitation(${doc.id},${isCabangOwner})`}" class="px-3 py-1.5 rounded-xl app-card border app-accent text-xs font-bold"><i class="fa-solid fa-pen mr-1"></i>${editLbl}</button>`
+                ? `<button type="button" onclick="${preClose}${isPf ? `openEditPortfolio(${doc.id},${isCabangOwner})` : `openEditInvitation(${doc.id},${isCabangOwner})`}" class="px-3 py-1.5 rounded-xl app-card-soft border app-accent text-xs font-bold"><i class="fa-solid fa-pen mr-1"></i>${editLbl}</button>`
                 : `<button type="button" disabled class="px-3 py-1.5 rounded-xl app-btn-sec opacity-50 text-xs font-bold"><i class="fa-solid fa-lock mr-1"></i>Edit</button>`}
             ${isPay
                 ? `<button type="button" onclick="${preClose}openUnifiedPayment('${isPf ? "portfolio" : "inv"}',${doc.id})" class="gold-pill-btn px-3.5 py-1.5 rounded-xl text-xs"><i class="fa-solid fa-qrcode mr-1"></i>Konfirmasi</button>`
@@ -362,30 +530,6 @@ function buildUserOwnProjectCardHtml(doc, isCabangOwner = false) {
                         : ""))}
         </div>
     </div>`;
-}
-
-function buildUnifiedOrdersListHtml(isStaffMode = false) {
-    const invItems = (db.invitations || []).map(i => Object.assign({}, i, { _kind: "inv" }));
-    const pfItems = (db.portfolios || []).map(p => Object.assign({}, p, { _kind: "pf" }));
-    let list = [...invItems, ...pfItems].sort((a, b) => Number(b.createdAt || b.id || 0) - Number(a.createdAt || a.id || 0));
-
-    if (isStaffMode) {
-        list = list.filter(x => !isCabangOwnedDoc(x));
-    }
-
-    if (masterOrdersFilter === "pending") list = list.filter(x => x.status !== "Aktif");
-    else if (masterOrdersFilter === "inv") list = list.filter(x => x._kind === "inv");
-    else if (masterOrdersFilter === "pf") list = list.filter(x => x._kind === "pf");
-
-    const filterBar = `<div class="flex flex-wrap gap-1.5 pb-2">
-        ${[["all","Semua"],["pending","Menunggu"],["inv","Undangan"],["pf","CV & Lamaran"]].map(([k, lbl]) =>
-            `<button type="button" onclick="masterOrdersFilter='${k}';${isStaffMode ? "renderStaffAdmin()" : "renderMasterWorkspaceContent()"};" class="px-3 py-1.5 rounded-xl text-[11px] font-bold ${masterOrdersFilter===k?"gold-pill-btn":"app-btn-sec"}">${lbl}</button>`
-        ).join("")}
-    </div>`;
-
-    if (!list.length) return filterBar + `<p class="text-xs app-muted py-6 text-center">Tidak ada data pesanan pada filter ini.</p>`;
-
-    return filterBar + `<div class="space-y-3">` + list.map(item => buildFullOrderCardHtml(item, { isStaffMode })).join("") + `</div>`;
 }
 
 function viewOrderProof(kind, id) {
@@ -454,12 +598,16 @@ async function deleteOrderItem(kind, id) {
 function refreshAfterAdminOrderAction(msg) {
     const u = getCurrentUserObj();
     if (u && u.role === "administrasi") renderStaffAdmin();
-    else { renderMasterHeaderStats(); renderMasterWorkspaceContent(); }
+    else renderMasterHeaderStats();
+    if (document.getElementById("modal-master-workspace") && !document.getElementById("modal-master-workspace").classList.contains("hide")) {
+        renderMasterWorkspaceContent();
+    }
     if (window._soloStatsViewState && window._soloStatsViewState.open) renderSoloStatsModal();
+    if (typeof updateNotificationBellBadge === "function") updateNotificationBellBadge();
     showToast(msg);
 }
 
-// ================= 3. WORKSPACE FOUNDER: TEMA, HARGA CV, AKUN, BANNER & MEDIA =================
+// ================= 3. WORKSPACE FOUNDER FULL-SCREEN: TEMA, HARGA CV, BANNER & STOK MUSIK =================
 function renderMasterThemesGridOnly() {
     const grid = document.getElementById("master-themes-grid");
     const countEl = document.getElementById("master-themes-count");
@@ -474,13 +622,13 @@ function renderMasterThemesGridOnly() {
     if (countEl) countEl.innerText = String(list.length);
 
     if (!list.length) {
-        grid.innerHTML = `<p class="text-xs app-muted text-center py-8 sm:col-span-2 lg:col-span-3 app-card-soft rounded-2xl border border-dashed">Tidak ada tema yang cocok dengan pencarian "${escHtml(masterThemeSearch)}".</p>`;
+        grid.innerHTML = `<p class="text-xs app-muted text-center py-8 sm:col-span-2 lg:col-span-3 app-card rounded-2xl border border-dashed">Tidak ada tema yang cocok dengan pencarian "${escHtml(masterThemeSearch)}".</p>`;
         return;
     }
 
     grid.innerHTML = list.map(t => {
         const cov = getThemeCoverPair(t.cat, t), pr = getThemePricing(t);
-        return `<div class="app-card-soft border rounded-2xl overflow-hidden flex flex-col justify-between ${t.isHidden ? "opacity-55 border-dashed" : ""}">
+        return `<div class="app-card border rounded-2xl overflow-hidden flex flex-col justify-between shadow-sm ${t.isHidden ? "opacity-55 border-dashed" : ""}">
             <div class="flex gap-3 p-3">
                 <img src="${cov.src}" ${imgFbAttr(cov.fb)} loading="lazy" class="w-16 h-24 rounded-xl object-cover border gold-border shrink-0 bg-black">
                 <div class="flex-1 min-w-0 space-y-1">
@@ -519,11 +667,6 @@ function renderMasterWorkspaceContent() {
         return;
     }
 
-    if (currentMasterWorkspace === "orders") {
-        box.innerHTML = buildUnifiedOrdersListHtml(false);
-        return;
-    }
-
     if (currentMasterWorkspace === "themes") {
         const cats = [...Object.keys(THEME_CATALOG), "CV & Lamaran"];
         if (masterThemeCatFilter === "CV & Lamaran") {
@@ -535,7 +678,7 @@ function renderMasterWorkspaceContent() {
                 <div class="flex flex-wrap gap-1.5">${cats.map(c => `<button type="button" onclick="masterThemeCatFilter='${c}';renderMasterWorkspaceContent();" class="px-3 py-1.5 rounded-xl text-[11px] font-bold ${masterThemeCatFilter===c?"gold-pill-btn":"app-btn-sec"}">${c}</button>`).join("")}</div>
                 <p class="text-xs app-muted">Atur harga normal (coret) dan harga jual untuk 9 tema CV &amp; 3 tema Surat Lamaran:</p>
                 <div class="grid sm:grid-cols-2 lg:grid-cols-3 gap-3">${allPf.map(p => `
-                    <div class="app-card-soft border rounded-2xl p-3.5 space-y-2.5">
+                    <div class="app-card border rounded-2xl p-3.5 space-y-2.5 shadow-sm">
                         <div class="flex items-center justify-between gap-2">
                             <div><span class="text-[9px] px-2 py-0.5 rounded-full app-accent-bg app-accent font-extrabold uppercase">${p._dt === "lamaran" ? "Lamaran" : "CV"}</span><h4 class="font-bold text-xs mt-1">${escHtml(p.name)}</h4></div>
                             <button type="button" onclick="openPortfolioDemoPreview('${p._dt}','${p.id}')" class="px-2.5 py-1 rounded-lg app-btn-sec text-[10px] font-bold"><i class="fa-regular fa-eye"></i></button>
@@ -566,52 +709,10 @@ function renderMasterWorkspaceContent() {
         return;
     }
 
-    if (currentMasterWorkspace === "users_cabang") {
-        const list = (db.users || []).filter(u => u.role !== "master");
-        box.innerHTML = `<div class="flex flex-wrap justify-between items-center gap-2 mb-4">
-            <p class="text-xs app-muted">Buka profil publik pengguna untuk melihat statistik, followers, following &amp; project, atau ubah status Akun Pro.</p>
-            <div class="flex flex-wrap gap-1.5">
-                <button onclick="openMasterUserModal(null,'user')" class="px-3 py-1.5 rounded-xl app-card-soft border app-accent text-xs font-bold">+ User</button>
-                <button onclick="openMasterUserModal(null,'cabang')" class="px-3 py-1.5 rounded-xl app-card-soft border text-blue-600 text-xs font-bold">+ Cabang</button>
-                <button onclick="openMasterUserModal(null,'administrasi')" class="gold-pill-btn px-3 py-1.5 rounded-xl text-xs">+ Administrasi</button>
-            </div>
-        </div>
-        <div class="grid md:grid-cols-2 gap-3">${list.length ? list.map(u => {
-            const roleCol = u.role === "cabang" ? "bg-blue-500/20 text-blue-600" : u.role === "administrasi" ? "bg-emerald-500/20 text-emerald-600" : "bg-zinc-500/20 app-muted";
-            return `<div class="app-card-soft border rounded-2xl p-4 space-y-3">
-                <div class="flex items-center gap-3">
-                    <img src="${u.avatar || DEFAULT_AVATAR}" class="w-11 h-11 rounded-full object-cover bg-zinc-800 border gold-border cursor-pointer" onclick="viewUserProfileModal('${esc(u.username)}')">
-                    <div class="flex-1 min-w-0">
-                        <div class="flex items-center gap-1.5">
-                            <strong class="text-xs truncate cursor-pointer hover:underline" onclick="viewUserProfileModal('${esc(u.username)}')">${escHtml(u.name)}</strong>
-                            ${u.isPro ? '<i class="fa-solid fa-circle-check text-blue-500 text-xs" title="Akun Pro"></i>' : ""}
-                            <span class="text-[9px] px-2 py-0.5 rounded-full font-bold uppercase ${roleCol}">${escHtml(u.role)}</span>
-                        </div>
-                        <p class="text-[11px] app-accent">@${escHtml(u.username)} • <span class="${u.status==="Aktif"?"text-emerald-600":"text-amber-600"}">${escHtml(u.status)}</span></p>
-                        ${u.role === "cabang" && u.brandName ? `<p class="text-[10px] text-blue-600 font-semibold truncate"><i class="fa-solid fa-tag mr-1"></i>${escHtml(u.brandName)}</p>` : ""}
-                    </div>
-                </div>
-                <div class="flex flex-wrap items-center justify-between gap-1.5 pt-2 border-t gold-border">
-                    <div class="flex items-center gap-1 text-[11px]">
-                        ${u.role === "cabang" ? `<span class="app-accent font-bold mr-1">Kuota: ${u.quota || 0}</span><button onclick="topUpCabangRealTime('${esc(u.username)}',5,this)" class="px-2 py-1 rounded bg-emerald-600 text-white font-bold">+5</button><button onclick="topUpCabangRealTime('${esc(u.username)}',10,this)" class="px-2 py-1 rounded gold-pill-btn">+10</button>` : ""}
-                        ${u.status !== "Aktif" ? `<button onclick="approveUserRealTime('${esc(u.username)}',this)" class="gold-pill-btn px-2.5 py-1 rounded-lg text-[10px]">✓ ACC</button>` : ""}
-                        ${u.role !== "administrasi" ? `<button onclick="toggleUserProQuick('${esc(u.username)}',this)" class="px-2 py-1 rounded-lg ${u.isPro ? "bg-blue-600 text-white" : "app-btn-sec"} text-[10px] font-bold" title="Ubah Status Akun Pro">${u.isPro ? "PRO ✓" : "+Pro"}</button>` : ""}
-                    </div>
-                    <div class="flex gap-1.5">
-                        <button onclick="viewUserProfileModal('${esc(u.username)}')" class="px-2.5 py-1 rounded-lg app-accent-bg app-accent border gold-border text-[11px] font-bold"><i class="fa-regular fa-user mr-1"></i>Profil</button>
-                        <button onclick="openMasterUserModal('${esc(u.username)}')" class="px-2.5 py-1 rounded-lg app-btn-sec text-[11px] font-bold">Edit</button>
-                        <button onclick="deleteUserRealTime('${esc(u.username)}')" class="px-2.5 py-1 rounded-lg bg-red-600/15 text-red-500 text-[11px]"><i class="fa-solid fa-trash"></i></button>
-                    </div>
-                </div>
-            </div>`;
-        }).join("") : '<p class="text-xs app-muted md:col-span-2">Belum ada akun terdaftar.</p>'}</div>`;
-        return;
-    }
-
     if (currentMasterWorkspace === "home_editor") {
         const banners = db.promoBanners || [];
         box.innerHTML = `<div class="grid md:grid-cols-2 gap-6">
-            <form onsubmit="savePromoBannerForm(event)" class="app-card-soft p-4 rounded-2xl border space-y-2.5">
+            <form onsubmit="savePromoBannerForm(event)" class="app-card p-4 rounded-3xl border space-y-2.5 shadow-sm">
                 <div class="flex justify-between items-center">
                     <h4 class="font-bold text-sm app-accent">Edit Banner Promosi (Rasio 12 : 4.4 Full)</h4>
                     <button type="button" onclick="resetPromoBannerForm()" class="text-[11px] app-muted hover:underline">Reset</button>
@@ -639,7 +740,7 @@ function renderMasterWorkspaceContent() {
             </form>
             <div class="space-y-2.5">
                 <h4 class="font-bold text-xs app-accent uppercase">Daftar Slide Banner Aktif (${banners.length})</h4>
-                ${banners.map((b, i) => `<div class="app-card-soft border rounded-xl p-2.5 flex items-center gap-3">
+                ${banners.map((b, i) => `<div class="app-card border rounded-2xl p-2.5 flex items-center gap-3 shadow-sm">
                     <img src="${b.img}" class="w-24 h-10 rounded-lg object-cover bg-black shrink-0">
                     <div class="flex-1 min-w-0"><strong class="text-xs block truncate">${escHtml(b.title)}</strong><span class="text-[10px] app-muted block truncate">${escHtml(b.badge || "Promo")} • ${escHtml(b.subtitle || "")}</span></div>
                     <button type="button" onclick="editPromoBannerItem(${i})" class="px-2.5 py-1 rounded app-btn-sec text-[10px] font-bold">Edit</button>
@@ -653,24 +754,51 @@ function renderMasterWorkspaceContent() {
     if (currentMasterWorkspace === "media") {
         box.innerHTML = `<div class="grid md:grid-cols-2 gap-6">
             <div class="space-y-4">
-                <form onsubmit="addStockSong(event)" class="app-card-soft p-4 rounded-2xl border space-y-2.5">
-                    <h4 class="font-bold text-sm app-accent">Stok Lagu Website</h4>
-                    <input type="text" id="song-title" placeholder="Judul Lagu" class="app-input" required>
-                    <input type="text" id="song-cat" placeholder="Kategori (Pernikahan / Islami / Ultah)" class="app-input" required>
-                    <input type="url" id="song-url" placeholder="Link MP3 (https://.../lagu.mp3)" class="app-input" required>
-                    <button id="btn-add-song" class="w-full gold-pill-btn py-2.5 rounded-xl text-xs">+ Tambah Link Lagu</button>
-                </form>
-                <div class="space-y-2 max-h-56 overflow-y-auto">${(db.musicLibrary||[]).map((m,i)=>`<div class="app-card-soft border rounded-xl p-3 flex justify-between items-center text-xs"><div><strong>${escHtml(m.title)}</strong><span class="block text-[10px] app-accent">${escHtml(m.category)}</span></div><button onclick="delStockSong(${i})" class="text-red-500 px-2"><i class="fa-solid fa-trash"></i></button></div>`).join("") || '<p class="text-xs app-muted">Belum ada stok lagu.</p>'}</div>
+                <div class="app-card p-4 rounded-3xl border space-y-3 shadow-sm">
+                    <div class="flex items-center justify-between">
+                        <h4 class="font-bold text-sm app-accent"><i class="fa-solid fa-music mr-1.5"></i>Stok Lagu Website</h4>
+                        <span class="text-[10px] app-muted font-semibold">${(db.musicLibrary || []).length} Lagu</span>
+                    </div>
+                    <label class="block gold-pill-btn py-3 px-4 rounded-2xl text-center cursor-pointer text-xs shadow-md">
+                        <i class="fa-solid fa-upload mr-1.5"></i>Upload File Musik dari Perangkat (MP3/WAV/M4A)
+                        <input type="file" accept="audio/*" class="hide" onchange="openAudioCropperFromInput(this,'library')">
+                    </label>
+                    <p class="text-[10px] app-muted leading-relaxed">Lagu dari perangkat Anda bisa langsung dipotong bagian terbaiknya (30–90 dtk), dikompresi otomatis ke MP3 ringan, dan tersimpan ke Google Drive Stok Lagu.</p>
+
+                    <form onsubmit="addStockSong(event)" class="pt-2.5 border-t gold-border space-y-2">
+                        <span class="text-[10px] font-bold uppercase app-muted block">Atau Tambah Manual via Link MP3:</span>
+                        <div class="grid grid-cols-2 gap-2">
+                            <input type="text" id="song-title" placeholder="Judul Lagu" class="app-input !py-2 text-xs" required>
+                            <input type="text" id="song-cat" placeholder="Kategori (Pernikahan)" class="app-input !py-2 text-xs" required>
+                        </div>
+                        <input type="url" id="song-url" placeholder="Link MP3 (https://.../lagu.mp3)" class="app-input !py-2 text-xs" required>
+                        <button id="btn-add-song" class="w-full app-btn-sec py-2 rounded-xl text-xs font-bold">+ Tambah dari Link</button>
+                    </form>
+                </div>
+
+                <div class="space-y-2 max-h-72 overflow-y-auto">${(db.musicLibrary || []).map((m, i) => `
+                    <div class="app-card border rounded-2xl p-3 flex justify-between items-center gap-2 text-xs shadow-sm">
+                        <button type="button" data-stock-play-btn="${i}" onclick="toggleAdminStockSongPreview(${i},this)" class="w-8 h-8 rounded-full app-accent-bg border gold-border app-accent flex items-center justify-center shrink-0 text-[11px]" title="Putar Preview">
+                            <i class="fa-solid fa-play"></i>
+                        </button>
+                        <div class="flex-1 min-w-0">
+                            <strong class="block truncate">${escHtml(m.title)}</strong>
+                            <span class="block text-[10px] app-accent truncate">${escHtml(m.category)}</span>
+                        </div>
+                        <button type="button" onclick="delStockSong(${i})" class="w-8 h-8 rounded-xl bg-red-600/12 text-red-500 flex items-center justify-center shrink-0" title="Hapus Lagu"><i class="fa-solid fa-trash"></i></button>
+                    </div>
+                `).join("") || '<p class="text-xs app-muted text-center py-4">Belum ada stok lagu.</p>'}</div>
             </div>
+
             <div class="space-y-4">
-                <form onsubmit="addTestimonial(event)" class="app-card-soft p-4 rounded-2xl border space-y-2.5">
-                    <h4 class="font-bold text-sm app-accent">Tambah Testimoni Beranda</h4>
+                <form onsubmit="addTestimonial(event)" class="app-card p-4 rounded-3xl border space-y-2.5 shadow-sm">
+                    <h4 class="font-bold text-sm app-accent"><i class="fa-solid fa-star mr-1.5"></i>Tambah Testimoni Beranda</h4>
                     <input type="text" id="t-name" placeholder="Nama Pelanggan" class="app-input" required>
                     <input type="text" id="t-cat" placeholder="Kategori (Undangan / CV & Lamaran)" class="app-input" required>
-                    <textarea id="t-text" placeholder="Isi testimoni..." class="app-input h-16" required></textarea>
+                    <textarea id="t-text" placeholder="Isi testimoni..." class="app-input h-20" required></textarea>
                     <button id="btn-add-testi" class="w-full gold-pill-btn py-2.5 rounded-xl text-xs">+ Tampilkan di Slideshow</button>
                 </form>
-                <div class="space-y-2 max-h-56 overflow-y-auto">${(db.testimonials||[]).map((t,i)=>`<div class="app-card-soft border rounded-xl p-3 flex justify-between items-center text-xs gap-2"><div><strong>${escHtml(t.name)}</strong> <span class="text-[10px] app-accent">(${escHtml(t.category)})</span><p class="text-[11px] app-muted">${escHtml(t.text)}</p></div><button onclick="delTestimonial(${i})" class="text-red-500 px-2"><i class="fa-solid fa-trash"></i></button></div>`).join("")}</div>
+                <div class="space-y-2 max-h-72 overflow-y-auto">${(db.testimonials || []).map((t, i) => `<div class="app-card border rounded-2xl p-3 flex justify-between items-center text-xs gap-2 shadow-sm"><div><strong>${escHtml(t.name)}</strong> <span class="text-[10px] app-accent">(${escHtml(t.category)})</span><p class="text-[11px] app-muted mt-0.5">${escHtml(t.text)}</p></div><button onclick="delTestimonial(${i})" class="text-red-500 px-2"><i class="fa-solid fa-trash"></i></button></div>`).join("")}</div>
             </div>
         </div>`;
     }
@@ -713,17 +841,20 @@ function _ensureSoloStatsModal() {
         mod.id = "solo-profile-stats-modal";
         mod.className = "hide fixed inset-0 z-[145] bg-[var(--app-bg)] flex flex-col overflow-hidden";
         mod.innerHTML = `
-            <div class="px-4 py-3 app-header border-b flex items-center justify-between gap-3 shrink-0 backdrop-blur-md">
+            <div class="lbk-fs-header px-4 sm:px-6 py-3.5 flex items-center justify-between gap-3 shrink-0">
                 <div class="flex items-center gap-2.5 min-w-0">
-                    <img src="./lembarku-logo.png" alt="Lembarku" class="w-8 h-8 rounded-lg bg-white p-1 object-contain border border-black/10 shrink-0" onerror="this.style.display='none'">
+                    <button type="button" onclick="_adminStepBackOrClose(closeSoloStatsModal)" class="w-9 h-9 rounded-full app-btn-sec flex items-center justify-center text-xs shrink-0 active:scale-95 transition" title="Kembali">
+                        <i class="fa-solid fa-chevron-left"></i>
+                    </button>
                     <div class="min-w-0">
-                        <h3 id="solo-stats-title" class="font-extrabold text-base truncate">Detail</h3>
+                        <h3 id="solo-stats-title" class="font-extrabold text-base sm:text-lg truncate">Detail</h3>
                         <p id="solo-stats-sub" class="text-[10px] app-muted truncate"></p>
                     </div>
                 </div>
+                <button type="button" onclick="closeSoloStatsModal()" class="px-4 py-1.5 rounded-full app-btn-sec text-xs font-bold shrink-0">Selesai</button>
             </div>
             <div id="solo-stats-subbar" class="px-4 py-2.5 border-b gold-border flex gap-2 overflow-x-auto no-scrollbar shrink-0 app-card hide"></div>
-            <div id="solo-stats-body" class="flex-1 overflow-y-auto p-4 space-y-2.5 max-w-2xl w-full mx-auto"></div>
+            <div id="solo-stats-body" class="lbk-fs-scroll p-4 space-y-3 max-w-3xl w-full mx-auto pb-20"></div>
         `;
         document.body.appendChild(mod);
     }
@@ -732,11 +863,13 @@ function _ensureSoloStatsModal() {
 
 function closeSoloStatsModal() {
     window._soloStatsViewState.open = false;
+    _soloFollowersSearch = "";
+    _soloProjectSearch = "";
+    _soloProjectTypeFilter = "all";
     const mod = document.getElementById("solo-profile-stats-modal");
     if (mod) mod.classList.add("hide");
 }
 
-// Dipanggil oleh pengendali navigasi terpusat di js/app.js saat tombol Back HP ditekan
 window._restoreSoloStatsFromNav = function (stepObj) {
     if (!stepObj || !stepObj.targetUsername) return;
     window._soloStatsViewState = {
@@ -754,30 +887,47 @@ window._restoreSoloStatsFromNav = function (stepObj) {
 function _openUserFromStatsList(uname) {
     const clean = _normAdminUserKey(uname);
     if (!clean) return;
-    // Sembunyikan layar statistik sementara tanpa menghapus dari _mrNavStack agar Back kembali ke daftar ini
     closeSoloStatsModal();
     viewUserProfileModal(clean, false);
 }
 
-function _renderSoloAccountCard(uItem) {
+function _renderSoloAccountCard(uItem, isFounderOwner = false) {
     const defAv = typeof DEFAULT_AVATAR !== "undefined" ? DEFAULT_AVATAR : "./lembarku-logo.png";
     const proCheck = uItem.isPro ? `<i class="fa-solid fa-circle-check text-blue-500 text-xs shrink-0" title="Akun Pro"></i>` : "";
     const roleLabel = uItem.role === "cabang" ? "Cabang" : uItem.role === "administrasi" ? "Administrasi" : uItem.role === "master" ? "Founder" : "User";
-    const canOpenProfile = !!(uItem.username && (db.users || []).some(x => _normAdminUserKey(x.username) === _normAdminUserKey(uItem.username)));
-    const clickAttr = canOpenProfile ? `onclick="_openUserFromStatsList('${esc(uItem.username)}')"` : "";
-    const hoverCls = canOpenProfile ? "cursor-pointer hover:brightness-95 active:scale-[0.99] transition" : "";
+    const isPending = uItem.status && uItem.status !== "Aktif";
+
+    // Aksi Lengkap Pengelolaan Akun di Followers Founder
+    const founderActionsHtml = isFounderOwner ? `
+        <div class="flex flex-wrap items-center justify-between gap-2 pt-2.5 mt-2 border-t gold-border">
+            <div class="flex flex-wrap items-center gap-1.5 text-[11px]">
+                ${isPending ? `<button type="button" onclick="event.stopPropagation();approveUserRealTime('${esc(uItem.username)}',this)" class="gold-pill-btn px-2.5 py-1 rounded-lg text-[10px] font-bold">✓ ACC Akun</button>` : ""}
+                ${uItem.role !== "administrasi" ? `<button type="button" onclick="event.stopPropagation();toggleUserProQuick('${esc(uItem.username)}',this)" class="px-2.5 py-1 rounded-lg ${uItem.isPro ? "bg-blue-600 text-white" : "app-btn-sec"} text-[10px] font-bold">${uItem.isPro ? "PRO ✓" : "+ Pro"}</button>` : ""}
+                ${uItem.role === "cabang" ? `<span class="app-accent font-bold px-1">Kuota: ${uItem.quota || 0}</span><button type="button" onclick="event.stopPropagation();topUpCabangRealTime('${esc(uItem.username)}',5,this)" class="px-2 py-1 rounded-lg bg-emerald-600 text-white text-[10px] font-bold">+5</button><button type="button" onclick="event.stopPropagation();topUpCabangRealTime('${esc(uItem.username)}',10,this)" class="px-2 py-1 rounded-lg gold-pill-btn text-[10px]">+10</button>` : ""}
+            </div>
+            <div class="flex items-center gap-1.5 ml-auto">
+                <button type="button" onclick="event.stopPropagation();openMasterUserModal('${esc(uItem.username)}')" class="px-3 py-1 rounded-lg app-card-soft border text-[11px] font-bold"><i class="fa-solid fa-pen mr-1"></i>Edit</button>
+                <button type="button" onclick="event.stopPropagation();deleteUserRealTime('${esc(uItem.username)}')" class="px-2.5 py-1 rounded-lg bg-red-600/15 text-red-500 text-[11px] font-bold" title="Hapus Akun"><i class="fa-solid fa-trash"></i></button>
+            </div>
+        </div>
+    ` : "";
 
     return `
-        <div ${clickAttr} class="app-card border rounded-2xl p-3 flex items-center gap-3 shadow-sm ${hoverCls}">
-            <img src="${uItem.avatar || defAv}" class="w-11 h-11 rounded-full object-cover border gold-border bg-zinc-800 shrink-0">
-            <div class="flex-1 min-w-0">
-                <div class="flex items-center gap-1.5 min-w-0">
-                    <strong class="text-xs sm:text-sm font-bold truncate">${escHtml(uItem.name || uItem.username)}</strong>
-                    ${proCheck}
+        <div onclick="_openUserFromStatsList('${esc(uItem.username)}')" class="app-card border rounded-3xl p-3.5 shadow-sm cursor-pointer hover:brightness-95 active:scale-[0.99] transition">
+            <div class="flex items-center gap-3">
+                <img src="${uItem.avatar || defAv}" class="w-11 h-11 rounded-full object-cover border gold-border bg-zinc-800 shrink-0">
+                <div class="flex-1 min-w-0">
+                    <div class="flex items-center gap-1.5 min-w-0">
+                        <strong class="text-xs sm:text-sm font-bold truncate">${escHtml(uItem.name || uItem.username)}</strong>
+                        ${proCheck}
+                        <span class="text-[9px] px-1.5 py-0.2 rounded-full font-bold uppercase ${uItem.role==="cabang"?"bg-blue-500/20 text-blue-600":uItem.role==="administrasi"?"bg-emerald-500/20 text-emerald-600":"bg-zinc-500/20 app-muted"}">${escHtml(roleLabel)}</span>
+                        ${isPending ? `<span class="text-[9px] px-1.5 py-0.2 rounded-full bg-amber-500/20 text-amber-600 font-extrabold">Menunggu</span>` : ""}
+                    </div>
+                    <p class="text-[11px] app-muted truncate">@${escHtml(uItem.username)}${uItem.role === "cabang" && uItem.brandName ? ` • ${escHtml(uItem.brandName)}` : ""}</p>
                 </div>
-                <p class="text-[11px] app-muted truncate">@${escHtml(uItem.username)} • ${escHtml(roleLabel)}</p>
+                <i class="fa-solid fa-chevron-right text-xs app-muted shrink-0"></i>
             </div>
-            ${canOpenProfile ? `<i class="fa-solid fa-chevron-right text-xs app-muted shrink-0"></i>` : ""}
+            ${founderActionsHtml}
         </div>
     `;
 }
@@ -795,6 +945,7 @@ function openSoloFollowersModal(targetUsername, fromNav = false) {
         masterCat: "user",
         projectCat: "proses"
     };
+    _soloFollowersSearch = "";
     const mod = _ensureSoloStatsModal();
     renderSoloStatsModal();
     mod.classList.remove("hide");
@@ -831,6 +982,8 @@ function openSoloProjectModal(targetUsername, fromNav = false) {
         masterCat: "user",
         projectCat: "proses"
     };
+    _soloProjectSearch = "";
+    _soloProjectTypeFilter = "all";
     const mod = _ensureSoloStatsModal();
     renderSoloStatsModal();
     mod.classList.remove("hide");
@@ -858,17 +1011,22 @@ function setSoloProjectCat(cat) {
     renderSoloStatsModal();
 }
 
+function setSoloProjectTypeFilter(f) {
+    _soloProjectTypeFilter = f;
+    renderSoloStatsModal();
+}
+
 function _buildPublicReadOnlyProjectCardHtml(doc) {
     const isPf = doc._kind === "pf";
     const isAktif = doc.status === "Aktif";
     const typeTag = isPf ? (doc.docType === "lamaran" ? "SURAT LAMARAN" : "CV") : `UNDANGAN • ${escHtml(doc.category)}`;
     const preClose = "closeSoloStatsModal();closeUserProfileModalCustom();";
 
-    return `<div class="app-card-soft border rounded-2xl p-4 flex items-center justify-between gap-3 shadow-sm">
+    return `<div class="app-card border rounded-2xl p-4 flex items-center justify-between gap-3 shadow-sm">
         <div class="min-w-0">
             <div class="flex flex-wrap items-center gap-1.5">
                 <span class="text-[9px] px-2 py-0.5 rounded-full app-accent-bg app-accent font-extrabold">${typeTag}</span>
-                <span class="text-[10px] px-2 py-0.5 rounded-full font-bold ${isAktif?"bg-emerald-500/20 text-emerald-600":"bg-amber-500/20 app-accent"}">● ${escHtml(doc.status || "Proses")}</span>
+                <span class="text-[10px] px-2 py-0.5 rounded-full font-bold ${isAktif?"bg-emerald-500/20 text-emerald-600":"bg-amber-500/20 app-accent"}">● ${escHtml(doc.status || "Aktif")}</span>
             </div>
             <h4 class="font-bold text-sm mt-1 truncate">${escHtml(doc.title || "Project")}</h4>
             <p class="text-xs app-muted truncate">${escHtml(isPf ? (doc.themeName || doc.themeId) : doc.theme)}</p>
@@ -895,21 +1053,26 @@ function renderSoloStatsModal() {
     if (subBar) { subBar.classList.add("hide"); subBar.innerHTML = ""; }
     if (!bodyEl) return;
 
-    // 1. ISI FOLLOWERS SAJA
+    // ================= A. MODE FOLLOWERS =================
     if (st.mode === "followers") {
         if (titleEl) titleEl.innerText = "Followers";
 
-        if (isMasterProfile && !isSelf) {
-            bodyEl.innerHTML = `
-                <div class="app-card border rounded-3xl p-7 text-center space-y-2 my-6">
-                    <i class="fa-solid fa-lock text-2xl app-accent"></i>
-                    <h4 class="font-extrabold text-sm">Daftar Followers Privat</h4>
-                    <p class="text-xs app-muted">Daftar followers akun Founder tidak dapat dilihat oleh pengguna lain.</p>
-                </div>
-            `;
-            return;
+        // Privasi Followers: jika pengguna lain melihat dan privasi dimatikan
+        if (!isSelf && curU && curU.role !== "master" && curU.role !== "administrasi") {
+            const priv = typeof getUserPrivacy === "function" ? getUserPrivacy(targetObj) : { showFollowers: true };
+            if (!priv.showFollowers) {
+                bodyEl.innerHTML = `
+                    <div class="app-card border rounded-3xl p-8 text-center space-y-2 mt-4">
+                        <i class="fa-solid fa-user-lock text-3xl app-accent"></i>
+                        <h4 class="font-extrabold text-sm">Daftar Followers Disembunyikan</h4>
+                        <p class="text-xs app-muted">Pengguna ini memilih untuk merahasiakan daftar pengikutnya.</p>
+                    </div>
+                `;
+                return;
+            }
         }
 
+        // Followers Founder: Panel Lengkap Pengelolaan Akun (User, Administrasi, Cabang)
         if (isMasterProfile && isSelf) {
             const allNonMaster = (db.users || []).filter(u => u && u.role !== "master");
             const catMap = {
@@ -918,20 +1081,43 @@ function renderSoloStatsModal() {
                 cabang: allNonMaster.filter(u => u.role === "cabang")
             };
             const activeCat = catMap[st.masterCat] ? st.masterCat : "user";
-            const usersInCat = catMap[activeCat] || [];
+            let usersInCat = catMap[activeCat] || [];
+
+            if (_soloFollowersSearch.trim()) {
+                const q = _soloFollowersSearch.trim().toLowerCase();
+                usersInCat = usersInCat.filter(u =>
+                    String(u.name || "").toLowerCase().includes(q) ||
+                    String(u.username || "").toLowerCase().includes(q) ||
+                    String(u.brandName || "").toLowerCase().includes(q)
+                );
+            }
 
             if (subBar) {
                 subBar.classList.remove("hide");
+                const pendingCnt = catMap[activeCat].filter(u => u.status !== "Aktif").length;
                 subBar.innerHTML = `
-                    <button type="button" onclick="setSoloMasterCat('user')" class="px-3.5 py-1.5 rounded-xl text-xs font-bold ${activeCat === "user" ? "gold-pill-btn" : "app-btn-sec"}">User (${catMap.user.length})</button>
-                    <button type="button" onclick="setSoloMasterCat('administrasi')" class="px-3.5 py-1.5 rounded-xl text-xs font-bold ${activeCat === "administrasi" ? "gold-pill-btn" : "app-btn-sec"}">Administrasi (${catMap.administrasi.length})</button>
-                    <button type="button" onclick="setSoloMasterCat('cabang')" class="px-3.5 py-1.5 rounded-xl text-xs font-bold ${activeCat === "cabang" ? "gold-pill-btn" : "app-btn-sec"}">Cabang (${catMap.cabang.length})</button>
+                    <div class="flex items-center gap-2 overflow-x-auto no-scrollbar w-full">
+                        <button type="button" onclick="setSoloMasterCat('user')" class="px-3.5 py-1.5 rounded-xl text-xs font-bold whitespace-nowrap ${activeCat === "user" ? "gold-pill-btn" : "app-btn-sec"}">User (${catMap.user.length})</button>
+                        <button type="button" onclick="setSoloMasterCat('administrasi')" class="px-3.5 py-1.5 rounded-xl text-xs font-bold whitespace-nowrap ${activeCat === "administrasi" ? "gold-pill-btn" : "app-btn-sec"}">Administrasi (${catMap.administrasi.length})</button>
+                        <button type="button" onclick="setSoloMasterCat('cabang')" class="px-3.5 py-1.5 rounded-xl text-xs font-bold whitespace-nowrap ${activeCat === "cabang" ? "gold-pill-btn" : "app-btn-sec"}">Cabang (${catMap.cabang.length})</button>
+                    </div>
                 `;
             }
 
-            bodyEl.innerHTML = usersInCat.length
-                ? usersInCat.map(_renderSoloAccountCard).join("")
-                : `<div class="app-card border border-dashed rounded-2xl p-6 text-center text-xs app-muted">Belum ada akun pada kategori ini.</div>`;
+            const headerActionsHtml = `
+                <div class="space-y-2.5 mb-2">
+                    <div class="flex flex-wrap items-center justify-between gap-2">
+                        <input type="text" id="solo-fol-search" value="${esc(_soloFollowersSearch)}" oninput="_soloFollowersSearch=this.value;renderSoloStatsModal();" placeholder="Cari ${activeCat}..." class="app-input !py-2 text-xs flex-1 min-w-[200px]">
+                        <div class="flex gap-1.5 shrink-0">
+                            <button type="button" onclick="openMasterUserModal(null,'${activeCat}')" class="gold-pill-btn px-3.5 py-2 rounded-xl text-xs shadow"><i class="fa-solid fa-user-plus mr-1"></i>+ ${activeCat.toUpperCase()}</button>
+                        </div>
+                    </div>
+                </div>
+            `;
+
+            bodyEl.innerHTML = headerActionsHtml + (usersInCat.length
+                ? usersInCat.map(u => _renderSoloAccountCard(u, true)).join("")
+                : `<div class="app-card border border-dashed rounded-3xl p-8 text-center text-xs app-muted">Tidak ada akun ${activeCat} yang cocok.</div>`);
             return;
         }
 
@@ -940,25 +1126,40 @@ function renderSoloStatsModal() {
             : (Array.isArray(targetObj.followers) ? targetObj.followers : []);
         const followerObjs = fKeys.map(k => (db.users || []).find(u => _normAdminUserKey(u.username) === _normAdminUserKey(k)) || { username: k, name: k, role: "user", avatar: DEFAULT_AVATAR });
         bodyEl.innerHTML = followerObjs.length
-            ? followerObjs.map(_renderSoloAccountCard).join("")
-            : `<div class="app-card border border-dashed rounded-2xl p-7 text-center text-xs app-muted">Belum ada followers.</div>`;
+            ? followerObjs.map(u => _renderSoloAccountCard(u, false)).join("")
+            : `<div class="app-card border border-dashed rounded-3xl p-8 text-center text-xs app-muted">Belum ada followers.</div>`;
         return;
     }
 
-    // 2. ISI FOLLOWING SAJA
+    // ================= B. MODE FOLLOWING =================
     if (st.mode === "following") {
         if (titleEl) titleEl.innerText = "Following";
+
+        if (!isSelf && curU && curU.role !== "master" && curU.role !== "administrasi") {
+            const priv = typeof getUserPrivacy === "function" ? getUserPrivacy(targetObj) : { showFollowing: true };
+            if (!priv.showFollowing) {
+                bodyEl.innerHTML = `
+                    <div class="app-card border rounded-3xl p-8 text-center space-y-2 mt-4">
+                        <i class="fa-solid fa-user-lock text-3xl app-accent"></i>
+                        <h4 class="font-extrabold text-sm">Daftar Following Disembunyikan</h4>
+                        <p class="text-xs app-muted">Pengguna ini memilih untuk merahasiakan akun yang diikutinya.</p>
+                    </div>
+                `;
+                return;
+            }
+        }
+
         const gKeys = (typeof _getFollowingListForUser === "function")
             ? _getFollowingListForUser(targetObj)
             : (Array.isArray(targetObj.following) ? targetObj.following : []);
         const followingObjs = gKeys.map(k => (db.users || []).find(u => _normAdminUserKey(u.username) === _normAdminUserKey(k)) || { username: k, name: k, role: "user", avatar: DEFAULT_AVATAR });
         bodyEl.innerHTML = followingObjs.length
-            ? followingObjs.map(_renderSoloAccountCard).join("")
-            : `<div class="app-card border border-dashed rounded-2xl p-7 text-center text-xs app-muted">Belum mengikuti akun mana pun.</div>`;
+            ? followingObjs.map(u => _renderSoloAccountCard(u, false)).join("")
+            : `<div class="app-card border border-dashed rounded-3xl p-8 text-center text-xs app-muted">Belum mengikuti akun mana pun.</div>`;
         return;
     }
 
-    // 3. ISI PROJECT LENGKAP SESUAI FUNGSI MASING-MASING AKUN
+    // ================= C. MODE PROJECT (VERIFIKASI ORDER & KELOLA LENGKAP) =================
     if (titleEl) titleEl.innerText = "Project";
     let allProj = (typeof _getProjectsForUser === "function") ? _getProjectsForUser(targetObj) : [];
     const isStaffScope = targetObj.role === "master" || targetObj.role === "administrasi";
@@ -969,26 +1170,55 @@ function renderSoloStatsModal() {
         allProj = allProj.filter(x => !isCabangOwnedDoc(x));
     }
 
+    // Founder & Tim Administrasi: Pengelolaan Order & Verifikasi Lengkap
     if (isStaffScope && isStaffViewer) {
-        const prosesList = allProj.filter(p => p.status !== "Aktif");
-        const aktifList = allProj.filter(p => p.status === "Aktif");
+        let filteredProj = [...allProj];
+        if (_soloProjectTypeFilter === "inv") filteredProj = filteredProj.filter(p => p._kind === "inv");
+        else if (_soloProjectTypeFilter === "pf") filteredProj = filteredProj.filter(p => p._kind === "pf");
+
+        if (_soloProjectSearch.trim()) {
+            const q = _soloProjectSearch.trim().toLowerCase();
+            filteredProj = filteredProj.filter(p =>
+                String(p.title || "").toLowerCase().includes(q) ||
+                String(p.owner || "").toLowerCase().includes(q) ||
+                String(p.brandName || "").toLowerCase().includes(q)
+            );
+        }
+
+        const prosesList = filteredProj.filter(p => p.status !== "Aktif" || p.pendingRevision);
+        const aktifList = filteredProj.filter(p => p.status === "Aktif" && !p.pendingRevision);
         const pCat = st.projectCat === "aktif" ? "aktif" : "proses";
         const shownList = pCat === "aktif" ? aktifList : prosesList;
 
         if (subBar) {
             subBar.classList.remove("hide");
             subBar.innerHTML = `
-                <button type="button" onclick="setSoloProjectCat('proses')" class="px-3.5 py-1.5 rounded-xl text-xs font-bold ${pCat === "proses" ? "gold-pill-btn" : "app-btn-sec"}">Proses / Belum Diverifikasi (${prosesList.length})</button>
-                <button type="button" onclick="setSoloProjectCat('aktif')" class="px-3.5 py-1.5 rounded-xl text-xs font-bold ${pCat === "aktif" ? "gold-pill-btn" : "app-btn-sec"}">Aktif / Sudah Diverifikasi (${aktifList.length})</button>
+                <div class="flex items-center gap-2 overflow-x-auto no-scrollbar w-full">
+                    <button type="button" onclick="setSoloProjectCat('proses')" class="px-3.5 py-1.5 rounded-xl text-xs font-bold whitespace-nowrap ${pCat === "proses" ? "gold-pill-btn" : "app-btn-sec"}">Proses / Revisi (${prosesList.length})</button>
+                    <button type="button" onclick="setSoloProjectCat('aktif')" class="px-3.5 py-1.5 rounded-xl text-xs font-bold whitespace-nowrap ${pCat === "aktif" ? "gold-pill-btn" : "app-btn-sec"}">Aktif (${aktifList.length})</button>
+                </div>
             `;
         }
 
-        bodyEl.innerHTML = shownList.length
+        const controlsHtml = `
+            <div class="space-y-2 mb-2">
+                <div class="flex flex-col sm:flex-row gap-2">
+                    <input type="text" value="${esc(_soloProjectSearch)}" oninput="_soloProjectSearch=this.value;renderSoloStatsModal();" placeholder="Cari judul proyek atau @username..." class="app-input !py-2 text-xs flex-1">
+                    <div class="flex gap-1.5 overflow-x-auto">
+                        <button type="button" onclick="setSoloProjectTypeFilter('all')" class="px-3 py-1.5 rounded-xl text-[11px] font-bold ${_soloProjectTypeFilter==='all'?'gold-pill-btn':'app-btn-sec'}">Semua</button>
+                        <button type="button" onclick="setSoloProjectTypeFilter('inv')" class="px-3 py-1.5 rounded-xl text-[11px] font-bold ${_soloProjectTypeFilter==='inv'?'gold-pill-btn':'app-btn-sec'}">Undangan</button>
+                        <button type="button" onclick="setSoloProjectTypeFilter('pf')" class="px-3 py-1.5 rounded-xl text-[11px] font-bold ${_soloProjectTypeFilter==='pf'?'gold-pill-btn':'app-btn-sec'}">CV &amp; Lamaran</button>
+                    </div>
+                </div>
+            </div>
+        `;
+
+        bodyEl.innerHTML = controlsHtml + (shownList.length
             ? shownList.map(doc => buildFullOrderCardHtml(doc, {
                 isStaffMode: isAdminOnlyViewer,
                 closeModalBeforeAction: true
             })).join("")
-            : `<div class="app-card border border-dashed rounded-2xl p-6 text-center text-xs app-muted">Belum ada project pada kategori ini.</div>`;
+            : `<div class="app-card border border-dashed rounded-3xl p-8 text-center text-xs app-muted">Tidak ada proyek pada status ini.</div>`);
         return;
     }
 
@@ -998,20 +1228,36 @@ function renderSoloStatsModal() {
                 isStaffMode: isAdminOnlyViewer,
                 closeModalBeforeAction: true
             })).join("")
-            : `<div class="app-card border border-dashed rounded-2xl p-7 text-center text-xs app-muted">Belum ada project yang dibuat.</div>`;
+            : `<div class="app-card border border-dashed rounded-3xl p-8 text-center text-xs app-muted">Belum ada project yang dibuat.</div>`;
         return;
     }
 
     if (isSelf) {
         bodyEl.innerHTML = allProj.length
             ? allProj.map(doc => buildUserOwnProjectCardHtml(doc, curU.role === "cabang")).join("")
-            : `<div class="app-card border border-dashed rounded-2xl p-7 text-center text-xs app-muted">Belum ada project yang dibuat.</div>`;
+            : `<div class="app-card border border-dashed rounded-3xl p-8 text-center text-xs app-muted">Belum ada project yang dibuat.</div>`;
         return;
     }
 
-    bodyEl.innerHTML = allProj.length
-        ? allProj.map(_buildPublicReadOnlyProjectCardHtml).join("")
-        : `<div class="app-card border border-dashed rounded-2xl p-7 text-center text-xs app-muted">Belum ada project yang dibuat.</div>`;
+    // Pengunjung Publik: Periksa Privasi Postingan/Dokumen
+    if (targetObj.role !== "cabang") {
+        const priv = typeof getUserPrivacy === "function" ? getUserPrivacy(targetObj) : { showProjects: true };
+        if (!priv.showProjects) {
+            bodyEl.innerHTML = `
+                <div class="app-card border rounded-3xl p-8 text-center space-y-2 mt-4">
+                    <i class="fa-solid fa-lock text-3xl app-accent"></i>
+                    <h4 class="font-extrabold text-sm">Daftar Project Disembunyikan</h4>
+                    <p class="text-xs app-muted">Pengguna ini memilih untuk merahasiakan postingan dokumen dari publik.</p>
+                </div>
+            `;
+            return;
+        }
+    }
+
+    const publicActiveProj = allProj.filter(p => p && p.status === "Aktif");
+    bodyEl.innerHTML = publicActiveProj.length
+        ? publicActiveProj.map(_buildPublicReadOnlyProjectCardHtml).join("")
+        : `<div class="app-card border border-dashed rounded-3xl p-8 text-center text-xs app-muted">Belum ada project publik aktif.</div>`;
 }
 
 function viewUserProfileModal(username, fromNav = false) {
@@ -1034,6 +1280,9 @@ function viewUserProfileModal(username, fromNav = false) {
     const isMasterProfile = u.role === "master";
     const isCabangProfile = u.role === "cabang";
 
+    const isBlocked = typeof isUserBlockedByMe === "function" && isUserBlockedByMe(cleanU);
+    const isBlockedByTarget = !!u.blockedViewer;
+
     let followersCount = 0;
     if (isMasterProfile) {
         followersCount = _formatMasterFollowersNum();
@@ -1051,7 +1300,7 @@ function viewUserProfileModal(username, fromNav = false) {
         ? _getProjectsForUser(u).length
         : 0;
 
-    const canFollowThis = !isSelf && curU && (
+    const canFollowThis = !isSelf && curU && !isBlocked && !isBlockedByTarget && (
         isMasterProfile
             ? (curU.role === "user" || curU.role === "administrasi")
             : true
@@ -1072,42 +1321,57 @@ function viewUserProfileModal(username, fromNav = false) {
                 ? `<span class="text-[9px] px-2 py-0.5 rounded-full bg-blue-500/20 text-blue-600 font-extrabold uppercase">CABANG</span>`
                 : "";
 
+    const priv = typeof getUserPrivacy === "function" ? getUserPrivacy(u) : { showContact: false, allowDirectChat: true };
+
+    const contactHtml = (priv.showContact && (u.phone || u.address)) ? `
+        <div class="flex flex-wrap gap-3 text-xs app-muted pt-1">
+            ${u.phone ? `<span><i class="fa-solid fa-phone app-accent mr-1"></i>${escHtml(u.phone)}</span>` : ""}
+            ${u.address ? `<span><i class="fa-solid fa-location-dot app-accent mr-1"></i>${escHtml(u.address)}</span>` : ""}
+        </div>
+    ` : "";
+
     const followBtnHtml = canFollowThis
         ? `<button type="button" onclick="toggleFollowTargetUser('${esc(cleanU)}')" class="w-full py-2.5 rounded-2xl text-xs font-extrabold transition shadow-sm ${isFollowingThis ? "app-btn-sec border" : "gold-pill-btn"}">
             <i class="fa-solid ${isFollowingThis ? "fa-user-check" : "fa-user-plus"} mr-1.5"></i>${isFollowingThis ? "Following" : "Follow"}
            </button>`
         : "";
 
-    const followersClick = (isMasterProfile && !isSelf)
-        ? `onclick="showToast('Daftar followers akun Founder bersifat privat.','info')"`
-        : `onclick="openSoloFollowersModal('${esc(cleanU)}')"`;
-
     const followersColHtml = isCabangProfile
         ? ""
-        : `<button type="button" ${followersClick} class="py-2 px-1 rounded-xl hover:bg-black/5 active:scale-98 transition">
+        : `<button type="button" onclick="openSoloFollowersModal('${esc(cleanU)}')" class="py-2 px-1 text-center rounded-xl hover:bg-black/5 active:scale-98 transition">
             <span class="block text-sm sm:text-base font-extrabold tracking-tight">${escHtml(String(followersCount))}</span>
             <span class="block text-[11px] app-muted font-medium">Followers</span>
         </button>`;
 
     const followingColHtml = isCabangProfile
         ? ""
-        : `<button type="button" onclick="openSoloFollowingModal('${esc(cleanU)}')" class="py-2 px-1 rounded-xl hover:bg-black/5 active:scale-98 transition">
+        : `<button type="button" onclick="openSoloFollowingModal('${esc(cleanU)}')" class="py-2 px-1 text-center rounded-xl hover:bg-black/5 active:scale-98 transition">
             <span class="block text-sm sm:text-base font-extrabold tracking-tight">${escHtml(_formatInstagramMetric(followingCount))}</span>
             <span class="block text-[11px] app-muted font-medium">Following</span>
         </button>`;
 
-    const projectColHtml = `<button type="button" onclick="openSoloProjectModal('${esc(cleanU)}')" class="py-2 px-1 rounded-xl hover:bg-black/5 active:scale-98 transition">
+    const projectColHtml = `<button type="button" onclick="openSoloProjectModal('${esc(cleanU)}')" class="py-2 px-1 text-center rounded-xl hover:bg-black/5 active:scale-98 transition">
         <span class="block text-sm sm:text-base font-extrabold tracking-tight">${escHtml(_formatInstagramMetric(projectCount))}</span>
         <span class="block text-[11px] app-muted font-medium">Project</span>
     </button>`;
 
     const gridColsClass = isCabangProfile ? "grid-cols-1" : "grid-cols-3";
 
+    // Tombol Blokir / Buka Blokir
+    const canBlock = !isSelf && curU && curU.role !== "cabang" && u.role !== "master";
+    const blockBtnHtml = canBlock ? `
+        <button type="button" onclick="toggleBlockTargetUser('${esc(cleanU)}')" class="w-full py-2 rounded-2xl text-xs font-bold transition border ${isBlocked ? "bg-red-600/15 text-red-500 border-red-500/40" : "app-btn-sec"}">
+            <i class="fa-solid ${isBlocked ? "fa-unlock" : "fa-ban"} mr-1.5"></i>${isBlocked ? "Buka Blokir Pengguna" : "Blokir Pengguna"}
+        </button>
+    ` : "";
+
+    const canChat = !isSelf && curU && !isBlocked && !isBlockedByTarget && (curU.role === "master" || curU.role === "administrasi" || priv.allowDirectChat);
+
     const bodyEl = document.getElementById("mvp-body");
     if (bodyEl) {
-        bodyEl.className = "flex-1 overflow-y-auto";
+        bodyEl.className = "lbk-fs-scroll";
         bodyEl.innerHTML = `
-            <div class="w-full max-w-xl mx-auto p-4 space-y-4">
+            <div class="w-full max-w-xl mx-auto p-4 space-y-4 pb-20">
                 <div class="app-card rounded-3xl border overflow-hidden shadow-sm relative">
                     <div class="h-32 md:h-40 bg-gradient-to-r from-zinc-700 to-zinc-900 bg-cover bg-center relative" style="${bannerStyle}">
                         <div class="absolute inset-0 bg-gradient-to-t from-black/65 via-transparent to-black/15"></div>
@@ -1123,12 +1387,13 @@ function viewUserProfileModal(username, fromNav = false) {
                                 </h2>
                                 <p class="text-xs app-accent font-semibold">@${escHtml(u.username)}</p>
                                 ${u.bio ? `<p class="text-xs app-muted mt-1 leading-relaxed max-w-md">${escHtml(u.bio)}</p>` : ""}
+                                ${contactHtml}
                             </div>
                         </div>
                     </div>
                 </div>
 
-                <div class="app-card border rounded-2xl p-3 shadow-sm space-y-3">
+                <div class="app-card border rounded-3xl p-3 shadow-sm space-y-3">
                     <div class="grid ${gridColsClass} divide-x divide-black/10 text-center">
                         ${followersColHtml}
                         ${followingColHtml}
@@ -1137,21 +1402,31 @@ function viewUserProfileModal(username, fromNav = false) {
                     ${followBtnHtml}
                 </div>
 
-                ${!isSelf ? `<div class="pt-2">
+                ${canChat ? `<div class="pt-1">
                     <button type="button" onclick="closeUserProfileModalCustom();if(typeof openFullChatOverlay==='function')openFullChatOverlay('${esc(cleanU)}');" class="w-full py-3 rounded-2xl bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-bold transition shadow-sm flex items-center justify-center gap-2">
                         <i class="fa-solid fa-comments"></i> Kirim Pesan ke @${escHtml(u.username)}
                     </button>
                 </div>` : ""}
+
+                ${blockBtnHtml}
             </div>
         `;
     }
 
     const headerBar = modal.querySelector(".border-b");
     if (headerBar) {
+        headerBar.className = "lbk-fs-header px-4 sm:px-6 py-3.5 flex items-center justify-between gap-3 shrink-0";
         headerBar.innerHTML = `
-            <div class="flex items-center gap-2.5">
-                <img src="./lembarku-logo.png" alt="Lembarku" class="w-8 h-8 rounded-lg bg-white p-1 object-contain border border-black/10 shrink-0" onerror="this.style.display='none'">
+            <div class="flex items-center gap-2.5 min-w-0">
+                <button type="button" onclick="_adminStepBackOrClose(closeUserProfileModalCustom)" class="w-9 h-9 rounded-full app-btn-sec flex items-center justify-center text-xs shrink-0 active:scale-95 transition" title="Kembali">
+                    <i class="fa-solid fa-chevron-left"></i>
+                </button>
+                <div class="min-w-0">
+                    <h3 class="font-extrabold text-base truncate">${escHtml(u.name || u.username)}</h3>
+                    <p class="text-[10px] app-muted truncate">Profil Pengguna</p>
+                </div>
             </div>
+            <button type="button" onclick="closeUserProfileModalCustom()" class="px-4 py-1.5 rounded-full app-btn-sec text-xs font-bold shrink-0">Selesai</button>
         `;
     }
 
@@ -1175,7 +1450,7 @@ async function toggleUserProQuick(uname, btn, reopenModal = false) {
     const nextPro = !u.isPro;
     await apiAction({ action: "upsert_user", oldUsername: u.username, user: Object.assign({}, u, { isPro: nextPro }) });
     renderMasterHeaderStats();
-    renderMasterWorkspaceContent();
+    if (window._soloStatsViewState && window._soloStatsViewState.open) renderSoloStatsModal();
     if (reopenModal) viewUserProfileModal(u.username, true);
     showToast(nextPro ? `@${u.username} ditingkatkan ke Akun PRO (Centang Biru)!` : `Status Pro @${u.username} dinonaktifkan.`, "info");
 }
@@ -1188,7 +1463,7 @@ function openMasterUserModal(username = null, defaultRole = "user") {
     document.getElementById("mmu-status").value = isEdit ? u.status : "Aktif";
     document.getElementById("mmu-name").value = isEdit ? u.name : "";
     document.getElementById("mmu-username").value = isEdit ? u.username : "";
-    document.getElementById("mmu-password").value = isEdit ? u.password : "";
+    document.getElementById("mmu-password").value = isEdit ? "" : "";
     document.getElementById("mmu-phone").value = isEdit ? (u.phone || "") : "";
     document.getElementById("mmu-address").value = isEdit ? (u.address || "") : "";
     document.getElementById("mmu-is-pro").checked = isEdit ? !!u.isPro : false;
@@ -1198,6 +1473,7 @@ function openMasterUserModal(username = null, defaultRole = "user") {
     document.getElementById("modal-master-user").classList.remove("hide");
     _pushAdminNavStep({ type: "modal", id: "modal-master-user" });
 }
+
 async function submitMasterUserModal(e) {
     e.preventDefault(); setBtnLoading("btn-mmu-save", true, "Menyimpan...");
     const oldU = document.getElementById("mmu-old-username").value;
@@ -1218,20 +1494,40 @@ async function submitMasterUserModal(e) {
     if (!res || !res.ok) return showToast((res && res.message) || "Gagal menyimpan akun.", "error");
     document.getElementById("modal-master-user").classList.add("hide");
     if (typeof _mrDropTopModalById === "function") _mrDropTopModalById("modal-master-user");
-    renderMasterHeaderStats(); renderMasterWorkspaceContent(); showToast("Akun berhasil disimpan!");
+    renderMasterHeaderStats();
+    if (window._soloStatsViewState && window._soloStatsViewState.open) renderSoloStatsModal();
+    showToast("Akun berhasil disimpan!");
 }
-async function approveUserRealTime(uname, btn) { const u = db.users.find(x => _normAdminUserKey(x.username) === _normAdminUserKey(uname)); if (!u) return; setBtnLoading(btn, true, "..."); await apiAction({ action: "upsert_user", oldUsername: u.username, user: Object.assign({}, u, { status: "Aktif" }) }); renderMasterHeaderStats(); renderMasterWorkspaceContent(); showToast(`Akun @${u.username} aktif!`); }
-async function deleteUserRealTime(uname) { if (!(await showConfirm("Hapus Akun", `Hapus akun @${uname} secara permanen?`, "fa-solid fa-trash", "Ya, Hapus"))) return; showLoading("Menghapus..."); await apiAction({ action: "delete_user", username: uname }); hideLoading(); renderMasterHeaderStats(); renderMasterWorkspaceContent(); showToast("Akun dihapus.", "info"); }
+
+async function approveUserRealTime(uname, btn) {
+    const u = db.users.find(x => _normAdminUserKey(x.username) === _normAdminUserKey(uname)); if (!u) return;
+    setBtnLoading(btn, true, "...");
+    await apiAction({ action: "upsert_user", oldUsername: u.username, user: Object.assign({}, u, { status: "Aktif" }) });
+    renderMasterHeaderStats();
+    if (window._soloStatsViewState && window._soloStatsViewState.open) renderSoloStatsModal();
+    showToast(`Akun @${u.username} aktif!`);
+}
+
+async function deleteUserRealTime(uname) {
+    if (!(await showConfirm("Hapus Akun", `Hapus akun @${uname} secara permanen?`, "fa-solid fa-trash", "Ya, Hapus"))) return;
+    showLoading("Menghapus...");
+    await apiAction({ action: "delete_user", username: uname });
+    hideLoading();
+    renderMasterHeaderStats();
+    if (window._soloStatsViewState && window._soloStatsViewState.open) renderSoloStatsModal();
+    showToast("Akun dihapus.", "info");
+}
+
 async function topUpCabangRealTime(uname, amt, btn, reopenModal = false) {
     setBtnLoading(btn, true, "...");
     await apiAction({ action: "topup_quota", username: uname, amount: amt });
     renderMasterHeaderStats();
-    renderMasterWorkspaceContent();
+    if (window._soloStatsViewState && window._soloStatsViewState.open) renderSoloStatsModal();
     if (reopenModal) viewUserProfileModal(uname, true);
     showToast(`+${amt} kuota ditambahkan!`);
 }
 
-// ================= 5. EDIT BANNER PROMOSI 12 : 4.4 & HARGA CV =================
+// ================= 5. BANNER PROMOSI & HARGA CV =================
 function pickCroppedPromoBanner(inp) {
     const file = inp.files[0]; if (!file) return; inp.value = "";
     openImageCropper(file, 12 / 4.4, "Crop Banner Promosi (12 : 4.4)", 1200, 440, async (dataUrl) => {
@@ -1246,11 +1542,13 @@ function pickCroppedPromoBanner(inp) {
         } else showToast("Gagal mengunggah foto.", "error");
     });
 }
+
 function resetPromoBannerForm() {
     pbTempUploadedImg = "";
     ["pb-id","pb-badge","pb-cta","pb-title","pb-sub","pb-img-url"].forEach(id => { const el = document.getElementById(id); if (el) el.value = ""; });
     document.getElementById("pb-preview-img").src = IMG("1519741497674-611481863552");
 }
+
 async function savePromoBannerForm(e) {
     e.preventDefault(); setBtnLoading("btn-save-pb", true, "Menyimpan...");
     const idVal = document.getElementById("pb-id").value;
@@ -1276,6 +1574,7 @@ async function savePromoBannerForm(e) {
     if (res && res.ok) { pbTempUploadedImg = ""; renderMasterWorkspaceContent(); showToast("Banner promosi beranda tersimpan permanen!"); }
     else showToast("Gagal menyimpan banner.", "error");
 }
+
 function editPromoBannerItem(i) {
     const b = (db.promoBanners || [])[i]; if (!b) return;
     pbTempUploadedImg = "";
@@ -1289,6 +1588,7 @@ function editPromoBannerItem(i) {
     document.getElementById("pb-preview-img").src = b.img || IMG("1519741497674-611481863552");
     showToast(`Mengedit banner "${b.title}"`, "info");
 }
+
 async function deletePromoBannerItem(i) {
     if ((db.promoBanners || []).length <= 1) return showToast("Minimal harus menyisakan 1 banner promosi.", "info");
     const list = [...(db.promoBanners || [])]; list.splice(i, 1);
@@ -1310,16 +1610,18 @@ async function saveCvThemePrice(themeId, btn) {
     showToast("Harga desain CV / Lamaran diperbarui permanen!");
 }
 
-// ================= 6. VISUAL THEME BUILDER 3 TAB =================
+// ================= 6. VISUAL THEME BUILDER =================
 function copyThemeDemoLink(cat, themeName) {
     navigator.clipboard.writeText(`${getCleanBaseUrl()}?demo=${encodeURIComponent(cat)}&theme=${encodeURIComponent(themeName)}`);
     showToast(`Link Demo "${themeName}" disalin!`);
 }
+
 function switchThemeBuilderTab(tab) {
     ["design", "photos", "demo"].forEach(k => document.getElementById(`tb-pane-${k}`)?.classList.toggle("hide", k !== tab));
     document.querySelectorAll(".tb-tab-btn").forEach(b => b.className = `tb-tab-btn px-3.5 py-1.5 rounded-xl text-xs font-bold ${b.dataset.tbt === tab ? "gold-pill-btn" : "app-btn-sec"}`);
     if (tab === "photos") renderThemeBuilderPhotoSlots();
 }
+
 function renderThemeBuilderPhotoSlots() {
     const slots = [
         { key:"cover", label:"★ Sampul Utama (9:16)", fb:IMG("1519741497674-611481863552") },
@@ -1341,11 +1643,13 @@ function renderThemeBuilderPhotoSlots() {
         </div>`;
     }).join("");
 }
+
 function clearThemeBuilderPhoto(slotKey) {
     tbPhotosDraft[slotKey] = "";
     renderThemeBuilderPhotoSlots();
     if (slotKey === "cover") document.getElementById("tb-live-img").src = IMG("1519741497674-611481863552");
 }
+
 function pickThemeBuilderPhoto(inp, slotKey) {
     const file = inp.files[0]; if (!file) return; inp.value = "";
     const isCover = slotKey === "cover";
@@ -1361,6 +1665,7 @@ function pickThemeBuilderPhoto(inp, slotKey) {
         } else showToast("Gagal mengunggah foto.", "error");
     });
 }
+
 function openThemeBuilderModal(cat = null, themeName = null, isDuplicate = false) {
     const isEdit = !!(cat && themeName), tObj = isEdit ? findThemeObject(cat, themeName) : null;
     const preset = (tObj && VISUAL_PRESETS[tObj.preset]) || VISUAL_PRESETS["dark-gold"];
@@ -1416,16 +1721,19 @@ function openThemeBuilderModal(cat = null, themeName = null, isDuplicate = false
     document.getElementById("modal-theme-builder").classList.remove("hide");
     _pushAdminNavStep({ type: "modal", id: "modal-theme-builder" });
 }
+
 function closeThemeBuilderModal() {
     document.getElementById("modal-theme-builder").classList.add("hide");
     if (typeof _mrDropTopModalById === "function") _mrDropTopModalById("modal-theme-builder");
 }
+
 function applyQuickColorPalette(key) {
     const map = { maroon:{bg:"#5c0a12",card:"#4a080f",text:"#fdf6ec",accent:"#f3d285"}, black:{bg:"#070709",card:"#121216",text:"#f4f4f5",accent:"#ffffff"}, emerald:{bg:"#04362a",card:"#074738",text:"#ecfdf5",accent:"#facc15"}, ivory:{bg:"#f7f4ef",card:"#ffffff",text:"#3b352f",accent:"#8c7658"}, navy:{bg:"#172433",card:"#1f3146",text:"#f1f5f9",accent:"#dbeafe"} };
     const p = map[key]; if (!p) return;
     document.getElementById("tb-c-bg").value = p.bg; document.getElementById("tb-c-card").value = p.card; document.getElementById("tb-c-text").value = p.text; document.getElementById("tb-c-accent").value = p.accent;
     updateThemeBuilderPreview();
 }
+
 function updateThemeBuilderPreview() {
     const demoTitle = document.getElementById("tb-demo-title").value.trim() || "Aqila & Fauzi";
     const badge = document.getElementById("tb-badge").value, font = document.getElementById("tb-font").value;
@@ -1440,6 +1748,7 @@ function updateThemeBuilderPreview() {
     const hasDisc = origP > price && price > 0;
     document.getElementById("tb-live-price-row").innerHTML = hasDisc ? `<span class="line-through opacity-65 text-[9px] mr-1">${fmtRp(origP)}</span><span>${fmtRp(price)}</span>` : `<span>${fmtRp(price || 99000)}</span>`;
 }
+
 async function submitVisualThemeBuilder(e) {
     e.preventDefault();
     const idVal = document.getElementById("tb-id").value, origKey = document.getElementById("tb-orig-key").value;
@@ -1477,11 +1786,13 @@ async function submitVisualThemeBuilder(e) {
     setBtnLoading("btn-tb-save", false); closeThemeBuilderModal(); renderMasterHeaderStats(); renderMasterWorkspaceContent();
     showToast(`Tema "${name}" tersimpan permanen!`);
 }
+
 async function deleteCustomTheme(id, name) {
     if (!(await showConfirm("Hapus Tema", `Hapus permanen tema "${name}"?`, "fa-solid fa-trash", "Ya, Hapus"))) return;
     showLoading("Menghapus..."); await apiAction({ action: "update_section", section: "customThemes", value: (db.customThemes || []).filter(t => String(t.id) !== String(id)) });
     hideLoading(); renderMasterWorkspaceContent(); showToast("Tema dihapus.", "info");
 }
+
 async function toggleHideBuiltInTheme(key, hideIt) {
     showLoading("Memperbarui...");
     let hid = [...(db.hiddenThemes || [])];
@@ -1498,10 +1809,12 @@ function addMasterBankRow(bk = "BCA", no = "", holder = "") {
     div.innerHTML = `<div class="flex gap-1.5 items-center"><select class="ms-bk app-input !py-1.5 font-bold flex-1">${Object.keys(BANK_LOGOS).map(k => `<option value="${k}" ${k===bk?"selected":""}>${k}</option>`).join("")}</select><button type="button" onclick="removeMasterBankRow(this)" class="px-2.5 py-1.5 rounded-lg bg-red-600/15 text-red-500 text-xs"><i class="fa-solid fa-trash"></i></button></div><input type="text" value="${esc(no)}" placeholder="No. Rekening / DANA" class="ms-no app-input !py-1.5"><input type="text" value="${esc(holder)}" placeholder="Atas Nama" class="ms-ho app-input !py-1.5">`;
     box.appendChild(div);
 }
+
 function removeMasterBankRow(btn) {
     if (document.querySelectorAll(".ms-bank-row").length <= 1) return showToast("Minimal harus menyisakan 1 rekening.", "info");
     btn.closest(".ms-bank-row").remove();
 }
+
 async function uploadMasterQRIS(inp) {
     if (!inp.files[0]) return;
     showLoading("Mengunggah QRIS...");
@@ -1514,6 +1827,7 @@ async function uploadMasterQRIS(inp) {
     } else showToast("Gagal mengunggah QRIS.", "error");
     hideLoading();
 }
+
 async function saveMasterSettings() {
     const banks = Array.from(document.querySelectorAll(".ms-bank-row")).map(r => ({
         bank: r.querySelector(".ms-bk").value, no: r.querySelector(".ms-no").value.trim(), holder: r.querySelector(".ms-ho").value.trim()
@@ -1537,8 +1851,69 @@ async function saveMasterSettings() {
     toggleSlideMenu(false);
     showToast(`Pembayaran tersimpan (Mode: ${qrisMode === "dynamic" ? "QRIS Dinamis DANA" : "QRIS Tetap"})!`);
 }
-function exportDB() { const a = document.createElement("a"); a.href = "data:text/json;charset=utf-8," + encodeURIComponent(JSON.stringify(db, null, 2)); a.download = "backup_lembarku.json"; a.click(); }
-async function addStockSong(e) { e.preventDefault(); setBtnLoading("btn-add-song", true, "Menyimpan..."); const list = [...(db.musicLibrary||[]), { id:Date.now(), title:document.getElementById("song-title").value.trim(), category:document.getElementById("song-cat").value.trim(), url:document.getElementById("song-url").value.trim() }]; db.musicLibrary = list; await apiAction({ action:"update_section", section:"musicLibrary", value:list }); setBtnLoading("btn-add-song", false); renderMasterWorkspaceContent(); showToast("Lagu ditambahkan!"); }
-async function delStockSong(i) { const list = [...db.musicLibrary]; list.splice(i, 1); db.musicLibrary = list; showLoading("Menghapus..."); await apiAction({ action:"update_section", section:"musicLibrary", value:list }); hideLoading(); renderMasterWorkspaceContent(); }
-async function addTestimonial(e) { e.preventDefault(); setBtnLoading("btn-add-testi", true, "Menyimpan..."); const list = [{ id:Date.now(), name:document.getElementById("t-name").value.trim(), category:document.getElementById("t-cat").value.trim(), rating:5, text:document.getElementById("t-text").value.trim() }, ...(db.testimonials||[])]; db.testimonials = list; await apiAction({ action:"update_section", section:"testimonials", value:list }); setBtnLoading("btn-add-testi", false); renderMasterWorkspaceContent(); showToast("Testimoni ditambahkan!"); }
-async function delTestimonial(i) { const list = [...db.testimonials]; list.splice(i, 1); db.testimonials = list; showLoading("Menghapus..."); await apiAction({ action:"update_section", section:"testimonials", value:list }); hideLoading(); renderMasterWorkspaceContent(); }
+
+function exportDB() {
+    const a = document.createElement("a");
+    a.href = "data:text/json;charset=utf-8," + encodeURIComponent(JSON.stringify(db, null, 2));
+    a.download = "backup_lembarku.json";
+    a.click();
+}
+
+async function addStockSong(e) {
+    e.preventDefault();
+    setBtnLoading("btn-add-song", true, "Menyimpan...");
+    const list = [...(db.musicLibrary || []), {
+        id: Date.now(),
+        title: document.getElementById("song-title").value.trim(),
+        category: document.getElementById("song-cat").value.trim(),
+        url: document.getElementById("song-url").value.trim()
+    }];
+    db.musicLibrary = list;
+    await apiAction({ action: "update_section", section: "musicLibrary", value: list });
+    setBtnLoading("btn-add-song", false);
+    document.getElementById("song-title").value = "";
+    document.getElementById("song-url").value = "";
+    renderMasterWorkspaceContent();
+    showToast("Lagu ditambahkan!");
+}
+
+async function delStockSong(i) {
+    stopAdminStockSongPreview();
+    const list = [...db.musicLibrary];
+    list.splice(i, 1);
+    db.musicLibrary = list;
+    showLoading("Menghapus...");
+    await apiAction({ action: "update_section", section: "musicLibrary", value: list });
+    hideLoading();
+    renderMasterWorkspaceContent();
+}
+
+async function addTestimonial(e) {
+    e.preventDefault();
+    setBtnLoading("btn-add-testi", true, "Menyimpan...");
+    const list = [{
+        id: Date.now(),
+        name: document.getElementById("t-name").value.trim(),
+        category: document.getElementById("t-cat").value.trim(),
+        rating: 5,
+        text: document.getElementById("t-text").value.trim()
+    }, ...(db.testimonials || [])];
+    db.testimonials = list;
+    await apiAction({ action: "update_section", section: "testimonials", value: list });
+    setBtnLoading("btn-add-testi", false);
+    document.getElementById("t-name").value = "";
+    document.getElementById("t-cat").value = "";
+    document.getElementById("t-text").value = "";
+    renderMasterWorkspaceContent();
+    showToast("Testimoni ditambahkan!");
+}
+
+async function delTestimonial(i) {
+    const list = [...db.testimonials];
+    list.splice(i, 1);
+    db.testimonials = list;
+    showLoading("Menghapus...");
+    await apiAction({ action: "update_section", section: "testimonials", value: list });
+    hideLoading();
+    renderMasterWorkspaceContent();
+}
