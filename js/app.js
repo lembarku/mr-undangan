@@ -1,6 +1,6 @@
 // =========================================================================
-// LEMBARKU — MAIN CONTROLLER (SPLASH HALO, BERANDA, PROFIL, MENU)
-// File: js/app.js
+// LEMBARKU — MAIN CONTROLLER (NOTIFIKASI, PRIVASI, BLOKIR, BERANDA & PROFIL)
+// File: js/app.js (V14.3)
 // =========================================================================
 const USER_CACHE_KEY = "MR_UNDANGAN_USER_OBJ";
 let deferredPwaPrompt = null;
@@ -8,6 +8,7 @@ let promoBannerIdx = 0, testiIdx = 0;
 let createChoiceIsCabang = false;
 let activeInvShelfCat = "Pernikahan", activePfShelfCat = "cv";
 let invShelfLock = false, pfShelfLock = false;
+let _currentDrawerSub = "";
 window.pendingActionAfterLogin = null;
 window._igProfileSheetState = { open: false, targetUsername: "", tab: "followers", masterCat: "user", projectCat: "proses" };
 
@@ -17,22 +18,34 @@ function _normAppUserKey(uname) {
     return k === "master" ? founderU : k;
 }
 
-// ================= 1. PWA INSTALL WELCOME MODAL & ANIMASI PEMASANGAN =================
+// ================= 1. PWA INSTALL / UNINSTALL TRACKING & WELCOME MODAL =================
 if ("serviceWorker" in navigator) navigator.serviceWorker.register("./sw.js").catch(() => {});
 
-const isAppInstalled = () =>
+const isStandaloneRunning = () =>
     window.matchMedia("(display-mode: standalone)").matches ||
-    window.navigator.standalone === true ||
+    window.navigator.standalone === true;
+
+const isAppInstalled = () =>
+    isStandaloneRunning() ||
     localStorage.getItem("MR_PWA_INSTALLED") === "true";
 
 window.addEventListener("beforeinstallprompt", (e) => {
     e.preventDefault();
     deferredPwaPrompt = e;
+    // Jika perangkat sebelumnya tercatat terpasang namun browser kembali menawarkan install,
+    // artinya aplikasi telah dicopot (uninstall) dari layar utama perangkat.
+    const prevMarked = localStorage.getItem("MR_PWA_INSTALLED") === "true" ||
+        (typeof APP_INSTALLED_REPORTED_KEY !== "undefined" && localStorage.getItem(APP_INSTALLED_REPORTED_KEY) === "installed");
+    if (prevMarked && !isStandaloneRunning()) {
+        localStorage.removeItem("MR_PWA_INSTALLED");
+        if (typeof reportAppInstallState === "function") reportAppInstallState("uninstalled");
+    }
 });
 
 window.addEventListener("appinstalled", () => {
     localStorage.setItem("MR_PWA_INSTALLED", "true");
     deferredPwaPrompt = null;
+    if (typeof reportAppInstallState === "function") reportAppInstallState("installed");
     completeInstallAnimationUI();
 });
 
@@ -76,10 +89,11 @@ async function acceptWelcomeInstall() {
                 if (lbl) lbl.innerText = "Memasang ikon ke layar utama HP Anda...";
                 if (bar) bar.style.width = "82%";
                 localStorage.setItem("MR_PWA_INSTALLED", "true");
+                if (typeof reportAppInstallState === "function") reportAppInstallState("installed");
                 setTimeout(() => completeInstallAnimationUI(), 1300);
             } else {
                 document.getElementById("modal-install-welcome")?.classList.add("hide");
-                showToast("Pemasangan dibatalkan. Anda tetap bisa pasang kapan saja lewat menu titik 3.", "info");
+                showToast("Pemasangan dibatalkan. Anda tetap bisa pasang kapan saja lewat menu Pengaturan.", "info");
             }
         } catch {
             document.getElementById("modal-install-welcome")?.classList.add("hide");
@@ -216,6 +230,8 @@ function logoutSession() {
     if (typeof idbRemove === "function") idbRemove("db_snapshot");
     db.users = []; db.invitations = []; db.portfolios = []; db.chats = [];
     toggleSlideMenu(false);
+    closeNotificationsFullscreen(true);
+    if (typeof closeMasterWorkspaceFullscreen === "function") closeMasterWorkspaceFullscreen(true);
     if (typeof closeFullChatOverlay === "function") closeFullChatOverlay(true);
     _mrResetNavToLanding();
     goToLanding(true);
@@ -223,7 +239,7 @@ function logoutSession() {
     showToast("Anda telah keluar.", "info");
 }
 
-// ================= 3. MESIN NAVIGASI BERTAHAP TERPUSAT (DEFAULT GENERAL) =================
+// ================= 3. MESIN NAVIGASI BERTAHAP TERPUSAT =================
 let lastBackPressTs = 0;
 let historyGuardReady = false;
 let _mrHistoryDepth = 0;
@@ -256,7 +272,6 @@ function initBackNavigationGuard() {
     _mrHistoryDepth = 0;
     _mrHomeGuardArmed = false;
 
-    // Pasang 1 pijakan guard Beranda pada sentuhan pertama user agar 100% sah di browser HP
     window.addEventListener("pointerdown", () => {
         if (!_mrHomeGuardArmed && _mrHistoryDepth === 0) {
             _mrHomeGuardArmed = true;
@@ -317,12 +332,13 @@ function _mrDropTopTransientToken(closedId) {
     const top = stack[stack.length - 1];
     if (top.type === "auto") { stack.pop(); return; }
     if (top.type === "drawer_sub" && closedId === "drawer-sub") { stack.pop(); return; }
+    if (top.type === "workspace" && closedId === "modal-master-workspace") { stack.pop(); return; }
     if (top.type === "modal" && top.id === closedId) { stack.pop(); return; }
     if (top.type === "avatar_lightbox" && closedId === "expanded-avatar-overlay") { stack.pop(); return; }
 }
 
 function _mrHasVisibleDrawerSub() {
-    return ["drawer-sub-theme", "drawer-sub-about", "drawer-sub-profil", "drawer-sub-akun", "drawer-sub-qris"]
+    return ["drawer-sub-theme", "drawer-sub-privacy", "drawer-sub-about", "drawer-sub-profil", "drawer-sub-akun", "drawer-sub-password", "drawer-sub-qris"]
         .some(id => _isElVis(id));
 }
 
@@ -339,6 +355,12 @@ function _mrHideStackableOverlaysOnly() {
         profMod.style.cssText = "";
         profMod.classList.add("hide");
     }
+
+    const notifMod = document.getElementById("modal-notifications");
+    if (notifMod) notifMod.classList.add("hide");
+
+    const wsMod = document.getElementById("modal-master-workspace");
+    if (wsMod) wsMod.classList.add("hide");
 
     const chatOv = document.getElementById("full-chat-overlay");
     if (chatOv) {
@@ -434,13 +456,22 @@ function _mrCloseTransientOverlayIfAny() {
         if (typeof cancelSocialShareModal === "function") cancelSocialShareModal();
         return "modal-share-sosmed";
     }
+    if (_isElVis("modal-notifications")) {
+        closeNotificationsFullscreen(true);
+        return "modal-notifications";
+    }
     if (document.getElementById("drawer-main")?.classList.contains("open")) {
         if (_mrHasVisibleDrawerSub()) {
-            backToMainSlideMenu();
+            handleDrawerBackBtn(true);
             return "drawer-sub";
         }
         toggleSlideMenu(false);
         return "drawer-main";
+    }
+    if (_isElVis("modal-master-workspace")) {
+        if (typeof closeMasterWorkspaceFullscreen === "function") closeMasterWorkspaceFullscreen(true);
+        else document.getElementById("modal-master-workspace")?.classList.add("hide");
+        return "modal-master-workspace";
     }
     if (_isElVis("guest-invitation-overlay") && _isElVis("gv-close-btn")) {
         if (typeof closeGuestInvitation === "function") closeGuestInvitation();
@@ -493,7 +524,6 @@ function _mrRestoreNavStep(step) {
     if (step.type === "workspace") {
         _mrHideStackableOverlaysOnly();
         if (typeof closeFullChatOverlay === "function") closeFullChatOverlay(true);
-        if (currentViewName !== "master") routeDashboard(true);
         if (typeof openMasterWorkspace === "function") openMasterWorkspace(step.name || "overview", true);
         return;
     }
@@ -505,7 +535,6 @@ function _mrRestoreNavStep(step) {
         if (step.view === "landing") {
             goToLanding(true);
         } else if (["profile", "master", "cabang", "staff"].includes(step.view)) {
-            if (step.view === "master") currentMasterWorkspace = "overview";
             routeDashboard(true);
         } else if (step.view === "guestlist") {
             hideAllViews();
@@ -546,10 +575,6 @@ function _mrHandleFallbackBackStep() {
         routeDashboard(true);
         return true;
     }
-    if (currentViewName === "master" && typeof currentMasterWorkspace !== "undefined" && currentMasterWorkspace !== "overview") {
-        if (typeof openMasterWorkspace === "function") openMasterWorkspace("overview", true);
-        return true;
-    }
     if (["profile", "master", "cabang", "staff"].includes(currentViewName)) {
         goToLanding(true);
         return true;
@@ -569,7 +594,6 @@ window.addEventListener("popstate", (e) => {
         : Math.max(0, _mrHistoryDepth - 1);
     _mrHistoryDepth = Math.max(0, stateDepth);
 
-    // Mode Portal Client Cabang
     if (typeof clientPortalState !== "undefined" && clientPortalState.active) {
         const closedT = _mrCloseTransientOverlayIfAny();
         if (closedT) {
@@ -588,14 +612,12 @@ window.addEventListener("popstate", (e) => {
         return;
     }
 
-    // 1. Tutup lapisan/modal transien teratas terlebih dahulu
     const closedTransient = _mrCloseTransientOverlayIfAny();
     if (closedTransient) {
         _mrDropTopTransientToken(closedTransient);
         return;
     }
 
-    // 2. Mundur 1 langkah sesuai urutan masuk pada tumpukan navigasi
     const stack = window._mrNavStack;
     while (stack.length > 1) {
         const top = stack[stack.length - 1];
@@ -614,12 +636,10 @@ window.addEventListener("popstate", (e) => {
         return;
     }
 
-    // 3. Fallback bila masih berada di luar Beranda
     if (_mrHandleFallbackBackStep()) {
         return;
     }
 
-    // 4. Sudah berada di Beranda (tempat kembali terakhir) -> konfirmasi 2x untuk keluar
     const now = Date.now();
     if (now - lastBackPressTs < 2400) {
         if (_mrHistoryDepth > 0) {
@@ -705,6 +725,7 @@ function routeDashboard(fromBack = false) {
 function renderHeaderActions() {
     const box = document.getElementById("header-actions");
     const dotsBtn = document.getElementById("header-dots-btn");
+    const notifBtn = document.getElementById("header-notif-btn");
     const mainEl = document.getElementById("header-brand-main");
     const subEl = document.getElementById("header-brand-sub");
     const footLoginBtn = document.getElementById("footer-login-cta");
@@ -718,6 +739,7 @@ function renderHeaderActions() {
             subEl.classList.remove("hide");
         }
         document.getElementById("floating-chat-wrap")?.classList.add("hide");
+        if (notifBtn) notifBtn.classList.add("hide");
         if (dotsBtn) {
             dotsBtn.classList.add("hide");
             dotsBtn.style.setProperty("display", "none", "important");
@@ -748,6 +770,10 @@ function renderHeaderActions() {
     const u = typeof getCurrentUserObj === "function" ? getCurrentUserObj() : null;
     if (footLoginBtn) footLoginBtn.classList.toggle("hide", !!u);
 
+    if (notifBtn) {
+        notifBtn.classList.toggle("hide", !u);
+    }
+
     if (!u) {
         if (box) box.innerHTML = `<button onclick="openAuthModal()" class="gold-pill-btn px-3.5 py-1.5 rounded-xl text-xs">Masuk / Daftar</button>`;
         return;
@@ -760,9 +786,357 @@ function renderHeaderActions() {
             : `<button onclick="routeDashboard()" class="w-9 h-9 rounded-full overflow-hidden border-2 gold-border shadow-sm hover:scale-105 transition bg-zinc-800 shrink-0" title="Buka Profil"><img src="${u.avatar || defAv}" alt="Profil" class="w-full h-full object-cover"></button>`;
     }
     if (typeof updateChatBadges === "function") updateChatBadges();
+    updateNotificationBellBadge();
 }
 
-// ================= INSTAGRAM-STYLE STATS HELPERS & FOLLOW =================
+// ================= 4. LONCENG NOTIFIKASI MINIMALIS BERDASARKAN PERAN =================
+function _getNotifReadTs(username) {
+    const k = `${typeof NOTIF_READ_TS_KEY !== "undefined" ? NOTIF_READ_TS_KEY : "LBK_NOTIF_LAST_READ_TS"}_${_normAppUserKey(username)}`;
+    return Number(localStorage.getItem(k) || 0);
+}
+
+function _setNotifReadTs(username, ts) {
+    const k = `${typeof NOTIF_READ_TS_KEY !== "undefined" ? NOTIF_READ_TS_KEY : "LBK_NOTIF_LAST_READ_TS"}_${_normAppUserKey(username)}`;
+    localStorage.setItem(k, String(ts || Date.now()));
+}
+
+function _fmtNotifTime(ts) {
+    if (!ts) return "Baru saja";
+    const d = new Date(Number(ts));
+    if (isNaN(d.getTime())) return "Baru saja";
+    return d.toLocaleDateString("id-ID", { day: "2-digit", month: "short", hour: "2-digit", minute: "2-digit" });
+}
+
+function buildNotificationsForCurrentUser() {
+    const u = typeof getCurrentUserObj === "function" ? getCurrentUserObj() : null;
+    if (!u) return [];
+    const role = u.role || "user";
+    const myKey = _normAppUserKey(u.username);
+    const lastRead = _getNotifReadTs(myKey);
+    const items = [];
+
+    const isCabDoc = (doc) => {
+        if (!doc) return false;
+        if (doc.brandName && String(doc.brandName).trim()) return true;
+        const ownerObj = (db.users || []).find(x => _normAppUserKey(x.username) === _normAppUserKey(doc.owner));
+        return !!(ownerObj && ownerObj.role === "cabang");
+    };
+
+    const allInvs = Array.isArray(db.invitations) ? db.invitations : [];
+    const allPfs = Array.isArray(db.portfolios) ? db.portfolios : [];
+    const allChats = Array.isArray(db.chats) ? db.chats : [];
+
+    if (role === "master" || role === "administrasi") {
+        const isAdminOnly = role === "administrasi";
+        const scopedDocs = [
+            ...allInvs.map(i => Object.assign({}, i, { _kind: "inv" })),
+            ...allPfs.map(p => Object.assign({}, p, { _kind: "pf" }))
+        ].filter(d => !isAdminOnly || !isCabDoc(d));
+
+        scopedDocs.forEach(doc => {
+            const ts = Number(doc.createdAt || doc.id || 0);
+            if (doc.pendingRevision) {
+                items.push({
+                    id: `rev_${doc._kind}_${doc.id}`,
+                    ts,
+                    unread: true,
+                    priority: true,
+                    icon: "fa-solid fa-pen-to-square",
+                    accent: "text-amber-500",
+                    title: `Pengajuan Revisi — ${doc.title}`,
+                    desc: `@${doc.owner} mengajukan revisi berkas. Ketuk untuk cek & ACC di Project.`,
+                    actionJs: `closeNotificationsFullscreen(true);if(typeof openSoloProjectModal==='function')openSoloProjectModal('${esc(myKey)}');`
+                });
+            } else if (doc.status === "Menunggu Verifikasi") {
+                items.push({
+                    id: `ver_${doc._kind}_${doc.id}`,
+                    ts,
+                    unread: true,
+                    priority: true,
+                    icon: "fa-solid fa-receipt",
+                    accent: "text-emerald-500",
+                    title: `Transaksi Masuk — ${doc.title}`,
+                    desc: `@${doc.owner} mengirim bukti konfirmasi${doc.totalPay ? ` (${fmtRp(doc.totalPay)})` : ""}. Ketuk untuk verifikasi.`,
+                    actionJs: `closeNotificationsFullscreen(true);if(typeof openSoloProjectModal==='function')openSoloProjectModal('${esc(myKey)}');`
+                });
+            } else if (doc.status === "Menunggu Pembayaran") {
+                items.push({
+                    id: `ord_${doc._kind}_${doc.id}`,
+                    ts,
+                    unread: ts > lastRead,
+                    icon: "fa-solid fa-bag-shopping",
+                    accent: "app-accent",
+                    title: `Pesanan Baru — ${doc.title}`,
+                    desc: `@${doc.owner} membuat draf baru (menunggu pembayaran).`,
+                    actionJs: `closeNotificationsFullscreen(true);if(typeof openSoloProjectModal==='function')openSoloProjectModal('${esc(myKey)}');`
+                });
+            }
+        });
+
+        if (role === "master") {
+            (db.users || []).filter(x => x.role !== "master" && x.status !== "Aktif").forEach(pu => {
+                const ts = Number(pu.createdAt || Date.now());
+                items.push({
+                    id: `reg_${pu.username}`,
+                    ts,
+                    unread: true,
+                    priority: true,
+                    icon: "fa-solid fa-user-clock",
+                    accent: "text-amber-500",
+                    title: `Pendaftar Akun Baru: @${pu.username}`,
+                    desc: `${pu.name || pu.username} menunggu persetujuan aktif di Followers Founder.`,
+                    actionJs: `closeNotificationsFullscreen(true);if(typeof openSoloFollowersModal==='function')openSoloFollowersModal('${esc(myKey)}');`
+                });
+            });
+        }
+
+        const unreadThreadMap = {};
+        allChats.forEach(c => {
+            if (c.readByMaster || c.role === "master" || c.role === "administrasi") return;
+            const key = _normAppUserKey(c.threadUser || c.sender || "");
+            if (!key) return;
+            if (isAdminOnly) {
+                const owner = (db.users || []).find(x => _normAppUserKey(x.username) === key);
+                if (owner && (owner.role === "cabang" || owner.role === "master")) return;
+            }
+            if (!unreadThreadMap[key] || (c.ts || 0) > unreadThreadMap[key].ts) {
+                unreadThreadMap[key] = c;
+            }
+        });
+        Object.keys(unreadThreadMap).forEach(tKey => {
+            const m = unreadThreadMap[tKey];
+            items.push({
+                id: `chat_${tKey}_${m.ts || 0}`,
+                ts: Number(m.ts || Date.now()),
+                unread: true,
+                priority: true,
+                icon: "fa-solid fa-comments",
+                accent: "text-blue-500",
+                title: `Pesan Baru dari ${m.senderName || "@" + tKey}`,
+                desc: m.text ? m.text.slice(0, 90) : "Mengirim lampiran foto.",
+                actionJs: `closeNotificationsFullscreen(true);if(typeof openFullChatOverlay==='function')openFullChatOverlay('${esc(tKey)}');`
+            });
+        });
+    } else if (role === "cabang") {
+        const quota = Number(u.quota || 0);
+        if (quota <= 2) {
+            items.push({
+                id: `cab_q_${quota}`,
+                ts: Date.now(),
+                unread: quota === 0,
+                icon: "fa-solid fa-coins",
+                accent: "text-amber-500",
+                title: quota === 0 ? "Kuota Deposit Habis" : `Sisa Kuota Cabang: ${quota}`,
+                desc: "Hubungi Founder melalui Live Chat untuk top-up kuota deposit cabang.",
+                actionJs: `closeNotificationsFullscreen(true);if(typeof openFullChatOverlay==='function')openFullChatOverlay();`
+            });
+        }
+        allInvs.filter(i => _normAppUserKey(i.owner) === myKey).forEach(inv => {
+            (inv.wishes || []).slice(0, 3).forEach(w => {
+                const ts = Number(w.id || inv.createdAt || 0);
+                items.push({
+                    id: `wish_${inv.id}_${w.id}`,
+                    ts,
+                    unread: ts > lastRead,
+                    icon: "fa-solid fa-envelope-open-text",
+                    accent: "text-emerald-500",
+                    title: `RSVP & Ucapan Baru (${inv.title})`,
+                    desc: `${w.name} (${w.rsvp || "Hadir"}): "${String(w.msg || "").slice(0, 70)}"`,
+                    actionJs: `closeNotificationsFullscreen(true);if(typeof openGuestListManager==='function')openGuestListManager(${inv.id});`
+                });
+            });
+        });
+        const unreadStaffChats = allChats.filter(c => _normAppUserKey(c.threadUser) === myKey && !c.readByUser && (c.role === "master" || c.role === "administrasi"));
+        if (unreadStaffChats.length) {
+            const last = unreadStaffChats[unreadStaffChats.length - 1];
+            items.push({
+                id: `cchat_${last.ts || 0}`,
+                ts: Number(last.ts || Date.now()),
+                unread: true,
+                priority: true,
+                icon: "fa-solid fa-headset",
+                accent: "text-blue-500",
+                title: "Balasan Baru dari Founder",
+                desc: last.text ? last.text.slice(0, 85) : "Mengirim lampiran foto.",
+                actionJs: `closeNotificationsFullscreen(true);if(typeof openFullChatOverlay==='function')openFullChatOverlay();`
+            });
+        }
+    } else {
+        // USER BIASA
+        const myDocs = [
+            ...allInvs.filter(i => _normAppUserKey(i.owner) === myKey).map(i => Object.assign({}, i, { _kind: "inv" })),
+            ...allPfs.filter(p => _normAppUserKey(p.owner) === myKey).map(p => Object.assign({}, p, { _kind: "pf" }))
+        ];
+        myDocs.forEach(doc => {
+            const ts = Number(doc.createdAt || doc.id || 0);
+            if (doc.status === "Menunggu Pembayaran") {
+                items.push({
+                    id: `upay_${doc._kind}_${doc.id}`,
+                    ts,
+                    unread: true,
+                    icon: "fa-solid fa-qrcode",
+                    accent: "text-amber-500",
+                    title: `Selesaikan Konfirmasi — ${doc.title}`,
+                    desc: "Pesanan Anda tersimpan. Ketuk untuk bayar QRIS atau lampirkan bukti.",
+                    actionJs: `closeNotificationsFullscreen(true);if(typeof openUnifiedPayment==='function')openUnifiedPayment('${doc._kind === "pf" ? "portfolio" : "inv"}',${doc.id});`
+                });
+            } else if (doc.status === "Menunggu Verifikasi") {
+                items.push({
+                    id: `uver_${doc._kind}_${doc.id}`,
+                    ts,
+                    unread: ts > lastRead,
+                    icon: "fa-solid fa-clock",
+                    accent: "text-blue-500",
+                    title: `Menunggu ACC Admin — ${doc.title}`,
+                    desc: doc.pendingRevision ? "Pengajuan revisi Anda sedang diperiksa Admin." : "Bukti pembayaran sudah diterima, sedang dikonfirmasi Admin.",
+                    actionJs: `closeNotificationsFullscreen(true);routeDashboard();`
+                });
+            } else if (doc.status === "Aktif") {
+                items.push({
+                    id: `uact_${doc._kind}_${doc.id}`,
+                    ts,
+                    unread: ts > lastRead,
+                    icon: "fa-solid fa-circle-check",
+                    accent: "text-emerald-500",
+                    title: `Berkas Aktif — ${doc.title}`,
+                    desc: doc._kind === "pf" ? "CV/Lamaran siap disempurnakan & unduh PDF." : "Undangan siap dibagikan ke daftar tamu Anda.",
+                    actionJs: doc._kind === "pf"
+                        ? `closeNotificationsFullscreen(true);if(typeof openSempurnakanModal==='function')openSempurnakanModal(${doc.id});`
+                        : `closeNotificationsFullscreen(true);if(typeof openGuestListManager==='function')openGuestListManager(${doc.id});`
+                });
+            }
+
+            if (doc._kind === "inv" && Array.isArray(doc.wishes)) {
+                doc.wishes.slice(0, 3).forEach(w => {
+                    const wts = Number(w.id || ts);
+                    items.push({
+                        id: `uwish_${doc.id}_${w.id}`,
+                        ts: wts,
+                        unread: wts > lastRead,
+                        icon: "fa-solid fa-heart",
+                        accent: "text-pink-500",
+                        title: `Ucapan Baru di ${doc.title}`,
+                        desc: `${w.name} (${w.rsvp || "Hadir"}): "${String(w.msg || "").slice(0, 75)}"`,
+                        actionJs: `closeNotificationsFullscreen(true);if(typeof openGuestListManager==='function')openGuestListManager(${doc.id});`
+                    });
+                });
+            }
+        });
+
+        const unreadStaffChats = allChats.filter(c => _normAppUserKey(c.threadUser) === myKey && !c.readByUser && (c.role === "master" || c.role === "administrasi"));
+        if (unreadStaffChats.length) {
+            const last = unreadStaffChats[unreadStaffChats.length - 1];
+            items.push({
+                id: `uchat_${last.ts || 0}`,
+                ts: Number(last.ts || Date.now()),
+                unread: true,
+                priority: true,
+                icon: "fa-solid fa-headset",
+                accent: "text-blue-500",
+                title: "Balasan Baru dari Admin Lembarku",
+                desc: last.text ? last.text.slice(0, 85) : "Mengirim lampiran foto.",
+                actionJs: `closeNotificationsFullscreen(true);if(typeof openFullChatOverlay==='function')openFullChatOverlay();`
+            });
+        }
+
+        if (u.isPro) {
+            items.push({
+                id: `upro_${myKey}`,
+                ts: Number(u.createdAt || 0),
+                unread: false,
+                icon: "fa-solid fa-circle-check",
+                accent: "text-blue-500",
+                title: "Status Akun PRO Aktif",
+                desc: "Centang biru & penyimpanan Album Rahasia tanpa batas aktif di akun Anda.",
+                actionJs: `closeNotificationsFullscreen(true);routeDashboard();`
+            });
+        }
+    }
+
+    return items.sort((a, b) => (Number(!!b.priority) - Number(!!a.priority)) || (Number(b.ts || 0) - Number(a.ts || 0)));
+}
+
+function updateNotificationBellBadge() {
+    const badge = document.getElementById("header-notif-badge");
+    const btn = document.getElementById("header-notif-btn");
+    const u = typeof getCurrentUserObj === "function" ? getCurrentUserObj() : null;
+    if (!badge || !btn) return;
+    if (!u || (typeof clientPortalState !== "undefined" && clientPortalState.active)) {
+        badge.classList.add("hide");
+        return;
+    }
+    const items = buildNotificationsForCurrentUser();
+    const unreadCnt = items.filter(x => x.unread).length;
+    badge.innerText = unreadCnt > 99 ? "99+" : String(unreadCnt);
+    badge.classList.toggle("hide", unreadCnt === 0);
+}
+
+function openNotificationsFullscreen() {
+    const u = typeof getCurrentUserObj === "function" ? getCurrentUserObj() : null;
+    if (!u) return openAuthModal();
+    const sub = document.getElementById("notif-subtitle");
+    if (sub) {
+        const subMap = {
+            master: "Transaksi masuk, revisi, pendaftar baru & Live Chat",
+            administrasi: "Antrean transaksi & pesan pelanggan terbaru",
+            cabang: "Status kuota, ucapan tamu klien & pesan Founder",
+            user: "Status pesanan berkas, ucapan tamu & balasan Admin"
+        };
+        sub.innerText = subMap[u.role] || "Aktivitas terbaru akun Anda";
+    }
+    renderNotificationsList();
+    document.getElementById("modal-notifications")?.classList.remove("hide");
+    mrNavPush({ type: "modal", id: "modal-notifications" });
+}
+
+function closeNotificationsFullscreen(fromNav = false) {
+    document.getElementById("modal-notifications")?.classList.add("hide");
+    if (!fromNav) _mrDropTopModalById("modal-notifications");
+    updateNotificationBellBadge();
+}
+
+function markAllNotificationsRead() {
+    const u = typeof getCurrentUserObj === "function" ? getCurrentUserObj() : null;
+    if (!u) return;
+    _setNotifReadTs(u.username, Date.now());
+    renderNotificationsList();
+    updateNotificationBellBadge();
+    showToast("Notifikasi ditandai sudah dibaca.", "info");
+}
+
+function renderNotificationsList() {
+    const box = document.getElementById("notifications-list-body");
+    if (!box) return;
+    const items = buildNotificationsForCurrentUser();
+    if (!items.length) {
+        box.innerHTML = `
+            <div class="app-card border border-dashed rounded-3xl p-10 text-center space-y-2 mt-4">
+                <i class="fa-regular fa-bell-slash text-2xl app-muted"></i>
+                <h4 class="font-bold text-sm">Belum Ada Notifikasi</h4>
+                <p class="text-xs app-muted">Semua aktivitas transaksi, revisi, dan pesan terbaru akan muncul rapi di sini.</p>
+            </div>
+        `;
+        return;
+    }
+
+    box.innerHTML = items.map(it => `
+        <button type="button" onclick="${it.actionJs}" class="w-full text-left app-card border rounded-2xl p-3.5 shadow-sm flex items-start gap-3 hover:brightness-95 active:scale-[0.99] transition ${it.unread ? "gold-border" : ""}">
+            <span class="w-10 h-10 rounded-2xl app-card-soft border flex items-center justify-center shrink-0 ${it.accent || "app-accent"}">
+                <i class="${it.icon}"></i>
+            </span>
+            <div class="flex-1 min-w-0 space-y-0.5">
+                <div class="flex items-center justify-between gap-2">
+                    <strong class="text-xs sm:text-sm font-extrabold truncate">${escHtml(it.title)}</strong>
+                    ${it.unread ? `<span class="w-2 h-2 rounded-full bg-red-500 shrink-0"></span>` : ""}
+                </div>
+                <p class="text-[11px] app-muted leading-snug line-clamp-2">${escHtml(it.desc)}</p>
+                <span class="block text-[9.5px] app-muted pt-0.5">${escHtml(_fmtNotifTime(it.ts))}</span>
+            </div>
+        </button>
+    `).join("");
+}
+
+// ================= 5. INSTAGRAM-STYLE STATS, FOLLOW & BLOKIR USER =================
 function _normKey(s) {
     return _normAppUserKey(s);
 }
@@ -837,10 +1211,7 @@ function _buildIgStatsRowHtml(targetUserObj) {
     );
     const isFollowingThis = canFollowThis && _getFollowingListForUser(curU).includes(uname);
 
-    const followersClick = (isMasterProfile && !isSelf)
-        ? `onclick="showToast('Daftar followers akun Founder bersifat privat.','info')"`
-        : `onclick="if(typeof openSoloFollowersModal==='function')openSoloFollowersModal('${esc(uname)}')"`;
-
+    const followersClick = `onclick="if(typeof openSoloFollowersModal==='function')openSoloFollowersModal('${esc(uname)}')"`;
     const followersColHtml = isCabangProfile
         ? ""
         : `<button type="button" ${followersClick} class="flex-1 py-2 px-1 text-center rounded-xl hover:bg-black/5 active:scale-98 transition">
@@ -893,36 +1264,64 @@ async function toggleFollowTargetUser(targetUname) {
     if (targetObj.role === "master" && curU.role !== "user" && curU.role !== "administrasi") {
         return showToast("Hanya User dan Admin yang dapat mengikuti akun Founder.", "info");
     }
-
-    const myKey = _normKey(curU.username);
-    if (!Array.isArray(curU.following)) curU.following = [];
-    if (!Array.isArray(targetObj.followers)) targetObj.followers = [];
-
-    const idxF = curU.following.map(_normKey).indexOf(tKey);
-    const nowFollowing = idxF === -1;
-    if (nowFollowing) {
-        curU.following.push(tKey);
-        if (!targetObj.followers.map(_normKey).includes(myKey)) targetObj.followers.push(myKey);
-    } else {
-        curU.following.splice(idxF, 1);
-        targetObj.followers = targetObj.followers.filter(x => _normKey(x) !== myKey);
+    if (typeof isUserBlockedByMe === "function" && isUserBlockedByMe(tKey)) {
+        return showToast("Buka blokir akun ini terlebih dahulu untuk mengikutinya.", "error");
+    }
+    if (targetObj.blockedViewer) {
+        return showToast("Anda tidak dapat mengikuti akun ini.", "error");
     }
 
-    ensureUserInLocalDb(curU);
-    ensureUserInLocalDb(targetObj);
+    showLoading("Memperbarui...");
+    const res = await apiAction({ action: "toggle_follow", targetUsername: tKey });
+    hideLoading();
+    if (!res || !res.ok) {
+        return showToast((res && res.message) || "Gagal memperbarui status mengikuti.", "error");
+    }
+
+    if (res.user) ensureUserInLocalDb(res.user);
     refreshActiveViewSmart();
     if (typeof viewUserProfileModal === "function" && _isElVis("modal-view-user-profile")) {
         viewUserProfileModal(tKey, true);
     }
-    showToast(nowFollowing ? `Mengikuti @${tKey}` : `Berhenti mengikuti @${tKey}`, "info");
-
-    try {
-        await apiAction({ action: "upsert_user", oldUsername: curU.username, user: curU });
-        await apiAction({ action: "upsert_user", oldUsername: targetObj.username, user: targetObj });
-    } catch {}
+    showToast(res.following ? `Mengikuti @${tKey}` : `Berhenti mengikuti @${tKey}`, "info");
 }
 
-// ================= 4. MENU TITIK 3 POPUP PENUH =================
+async function toggleBlockTargetUser(targetUname, fromPrivacyList = false) {
+    const curU = typeof getCurrentUserObj === "function" ? getCurrentUserObj() : null;
+    if (!curU || !curU.username) return showToast("Silakan masuk akun terlebih dahulu.", "info");
+    if (curU.role === "cabang") return showToast("Fitur blokir tidak tersedia untuk akun Cabang.", "info");
+
+    const tKey = _normKey(targetUname);
+    const alreadyBlocked = typeof isUserBlockedByMe === "function" && isUserBlockedByMe(tKey);
+    const ok = await showConfirm(
+        alreadyBlocked ? "Buka Blokir Akun" : "Blokir Pengguna",
+        alreadyBlocked
+            ? `Buka blokir @${tKey}? Setelah dibuka, akun ini dapat melihat profil Anda sesuai pengaturan privasi.`
+            : `Blokir @${tKey}? Pengguna ini tidak akan bisa melihat profil, project, atau mengikuti Anda lagi.`,
+        alreadyBlocked ? "fa-solid fa-unlock" : "fa-solid fa-ban",
+        alreadyBlocked ? "Ya, Buka Blokir" : "Ya, Blokir"
+    );
+    if (!ok) return;
+
+    showLoading(alreadyBlocked ? "Membuka blokir..." : "Memblokir akun...");
+    const res = await apiAction({ action: "toggle_block", targetUsername: tKey });
+    hideLoading();
+    if (!res || !res.ok) {
+        return showToast((res && res.message) || "Gagal mengubah status blokir.", "error");
+    }
+
+    if (res.user) ensureUserInLocalDb(res.user);
+    if (fromPrivacyList && typeof renderPrivacySubPanel === "function") {
+        renderPrivacySubPanel();
+    }
+    if (typeof viewUserProfileModal === "function" && _isElVis("modal-view-user-profile")) {
+        viewUserProfileModal(tKey, true);
+    }
+    refreshActiveViewSmart();
+    showToast(res.blocked ? `@${tKey} berhasil diblokir.` : `Blokir @${tKey} dibuka.`, "info");
+}
+
+// ================= 6. MENU PENGATURAN FULL-SCREEN (PRIVASI & GANTI PASSWORD) =================
 function toggleSlideMenu(show) {
     const el = document.getElementById("drawer-main"); if (!el) return;
     if (show) {
@@ -931,16 +1330,30 @@ function toggleSlideMenu(show) {
         mrNavPush({ type: "modal", id: "drawer-main" });
     } else {
         el.classList.remove("open");
+        _currentDrawerSub = "";
         _mrDropTopModalById("drawer-main");
     }
 }
 
+function handleDrawerBackBtn(fromPopstate = false) {
+    if (_currentDrawerSub === "password") {
+        openSlideSub("akun", true);
+        return;
+    }
+    backToMainSlideMenu(fromPopstate);
+}
+
 function backToMainSlideMenu(silent = false) {
+    _currentDrawerSub = "";
     const tEl = document.getElementById("drawer-main-title");
     if (tEl) tEl.innerText = "Pengaturan";
+    document.getElementById("drawer-back-btn")?.classList.add("hide");
     document.getElementById("drawer-main-list")?.classList.remove("hide");
-    ["drawer-sub-theme", "drawer-sub-about", "drawer-sub-profil", "drawer-sub-akun", "drawer-sub-qris"]
+    ["drawer-sub-theme", "drawer-sub-privacy", "drawer-sub-about", "drawer-sub-profil", "drawer-sub-akun", "drawer-sub-password", "drawer-sub-qris"]
         .forEach(id => document.getElementById(id)?.classList.add("hide"));
+    const sc = document.getElementById("drawer-scroll-body");
+    if (sc) sc.scrollTop = 0;
+
     if (!silent && Array.isArray(window._mrNavStack) && window._mrNavStack.length > 1) {
         const top = window._mrNavStack[window._mrNavStack.length - 1];
         if (top && top.type === "drawer_sub") window._mrNavStack.pop();
@@ -967,24 +1380,28 @@ function renderMainSlideMenuList() {
     if (!u) {
         html += menuRowItem("fa-right-to-bracket", "Masuk / Daftar Akun", "Buat undangan, CV & simpan favorit", "toggleSlideMenu(false);openAuthModal();");
     } else if (u.role === "master") {
-        html += menuRowItem("fa-chart-line", "Grafik & Analitik Bisnis", "Ringkasan omzet, tren & aktivitas", "toggleSlideMenu(false);routeDashboard();openMasterWorkspace('overview');");
-        html += menuRowItem("fa-clipboard-check", "Verifikasi Order & Revisi", "Cek bukti konfirmasi & edit proyek klien", "toggleSlideMenu(false);routeDashboard();openMasterWorkspace('orders');");
-        html += menuRowItem("fa-palette", "Kelola Tema & Harga", "Foto template, nama contoh & harga CV", "toggleSlideMenu(false);routeDashboard();openMasterWorkspace('themes');");
-        html += menuRowItem("fa-users-gear", "Kelola User, Cabang & Pro", "Inspeksi album, PIN, Akun Pro & Staf", "toggleSlideMenu(false);routeDashboard();openMasterWorkspace('users_cabang');");
-        html += menuRowItem("fa-rectangle-ad", "Edit Banner Promosi (12:4.4)", "Atur banner promosi utama beranda", "toggleSlideMenu(false);routeDashboard();openMasterWorkspace('home_editor');");
-        html += menuRowItem("fa-music", "Stok Musik & Testimoni", "Kelola daftar lagu & ulasan beranda", "toggleSlideMenu(false);routeDashboard();openMasterWorkspace('media');");
-        html += menuRowItem("fa-qrcode", "QRIS DANA & Rekening", "Mode QRIS Tetap / Dinamis & rekening", "openSlideSub('qris')");
+        html += menuRowItem("fa-chart-line", "Grafik & Analitik Bisnis", "Omzet, tren pesanan & data install/uninstall PWA", "toggleSlideMenu(false);if(typeof openMasterWorkspace==='function')openMasterWorkspace('overview');");
+        html += menuRowItem("fa-palette", "Kelola Tema & Harga", "Foto template, nama contoh & harga CV/Lamaran", "toggleSlideMenu(false);if(typeof openMasterWorkspace==='function')openMasterWorkspace('themes');");
+        html += menuRowItem("fa-rectangle-ad", "Edit Banner Promosi (12:4.4)", "Atur banner promosi utama beranda", "toggleSlideMenu(false);if(typeof openMasterWorkspace==='function')openMasterWorkspace('home_editor');");
+        html += menuRowItem("fa-music", "Stok Musik & Testimoni", "Upload lagu dari perangkat & ulasan beranda", "toggleSlideMenu(false);if(typeof openMasterWorkspace==='function')openMasterWorkspace('media');");
+        html += menuRowItem("fa-qrcode", "QRIS DANA & Rekening", "Mode QRIS Tetap / Dinamis & daftar rekening", "openSlideSub('qris')");
         html += menuRowItem("fa-comments", "Live Chat Pelanggan", "Balas pesan, mulai chat baru & pengajuan PIN", "toggleSlideMenu(false);openFullChatOverlay();");
+        html += menuRowItem("fa-user-shield", "Privasi & Blokir User", "Atur visibilitas profil, dokumen & akun diblokir", "openSlideSub('privacy')");
         html += menuRowItem("fa-user-pen", "Edit Profil Founder", "Foto profil, sampul & bio", "openSlideSub('profil')");
-        html += menuRowItem("fa-shield-halved", "Keamanan Akun & Keluar", "Ubah username, sandi atau logout", "openSlideSub('akun')");
+        html += menuRowItem("fa-shield-halved", "Keamanan Akun & Keluar", "Username, ganti password aman & logout", "openSlideSub('akun')");
     } else if (u.role === "administrasi") {
-        html += menuRowItem("fa-clipboard-check", "Antrean Konfirmasi & Edit User", "Konfirmasi berkas, revisi & edit proyek user", "toggleSlideMenu(false);routeDashboard();");
         html += menuRowItem("fa-comments", "Live Chat Pelanggan", "Balas pesan & hubungi kontak user", "toggleSlideMenu(false);openFullChatOverlay();");
+        html += menuRowItem("fa-user-shield", "Privasi & Blokir User", "Atur visibilitas profil, dokumen & akun diblokir", "openSlideSub('privacy')");
         html += menuRowItem("fa-user-pen", "Edit Profil Staf", "Foto profil & informasi kontak", "openSlideSub('profil')");
-        html += menuRowItem("fa-right-from-bracket", "Keluar (Logout)", "Akhiri sesi tim administrasi", "confirmLogout()");
+        html += menuRowItem("fa-shield-halved", "Keamanan Akun & Keluar", "Username, ganti password aman & logout", "openSlideSub('akun')");
+    } else if (u.role === "cabang") {
+        html += menuRowItem("fa-user-pen", "Profil & Label Brand Cabang", "Foto, sampul, nama brand & kontak", "openSlideSub('profil')");
+        html += menuRowItem("fa-shield-halved", "Keamanan Akun & Keluar", "Username, ganti password aman & logout", "openSlideSub('akun')");
+        html += menuRowItem("fa-headset", "Live Chat Founder", "Bantuan, top-up kuota & kendala teknis", "toggleSlideMenu(false);openFullChatOverlay();");
     } else {
-        html += menuRowItem("fa-user-pen", u.role === "cabang" ? "Profil & Label Brand Cabang" : "Pengaturan Profil", "Foto, sampul, nama & kontak", "openSlideSub('profil')");
-        html += menuRowItem("fa-shield-halved", "Pengaturan Akun", "Ubah username, password & keluar", "openSlideSub('akun')");
+        html += menuRowItem("fa-user-pen", "Pengaturan Profil", "Foto, sampul, nama & kontak", "openSlideSub('profil')");
+        html += menuRowItem("fa-user-shield", "Privasi & Blokir User", "Atur postingan, followers, following & blokir", "openSlideSub('privacy')");
+        html += menuRowItem("fa-shield-halved", "Keamanan Akun & Keluar", "Username, ganti password aman & logout", "openSlideSub('akun')");
         html += menuRowItem("fa-headset", "Live Chat Admin", "Bantuan, konfirmasi & upgrade Pro", "toggleSlideMenu(false);openFullChatOverlay();");
     }
 
@@ -992,17 +1409,26 @@ function renderMainSlideMenuList() {
     if (!isAppInstalled()) {
         html += menuRowItem("fa-mobile-screen-button", "Pasang Aplikasi (< 2 MB)", "Akses super cepat dari layar utama HP", "toggleSlideMenu(false);openWelcomeInstallModal(true);");
     }
-    html += menuRowItem("fa-circle-info", "Tentang Aplikasi", "Penjelasan singkat & seluruh fitur", "openSlideSub('about')");
+    html += menuRowItem("fa-circle-info", "Tentang Aplikasi", "Penjelasan singkat, fitur & versi aplikasi", "openSlideSub('about')");
 
     box.innerHTML = html;
 }
 
-function openSlideSub(sec) {
+function openSlideSub(sec, skipNavPush = false) {
+    const u = typeof getCurrentUserObj === "function" ? getCurrentUserObj() : null;
+    if (sec === "privacy" && (!u || u.role === "cabang")) {
+        return showToast("Pengaturan privasi tidak tersedia untuk akun Cabang.", "info");
+    }
+
+    _currentDrawerSub = sec;
+    document.getElementById("drawer-back-btn")?.classList.remove("hide");
     document.getElementById("drawer-main-list")?.classList.add("hide");
-    ["drawer-sub-theme", "drawer-sub-about", "drawer-sub-profil", "drawer-sub-akun", "drawer-sub-qris"]
+    ["drawer-sub-theme", "drawer-sub-privacy", "drawer-sub-about", "drawer-sub-profil", "drawer-sub-akun", "drawer-sub-password", "drawer-sub-qris"]
         .forEach(id => document.getElementById(id)?.classList.add("hide"));
 
-    const u = typeof getCurrentUserObj === "function" ? getCurrentUserObj() : null;
+    const sc = document.getElementById("drawer-scroll-body");
+    if (sc) sc.scrollTop = 0;
+
     const defAv = typeof DEFAULT_AVATAR !== "undefined" ? DEFAULT_AVATAR : "./lembarku-logo.png";
     const tKey = typeof APP_THEME_KEY !== "undefined" ? APP_THEME_KEY : "MR_UNDANGAN_APP_THEME";
     const tEl = document.getElementById("drawer-main-title");
@@ -1011,6 +1437,10 @@ function openSlideSub(sec) {
         if (tEl) tEl.innerText = "Tampilan & Warna";
         if (typeof applyAppTheme === "function") applyAppTheme(localStorage.getItem(tKey) || "light", false);
         document.getElementById("drawer-sub-theme")?.classList.remove("hide");
+    } else if (sec === "privacy" && u) {
+        if (tEl) tEl.innerText = "Privasi & Blokir";
+        renderPrivacySubPanel();
+        document.getElementById("drawer-sub-privacy")?.classList.remove("hide");
     } else if (sec === "about") {
         if (tEl) tEl.innerText = "Tentang Lembarku";
         document.getElementById("drawer-sub-about")?.classList.remove("hide");
@@ -1026,10 +1456,30 @@ function openSlideSub(sec) {
         const adInp = document.getElementById("set-prof-address"); if (adInp) adInp.value = u.address || "";
         document.getElementById("drawer-sub-profil")?.classList.remove("hide");
     } else if (sec === "akun" && u) {
-        if (tEl) tEl.innerText = "Pengaturan Akun";
-        const uInp = document.getElementById("set-acc-user"); if (uInp) uInp.value = u.username;
-        const pInp = document.getElementById("set-acc-pass"); if (pInp) pInp.value = u.password || "";
+        if (tEl) tEl.innerText = "Keamanan Akun";
+        const uInp = document.getElementById("set-acc-user");
+        const uNote = document.getElementById("set-acc-user-note");
+        const uBtn = document.getElementById("btn-save-acc-user");
+        const isFounder = u.role === "master";
+        if (uInp) {
+            uInp.value = u.username;
+            uInp.readOnly = isFounder;
+        }
+        if (uNote) {
+            uNote.innerText = isFounder
+                ? "Username Founder (@kausar.af) bersifat permanen untuk keamanan sistem."
+                : "Username dipakai untuk masuk akun dan alamat profil Anda.";
+        }
+        if (uBtn) uBtn.classList.toggle("hide", isFounder);
         document.getElementById("drawer-sub-akun")?.classList.remove("hide");
+    } else if (sec === "password" && u) {
+        if (tEl) tEl.innerText = "Ganti Kata Sandi";
+        ["pw-old", "pw-new", "pw-confirm"].forEach(id => {
+            const inp = document.getElementById(id);
+            if (inp) { inp.value = ""; inp.type = "password"; }
+        });
+        evaluatePasswordStrengthUI();
+        document.getElementById("drawer-sub-password")?.classList.remove("hide");
     } else if (sec === "qris" && u && u.role === "master") {
         if (tEl) tEl.innerText = "QRIS DANA & Rekening";
         const ms = db.masterSettings || {};
@@ -1047,7 +1497,209 @@ function openSlideSub(sec) {
         document.getElementById("drawer-sub-qris")?.classList.remove("hide");
     }
 
-    mrNavPush({ type: "drawer_sub", sec });
+    if (!skipNavPush) mrNavPush({ type: "drawer_sub", sec });
+}
+
+function renderPrivacySubPanel() {
+    const u = typeof getCurrentUserObj === "function" ? getCurrentUserObj() : null;
+    if (!u || u.role === "cabang") return;
+    const priv = typeof getUserPrivacy === "function" ? getUserPrivacy(u) : DEFAULT_PRIVACY;
+
+    const setChk = (id, val) => { const el = document.getElementById(id); if (el) el.checked = !!val; };
+    setChk("priv-show-projects", priv.showProjects);
+    setChk("priv-show-followers", priv.showFollowers);
+    setChk("priv-show-following", priv.showFollowing);
+    setChk("priv-show-contact", priv.showContact);
+    setChk("priv-show-chat-contacts", priv.showInChatContacts);
+    setChk("priv-allow-direct-chat", priv.allowDirectChat);
+
+    const blocked = typeof getBlockedUsersList === "function" ? getBlockedUsersList(u) : [];
+    const cntEl = document.getElementById("priv-blocked-count");
+    if (cntEl) cntEl.innerText = String(blocked.length);
+    const listEl = document.getElementById("priv-blocked-list");
+    if (!listEl) return;
+
+    if (!blocked.length) {
+        listEl.innerHTML = `<p class="text-xs app-muted text-center py-4 app-card-soft rounded-2xl border border-dashed">Tidak ada akun yang diblokir. Anda bisa memblokir pengguna pengganggu langsung dari halaman profilnya.</p>`;
+        return;
+    }
+
+    const defAv = typeof DEFAULT_AVATAR !== "undefined" ? DEFAULT_AVATAR : "./lembarku-logo.png";
+    listEl.innerHTML = blocked.map(bUname => {
+        const bObj = (db.users || []).find(x => _normAppUserKey(x.username) === _normAppUserKey(bUname)) || { username: bUname, name: bUname, avatar: defAv };
+        return `
+            <div class="app-card-soft border rounded-2xl p-2.5 flex items-center justify-between gap-2.5">
+                <div class="flex items-center gap-2.5 min-w-0">
+                    <img src="${bObj.avatar || defAv}" class="w-9 h-9 rounded-full object-cover border gold-border bg-zinc-800 shrink-0">
+                    <div class="min-w-0">
+                        <strong class="text-xs block truncate">${escHtml(bObj.name || bUname)}</strong>
+                        <span class="text-[10px] app-muted block truncate">@${escHtml(bUname)}</span>
+                    </div>
+                </div>
+                <button type="button" onclick="toggleBlockTargetUser('${esc(bUname)}',true)" class="px-3 py-1.5 rounded-xl bg-red-600/15 text-red-500 text-[11px] font-bold shrink-0">Buka Blokir</button>
+            </div>
+        `;
+    }).join("");
+}
+
+async function savePrivacySettings() {
+    const u = typeof getCurrentUserObj === "function" ? getCurrentUserObj() : null;
+    if (!u || u.role === "cabang") return;
+
+    const privacy = {
+        showProjects: !!document.getElementById("priv-show-projects")?.checked,
+        showFollowers: !!document.getElementById("priv-show-followers")?.checked,
+        showFollowing: !!document.getElementById("priv-show-following")?.checked,
+        showContact: !!document.getElementById("priv-show-contact")?.checked,
+        showInChatContacts: !!document.getElementById("priv-show-chat-contacts")?.checked,
+        allowDirectChat: !!document.getElementById("priv-allow-direct-chat")?.checked
+    };
+
+    setBtnLoading("btn-save-privacy", true, "Menyimpan...");
+    const res = await apiAction({ action: "update_privacy", privacy });
+    setBtnLoading("btn-save-privacy", false);
+
+    if (res && res.ok) {
+        ensureUserInLocalDb(Object.assign({}, u, res.user || {}, { privacy }));
+        showToast("Pengaturan privasi berhasil disimpan!");
+    } else {
+        showToast((res && res.message) || "Gagal menyimpan privasi.", "error");
+    }
+}
+
+function evaluatePasswordStrengthUI() {
+    const pNew = (document.getElementById("pw-new")?.value || "").trim();
+    const pConf = (document.getElementById("pw-confirm")?.value || "").trim();
+    const bar = document.getElementById("pw-strength-bar");
+    const txt = document.getElementById("pw-strength-text");
+    const matchEl = document.getElementById("pw-match-hint");
+
+    let score = 0;
+    if (pNew.length >= 6) score++;
+    if (pNew.length >= 10) score++;
+    if (/[A-Z]/.test(pNew) && /[a-z]/.test(pNew)) score++;
+    if (/[0-9]/.test(pNew)) score++;
+    if (/[^A-Za-z0-9]/.test(pNew)) score++;
+
+    if (bar && txt) {
+        if (!pNew) {
+            bar.style.width = "0%";
+            bar.className = "h-full transition-all duration-300 bg-zinc-400";
+            txt.innerText = "Gunakan minimal 6 karakter kombinasi huruf & angka.";
+        } else if (pNew.length < 6 || score <= 1) {
+            bar.style.width = "30%";
+            bar.className = "h-full transition-all duration-300 bg-red-500";
+            txt.innerText = "Kekuatan: Lemah (minimal 6 karakter).";
+        } else if (score <= 3) {
+            bar.style.width = "65%";
+            bar.className = "h-full transition-all duration-300 bg-amber-500";
+            txt.innerText = "Kekuatan: Cukup kuat.";
+        } else {
+            bar.style.width = "100%";
+            bar.className = "h-full transition-all duration-300 bg-emerald-500";
+            txt.innerText = "Kekuatan: Sangat kuat.";
+        }
+    }
+
+    if (matchEl) {
+        if (!pConf) {
+            matchEl.classList.add("hide");
+        } else if (pNew === pConf) {
+            matchEl.className = "text-[10px] text-emerald-600 font-semibold";
+            matchEl.innerText = "✓ Konfirmasi password baru cocok.";
+        } else {
+            matchEl.className = "text-[10px] text-red-500 font-semibold";
+            matchEl.innerText = "✕ Ulangi password baru belum sama.";
+        }
+    }
+}
+
+async function submitSecurePasswordChange(e) {
+    e.preventDefault();
+    const u = typeof getCurrentUserObj === "function" ? getCurrentUserObj() : null;
+    if (!u) return showToast("Sesi login tidak ditemukan.", "error");
+
+    const oldPassword = (document.getElementById("pw-old")?.value || "").trim();
+    const newPassword = (document.getElementById("pw-new")?.value || "").trim();
+    const confirmPassword = (document.getElementById("pw-confirm")?.value || "").trim();
+
+    if (!oldPassword || !newPassword || !confirmPassword) {
+        return showToast("Semua kolom kata sandi wajib diisi.", "error");
+    }
+    if (newPassword.length < 6) {
+        return showToast("Password baru minimal 6 karakter.", "error");
+    }
+    if (newPassword !== confirmPassword) {
+        return showToast("Konfirmasi password baru tidak cocok.", "error");
+    }
+    if (oldPassword === newPassword) {
+        return showToast("Password baru tidak boleh sama dengan password lama.", "error");
+    }
+
+    const confirmed = await showConfirm(
+        "Peringatan Ganti Password",
+        "Anda akan mengganti kata sandi akun ini. Pastikan Anda sudah mencatat kata sandi baru dengan aman sebelum melanjutkan. Konfirmasi penggantian sekarang?",
+        "fa-solid fa-triangle-exclamation",
+        "Konfirmasi & Ganti"
+    );
+    if (!confirmed) return;
+
+    setBtnLoading("btn-submit-change-pw", true, "Memverifikasi & Mengganti...");
+    const res = await apiAction({ action: "change_password", oldPassword, newPassword });
+    setBtnLoading("btn-submit-change-pw", false);
+
+    if (!res || !res.ok) {
+        return showToast((res && res.message) || "Gagal mengganti kata sandi.", "error");
+    }
+
+    if (res.token) {
+        currentSessionToken = res.token;
+        localStorage.setItem(SESSION_TOKEN_KEY, res.token);
+    }
+    if (res.user) ensureUserInLocalDb(res.user);
+
+    ["pw-old", "pw-new", "pw-confirm"].forEach(id => {
+        const inp = document.getElementById(id);
+        if (inp) inp.value = "";
+    });
+    evaluatePasswordStrengthUI();
+    openSlideSub("akun", true);
+    showToast("Kata sandi berhasil diganti dengan aman!");
+}
+
+async function changeUsernameOnly() {
+    const u = typeof getCurrentUserObj === "function" ? getCurrentUserObj() : null; if (!u) return;
+    if (u.role === "master") return showToast("Username Founder (@kausar.af) bersifat permanen.", "info");
+    const oldU = _normAppUserKey(u.username);
+    const newU = _normAppUserKey(document.getElementById("set-acc-user").value.trim().toLowerCase());
+    if (!newU) return showToast("Isi username baru terlebih dahulu.", "error");
+    if (newU === oldU) return showToast("Username tidak berubah.", "info");
+    if (!(await showConfirm("Ubah Username", `Yakin ingin mengganti username dari @${oldU} menjadi @${newU}?`, "fa-solid fa-user-pen", "Ya, Simpan"))) return;
+
+    setBtnLoading("btn-save-acc-user", true, "Menyimpan...");
+    const updated = Object.assign({}, u, { username: newU });
+    delete updated.password;
+    const res = await apiAction({ action: "upsert_user", oldUsername: oldU, user: updated });
+    setBtnLoading("btn-save-acc-user", false);
+    if (!res || !res.ok) return showToast((res && res.message) || "Gagal memperbarui username.", "error");
+
+    const finalUser = (res.user && res.user.username)
+        ? Object.assign({}, updated, res.user, { username: _normAppUserKey(res.user.username) })
+        : updated;
+
+    currentSessionUser = finalUser.username;
+    localStorage.setItem(SESSION_KEY, currentSessionUser);
+    if (res.token) {
+        currentSessionToken = res.token;
+        localStorage.setItem(SESSION_TOKEN_KEY, res.token);
+    }
+    if (Array.isArray(db.users) && oldU && oldU !== currentSessionUser) {
+        db.users = db.users.filter(x => _normAppUserKey(x.username) !== oldU);
+    }
+    ensureUserInLocalDb(finalUser);
+    if (typeof idbSet === "function") idbSet("db_snapshot", db);
+    refreshActiveViewSmart(); renderHeaderActions();
+    showToast("Username berhasil diperbarui!");
 }
 
 function pickCroppedProfileMedia(inp, type) {
@@ -1066,7 +1718,7 @@ function pickCroppedProfileMedia(inp, type) {
             ensureUserInLocalDb(upd);
             if (!isBanner) { const prev = document.getElementById("set-prof-avatar-prev"); if (prev) prev.src = up.url; }
             refreshActiveViewSmart(); renderHeaderActions();
-            showToast(isBanner ? "Sampul profil diperbarui & file lama dihapus!" : "Foto profil diperbarui & foto lama dihapus!");
+            showToast(isBanner ? "Sampul profil diperbarui!" : "Foto profil diperbarui!");
         }
     });
 }
@@ -1104,39 +1756,8 @@ async function saveProfileInfo() {
         showToast("Profil berhasil disimpan!");
     } else showToast("Gagal menyimpan profil.", "error");
 }
-async function changeUserCredentials() {
-    const u = typeof getCurrentUserObj === "function" ? getCurrentUserObj() : null; if (!u) return;
-    const oldU = _normAppUserKey(u.username);
-    const newU = _normAppUserKey(document.getElementById("set-acc-user").value.trim().toLowerCase());
-    const newP = document.getElementById("set-acc-pass").value.trim();
-    if (!newU || !newP) return showToast("Isi username dan password baru.", "error");
-    if (!(await showConfirm("Ubah Kredensial", "Yakin ingin memperbarui username atau password Anda?"))) return;
-    setBtnLoading("btn-save-acc", true, "Menyimpan...");
-    const updated = Object.assign({}, u, { username: newU, password: newP });
-    const res = await apiAction({ action: "upsert_user", oldUsername: oldU, user: updated });
-    setBtnLoading("btn-save-acc", false);
-    if (!res || !res.ok) return showToast((res && res.message) || "Gagal memperbarui akun.", "error");
 
-    const finalUser = (res.user && res.user.username)
-        ? Object.assign({}, updated, res.user, { username: _normAppUserKey(res.user.username) })
-        : updated;
-
-    currentSessionUser = finalUser.username;
-    localStorage.setItem(SESSION_KEY, currentSessionUser);
-    if (res.token) {
-        currentSessionToken = res.token;
-        localStorage.setItem(SESSION_TOKEN_KEY, res.token);
-    }
-    if (Array.isArray(db.users) && oldU && oldU !== currentSessionUser) {
-        db.users = db.users.filter(x => _normAppUserKey(x.username) !== oldU);
-    }
-    ensureUserInLocalDb(finalUser);
-    if (typeof idbSet === "function") idbSet("db_snapshot", db);
-    toggleSlideMenu(false); refreshActiveViewSmart(); renderHeaderActions();
-    showToast("Username & password diperbarui!");
-}
-
-// ================= 5. BERANDA (BANNER + ETALASE RINGAN + CV + 6 SERTIFIKAT BERKELAS) =================
+// ================= 7. BERANDA (BANNER + ETALASE SAMPUL JADI + CV + 6 SERTIFIKAT) =================
 function renderLandingPage() {
     renderPromoBannerSlider();
     renderInfiniteInvShelf();
@@ -1423,7 +2044,7 @@ setInterval(() => {
     if ((db.testimonials || []).length > 1) slideTestimonial(1);
 }, 4500);
 
-// ================= 6. BUAT BERKASMU & PROFIL USER / CABANG =================
+// ================= 8. BUAT BERKASMU & PROFIL USER / CABANG =================
 function openCreateChoiceModal(isCabang = false) {
     const u = typeof getCurrentUserObj === "function" ? getCurrentUserObj() : null;
     if (!u) {
@@ -1646,7 +2267,7 @@ function renderCabangAdmin() {
     renderProfileFavoritesShelf();
 }
 
-// ================= 7. SMART REFRESH & INITIALIZATION =================
+// ================= 9. SMART REFRESH & INITIALIZATION =================
 function isUserTypingIn(id) {
     const el = document.activeElement;
     if (!el || !["INPUT", "TEXTAREA", "SELECT"].includes(el.tagName)) return false;
@@ -1656,6 +2277,9 @@ function isUserTypingIn(id) {
 
 function refreshActiveViewSmart() {
     if (typeof updateChatBadges === "function") updateChatBadges();
+    updateNotificationBellBadge();
+    if (_isElVis("modal-notifications")) renderNotificationsList();
+
     const chatOv = document.getElementById("full-chat-overlay");
     if (chatOv && !chatOv.classList.contains("hide") && typeof renderFullChatContentSmart === "function") renderFullChatContentSmart();
     if (currentViewName === "landing" && !isUserTypingIn("view-landing")) renderLandingPage();
@@ -1665,9 +2289,10 @@ function refreshActiveViewSmart() {
     else if (currentViewName === "guestlist" && !isUserTypingIn("view-guestlist") && typeof renderGuestListStatsAndRows === "function") renderGuestListStatsAndRows();
     else if (currentViewName === "master" && typeof renderMasterHeaderStats === "function") {
         renderMasterHeaderStats();
-        if (currentMasterWorkspace !== "home_editor" && currentMasterWorkspace !== "media" && !isUserTypingIn("master-workspace-body") && typeof renderMasterWorkspaceContent === "function") {
-            renderMasterWorkspaceContent();
-        }
+    }
+
+    if (_isElVis("modal-master-workspace") && currentMasterWorkspace !== "home_editor" && currentMasterWorkspace !== "media" && !isUserTypingIn("master-workspace-body") && typeof renderMasterWorkspaceContent === "function") {
+        renderMasterWorkspaceContent();
     }
     if (window._soloStatsViewState && window._soloStatsViewState.open && typeof renderSoloStatsModal === "function") {
         renderSoloStatsModal();
@@ -1695,6 +2320,11 @@ async function bootMrUndanganApp() {
     };
 
     try {
+        if (isStandaloneRunning()) {
+            localStorage.setItem("MR_PWA_INSTALLED", "true");
+            if (typeof reportAppInstallState === "function") reportAppInstallState("installed");
+        }
+
         const tKey = typeof APP_THEME_KEY !== "undefined" ? APP_THEME_KEY : "MR_UNDANGAN_APP_THEME";
         if (typeof applyAppTheme === "function") applyAppTheme(localStorage.getItem(tKey) || "light", false);
         initBackNavigationGuard();
@@ -1763,7 +2393,6 @@ async function bootMrUndanganApp() {
                 const nmEl = document.getElementById("ios-hello-name");
                 if (nmEl && uCached.name) nmEl.innerText = uCached.name.split(" ")[0];
             }
-            // Halaman utama aplikasi selalu Beranda (tempat kembali terakhir)
             _mrResetNavToLanding();
             goToLanding(true);
             finishSplash(1150);
@@ -1801,6 +2430,7 @@ async function bootMrUndanganApp() {
         }
 
         if (typeof updateChatBadges === "function") updateChatBadges();
+        updateNotificationBellBadge();
         if (typeof scheduleAdaptivePoll === "function") scheduleAdaptivePoll();
     } catch (err) {
         console.error("Boot error:", err);
