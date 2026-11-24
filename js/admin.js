@@ -1,11 +1,17 @@
 // =========================================================================
-// MR UNDANGAN — MASTER ADMIN (GRAFIK, INSPEKSI, THEME BUILDER) & STAFF
+// LEMBARKU — FOUNDER PANEL (GRAFIK, INSPEKSI, THEME BUILDER) & STAFF
 // File: js/admin.js
 // =========================================================================
 let masterThemeCatFilter = "Pernikahan", masterThemeSearch = "", masterOrdersFilter = "all";
 let tbPhotosDraft = { cover: "", pria: "", wanita: "", couple: "", g1: "", g2: "", g3: "" };
 let pbTempUploadedImg = "";
 window._soloStatsViewState = { open: false, targetUsername: "", mode: "followers", masterCat: "user", projectCat: "proses" };
+
+function _normAdminUserKey(uname) {
+    const k = String(uname || "").trim().toLowerCase();
+    const founderU = (typeof FOUNDER_USERNAME !== "undefined" && FOUNDER_USERNAME) ? FOUNDER_USERNAME : "kausar.af";
+    return k === "master" ? founderU : k;
+}
 
 function _pushAdminNavStep(stepObj) {
     if (typeof mrNavPush === "function") {
@@ -15,7 +21,7 @@ function _pushAdminNavStep(stepObj) {
     }
 }
 
-// ================= 1. DASBOR MASTER ADMIN =================
+// ================= 1. DASBOR FOUNDER =================
 function renderMasterAdmin() {
     renderMasterHeaderStats();
     openMasterWorkspace(currentMasterWorkspace || "overview", true);
@@ -62,11 +68,11 @@ function renderMasterHeaderStats() {
     }
 
     const nEl = document.getElementById("mprof-name");
-    if (nEl) nEl.innerText = m.name || "Master Admin";
+    if (nEl) nEl.innerText = m.name || "Founder";
     const uEl = document.getElementById("mprof-username");
     if (uEl) uEl.innerText = `@${m.username}`;
     const bioEl = document.getElementById("mprof-bio");
-    if (bioEl) bioEl.innerText = m.bio || "Mr Undangan founder";
+    if (bioEl) bioEl.innerText = m.bio || "Founder Lembarku";
 
     const statsContainer = _findMasterStatsBox();
     if (statsContainer) {
@@ -112,7 +118,7 @@ function openMasterWorkspace(name, fromNav = false) {
         media: "Stok Musik & Slideshow Testimoni"
     };
     const tEl = document.getElementById("master-active-panel-title");
-    if (tEl) tEl.innerText = titles[currentMasterWorkspace] || "Panel Master";
+    if (tEl) tEl.innerText = titles[currentMasterWorkspace] || "Panel Founder";
     const backBtn = document.getElementById("master-back-overview-btn");
     if (backBtn) backBtn.classList.toggle("hide", currentMasterWorkspace === "overview");
     renderMasterWorkspaceContent();
@@ -253,7 +259,7 @@ function buildMasterAnalyticsHtml() {
 function isCabangOwnedDoc(item) {
     if (!item) return false;
     if (item.brandName && String(item.brandName).trim()) return true;
-    const ownerObj = (db.users || []).find(u => String(u.username || "").toLowerCase() === String(item.owner || "").toLowerCase());
+    const ownerObj = (db.users || []).find(u => _normAdminUserKey(u.username) === _normAdminUserKey(item.owner));
     return !!(ownerObj && ownerObj.role === "cabang");
 }
 
@@ -453,7 +459,7 @@ function refreshAfterAdminOrderAction(msg) {
     showToast(msg);
 }
 
-// ================= 3. WORKSPACE MASTER: TEMA, HARGA CV, AKUN, BANNER & MEDIA =================
+// ================= 3. WORKSPACE FOUNDER: TEMA, HARGA CV, AKUN, BANNER & MEDIA =================
 function renderMasterThemesGridOnly() {
     const grid = document.getElementById("master-themes-grid");
     const countEl = document.getElementById("master-themes-count");
@@ -669,6 +675,7 @@ function renderMasterWorkspaceContent() {
         </div>`;
     }
 }
+
 // ================= 4. BERANDA PROFIL PUBLIK & DETAIL TERPISAH =================
 function openExpandedAvatarLightbox(imgSrc, labelText = "") {
     const src = imgSrc || DEFAULT_AVATAR;
@@ -708,7 +715,7 @@ function _ensureSoloStatsModal() {
         mod.innerHTML = `
             <div class="px-4 py-3 app-header border-b flex items-center justify-between gap-3 shrink-0 backdrop-blur-md">
                 <div class="flex items-center gap-2.5 min-w-0">
-                    <img src="./logo.png" alt="Mr Undangan" class="w-8 h-8 rounded-lg bg-white p-1 object-contain border border-black/10 shrink-0" onerror="this.style.display='none'">
+                    <img src="./lembarku-logo.png" alt="Lembarku" class="w-8 h-8 rounded-lg bg-white p-1 object-contain border border-black/10 shrink-0" onerror="this.style.display='none'">
                     <div class="min-w-0">
                         <h3 id="solo-stats-title" class="font-extrabold text-base truncate">Detail</h3>
                         <p id="solo-stats-sub" class="text-[10px] app-muted truncate"></p>
@@ -734,7 +741,7 @@ window._restoreSoloStatsFromNav = function (stepObj) {
     if (!stepObj || !stepObj.targetUsername) return;
     window._soloStatsViewState = {
         open: true,
-        targetUsername: String(stepObj.targetUsername).toLowerCase(),
+        targetUsername: _normAdminUserKey(stepObj.targetUsername),
         mode: stepObj.mode || "followers",
         masterCat: stepObj.masterCat || "user",
         projectCat: stepObj.projectCat || "proses"
@@ -745,7 +752,7 @@ window._restoreSoloStatsFromNav = function (stepObj) {
 };
 
 function _openUserFromStatsList(uname) {
-    const clean = String(uname || "").trim().toLowerCase();
+    const clean = _normAdminUserKey(uname);
     if (!clean) return;
     // Sembunyikan layar statistik sementara tanpa menghapus dari _mrNavStack agar Back kembali ke daftar ini
     closeSoloStatsModal();
@@ -753,10 +760,10 @@ function _openUserFromStatsList(uname) {
 }
 
 function _renderSoloAccountCard(uItem) {
-    const defAv = typeof DEFAULT_AVATAR !== "undefined" ? DEFAULT_AVATAR : "./logo.png";
+    const defAv = typeof DEFAULT_AVATAR !== "undefined" ? DEFAULT_AVATAR : "./lembarku-logo.png";
     const proCheck = uItem.isPro ? `<i class="fa-solid fa-circle-check text-blue-500 text-xs shrink-0" title="Akun Pro"></i>` : "";
-    const roleLabel = uItem.role === "cabang" ? "Cabang" : uItem.role === "administrasi" ? "Administrasi" : uItem.role === "master" ? "Master" : "User";
-    const canOpenProfile = !!(uItem.username && (db.users || []).some(x => String(x.username || "").toLowerCase() === String(uItem.username).toLowerCase()));
+    const roleLabel = uItem.role === "cabang" ? "Cabang" : uItem.role === "administrasi" ? "Administrasi" : uItem.role === "master" ? "Founder" : "User";
+    const canOpenProfile = !!(uItem.username && (db.users || []).some(x => _normAdminUserKey(x.username) === _normAdminUserKey(uItem.username)));
     const clickAttr = canOpenProfile ? `onclick="_openUserFromStatsList('${esc(uItem.username)}')"` : "";
     const hoverCls = canOpenProfile ? "cursor-pointer hover:brightness-95 active:scale-[0.99] transition" : "";
 
@@ -776,8 +783,8 @@ function _renderSoloAccountCard(uItem) {
 }
 
 function openSoloFollowersModal(targetUsername, fromNav = false) {
-    const tKey = String(targetUsername || "").trim().toLowerCase();
-    const targetObj = (db.users || []).find(u => String(u.username || "").toLowerCase() === tKey);
+    const tKey = _normAdminUserKey(targetUsername);
+    const targetObj = (db.users || []).find(u => _normAdminUserKey(u.username) === tKey);
     if (!targetObj) return;
     if (targetObj.role === "cabang") return;
 
@@ -795,8 +802,8 @@ function openSoloFollowersModal(targetUsername, fromNav = false) {
 }
 
 function openSoloFollowingModal(targetUsername, fromNav = false) {
-    const tKey = String(targetUsername || "").trim().toLowerCase();
-    const targetObj = (db.users || []).find(u => String(u.username || "").toLowerCase() === tKey);
+    const tKey = _normAdminUserKey(targetUsername);
+    const targetObj = (db.users || []).find(u => _normAdminUserKey(u.username) === tKey);
     if (!targetObj) return;
 
     window._soloStatsViewState = {
@@ -813,8 +820,8 @@ function openSoloFollowingModal(targetUsername, fromNav = false) {
 }
 
 function openSoloProjectModal(targetUsername, fromNav = false) {
-    const tKey = String(targetUsername || "").trim().toLowerCase();
-    const targetObj = (db.users || []).find(u => String(u.username || "").toLowerCase() === tKey);
+    const tKey = _normAdminUserKey(targetUsername);
+    const targetObj = (db.users || []).find(u => _normAdminUserKey(u.username) === tKey);
     if (!targetObj) return;
 
     window._soloStatsViewState = {
@@ -872,11 +879,11 @@ function _buildPublicReadOnlyProjectCardHtml(doc) {
 
 function renderSoloStatsModal() {
     const st = window._soloStatsViewState;
-    const targetObj = (db.users || []).find(u => String(u.username || "").toLowerCase() === String(st.targetUsername || "").toLowerCase());
+    const targetObj = (db.users || []).find(u => _normAdminUserKey(u.username) === _normAdminUserKey(st.targetUsername));
     if (!targetObj) return;
 
     const curU = typeof getCurrentUserObj === "function" ? getCurrentUserObj() : null;
-    const isSelf = !!(curU && String(curU.username || "").toLowerCase() === String(targetObj.username || "").toLowerCase());
+    const isSelf = !!(curU && _normAdminUserKey(curU.username) === _normAdminUserKey(targetObj.username));
     const isMasterProfile = targetObj.role === "master";
 
     const titleEl = document.getElementById("solo-stats-title");
@@ -897,7 +904,7 @@ function renderSoloStatsModal() {
                 <div class="app-card border rounded-3xl p-7 text-center space-y-2 my-6">
                     <i class="fa-solid fa-lock text-2xl app-accent"></i>
                     <h4 class="font-extrabold text-sm">Daftar Followers Privat</h4>
-                    <p class="text-xs app-muted">Daftar followers akun Master tidak dapat dilihat oleh pengguna lain.</p>
+                    <p class="text-xs app-muted">Daftar followers akun Founder tidak dapat dilihat oleh pengguna lain.</p>
                 </div>
             `;
             return;
@@ -931,7 +938,7 @@ function renderSoloStatsModal() {
         const fKeys = (typeof _getFollowersListForUser === "function")
             ? _getFollowersListForUser(targetObj)
             : (Array.isArray(targetObj.followers) ? targetObj.followers : []);
-        const followerObjs = fKeys.map(k => (db.users || []).find(u => String(u.username || "").toLowerCase() === String(k).toLowerCase()) || { username: k, name: k, role: "user", avatar: DEFAULT_AVATAR });
+        const followerObjs = fKeys.map(k => (db.users || []).find(u => _normAdminUserKey(u.username) === _normAdminUserKey(k)) || { username: k, name: k, role: "user", avatar: DEFAULT_AVATAR });
         bodyEl.innerHTML = followerObjs.length
             ? followerObjs.map(_renderSoloAccountCard).join("")
             : `<div class="app-card border border-dashed rounded-2xl p-7 text-center text-xs app-muted">Belum ada followers.</div>`;
@@ -944,7 +951,7 @@ function renderSoloStatsModal() {
         const gKeys = (typeof _getFollowingListForUser === "function")
             ? _getFollowingListForUser(targetObj)
             : (Array.isArray(targetObj.following) ? targetObj.following : []);
-        const followingObjs = gKeys.map(k => (db.users || []).find(u => String(u.username || "").toLowerCase() === String(k).toLowerCase()) || { username: k, name: k, role: "user", avatar: DEFAULT_AVATAR });
+        const followingObjs = gKeys.map(k => (db.users || []).find(u => _normAdminUserKey(u.username) === _normAdminUserKey(k)) || { username: k, name: k, role: "user", avatar: DEFAULT_AVATAR });
         bodyEl.innerHTML = followingObjs.length
             ? followingObjs.map(_renderSoloAccountCard).join("")
             : `<div class="app-card border border-dashed rounded-2xl p-7 text-center text-xs app-muted">Belum mengikuti akun mana pun.</div>`;
@@ -1008,8 +1015,8 @@ function renderSoloStatsModal() {
 }
 
 function viewUserProfileModal(username, fromNav = false) {
-    const cleanU = String(username || "").trim().toLowerCase();
-    const u = (db.users || []).find(x => String(x.username || "").toLowerCase() === cleanU);
+    const cleanU = _normAdminUserKey(username);
+    const u = (db.users || []).find(x => _normAdminUserKey(x.username) === cleanU);
     if (!u) return showToast("Akun tidak ditemukan.", "error");
 
     const modal = document.getElementById("modal-view-user-profile");
@@ -1023,7 +1030,7 @@ function viewUserProfileModal(username, fromNav = false) {
     }
 
     const curU = typeof getCurrentUserObj === "function" ? getCurrentUserObj() : null;
-    const isSelf = !!(curU && String(curU.username || "").toLowerCase() === cleanU);
+    const isSelf = !!(curU && _normAdminUserKey(curU.username) === cleanU);
     const isMasterProfile = u.role === "master";
     const isCabangProfile = u.role === "cabang";
 
@@ -1051,14 +1058,14 @@ function viewUserProfileModal(username, fromNav = false) {
     );
     const curFollowingList = (curU && typeof _getFollowingListForUser === "function")
         ? _getFollowingListForUser(curU)
-        : (curU && Array.isArray(curU.following) ? curU.following.map(x => String(x).toLowerCase()) : []);
+        : (curU && Array.isArray(curU.following) ? curU.following.map(_normAdminUserKey) : []);
     const isFollowingThis = canFollowThis && curFollowingList.includes(cleanU);
 
     const avatarSrc = u.avatar || DEFAULT_AVATAR;
     const bannerStyle = u.banner ? `background-image:url('${u.banner}');` : "";
     const proBadgeHtml = u.isPro ? `<i class="fa-solid fa-circle-check text-blue-500 text-sm"></i>` : "";
     const roleBadgeHtml = u.role === "master"
-        ? `<span class="text-[9px] px-2 py-0.5 rounded-full bg-amber-500/20 text-amber-600 font-extrabold uppercase">MASTER</span>`
+        ? `<span class="text-[9px] px-2 py-0.5 rounded-full bg-amber-500/20 text-amber-600 font-extrabold uppercase">FOUNDER</span>`
         : u.role === "administrasi"
             ? `<span class="text-[9px] px-2 py-0.5 rounded-full bg-emerald-500/20 text-emerald-600 font-extrabold uppercase">ADMINISTRASI</span>`
             : u.role === "cabang"
@@ -1072,7 +1079,7 @@ function viewUserProfileModal(username, fromNav = false) {
         : "";
 
     const followersClick = (isMasterProfile && !isSelf)
-        ? `onclick="showToast('Daftar followers akun Master bersifat privat.','info')"`
+        ? `onclick="showToast('Daftar followers akun Founder bersifat privat.','info')"`
         : `onclick="openSoloFollowersModal('${esc(cleanU)}')"`;
 
     const followersColHtml = isCabangProfile
@@ -1143,7 +1150,7 @@ function viewUserProfileModal(username, fromNav = false) {
     if (headerBar) {
         headerBar.innerHTML = `
             <div class="flex items-center gap-2.5">
-                <img src="./logo.png" alt="Mr Undangan" class="w-8 h-8 rounded-lg bg-white p-1 object-contain border border-black/10 shrink-0" onerror="this.style.display='none'">
+                <img src="./lembarku-logo.png" alt="Lembarku" class="w-8 h-8 rounded-lg bg-white p-1 object-contain border border-black/10 shrink-0" onerror="this.style.display='none'">
             </div>
         `;
     }
@@ -1163,18 +1170,18 @@ function closeUserProfileModalCustom() {
 }
 
 async function toggleUserProQuick(uname, btn, reopenModal = false) {
-    const u = (db.users || []).find(x => x.username === uname); if (!u) return;
+    const u = (db.users || []).find(x => _normAdminUserKey(x.username) === _normAdminUserKey(uname)); if (!u) return;
     setBtnLoading(btn, true, "...");
     const nextPro = !u.isPro;
-    await apiAction({ action: "upsert_user", oldUsername: uname, user: Object.assign({}, u, { isPro: nextPro }) });
+    await apiAction({ action: "upsert_user", oldUsername: u.username, user: Object.assign({}, u, { isPro: nextPro }) });
     renderMasterHeaderStats();
     renderMasterWorkspaceContent();
-    if (reopenModal) viewUserProfileModal(uname, true);
-    showToast(nextPro ? `@${uname} ditingkatkan ke Akun PRO (Centang Biru)!` : `Status Pro @${uname} dinonaktifkan.`, "info");
+    if (reopenModal) viewUserProfileModal(u.username, true);
+    showToast(nextPro ? `@${u.username} ditingkatkan ke Akun PRO (Centang Biru)!` : `Status Pro @${u.username} dinonaktifkan.`, "info");
 }
 
 function openMasterUserModal(username = null, defaultRole = "user") {
-    const isEdit = !!username, u = isEdit ? db.users.find(x => x.username === username) : null;
+    const isEdit = !!username, u = isEdit ? db.users.find(x => _normAdminUserKey(x.username) === _normAdminUserKey(username)) : null;
     document.getElementById("mmu-title").innerText = isEdit ? `Edit Akun @${u.username}` : `Tambah ${defaultRole === "cabang" ? "Admin Cabang" : defaultRole === "administrasi" ? "Tim Administrasi" : "User"}`;
     document.getElementById("mmu-old-username").value = isEdit ? u.username : "";
     document.getElementById("mmu-role").value = isEdit ? u.role : defaultRole;
@@ -1213,7 +1220,7 @@ async function submitMasterUserModal(e) {
     if (typeof _mrDropTopModalById === "function") _mrDropTopModalById("modal-master-user");
     renderMasterHeaderStats(); renderMasterWorkspaceContent(); showToast("Akun berhasil disimpan!");
 }
-async function approveUserRealTime(uname, btn) { const u = db.users.find(x => x.username === uname); if (!u) return; setBtnLoading(btn, true, "..."); await apiAction({ action: "upsert_user", oldUsername: uname, user: Object.assign({}, u, { status: "Aktif" }) }); renderMasterHeaderStats(); renderMasterWorkspaceContent(); showToast(`Akun @${uname} aktif!`); }
+async function approveUserRealTime(uname, btn) { const u = db.users.find(x => _normAdminUserKey(x.username) === _normAdminUserKey(uname)); if (!u) return; setBtnLoading(btn, true, "..."); await apiAction({ action: "upsert_user", oldUsername: u.username, user: Object.assign({}, u, { status: "Aktif" }) }); renderMasterHeaderStats(); renderMasterWorkspaceContent(); showToast(`Akun @${u.username} aktif!`); }
 async function deleteUserRealTime(uname) { if (!(await showConfirm("Hapus Akun", `Hapus akun @${uname} secara permanen?`, "fa-solid fa-trash", "Ya, Hapus"))) return; showLoading("Menghapus..."); await apiAction({ action: "delete_user", username: uname }); hideLoading(); renderMasterHeaderStats(); renderMasterWorkspaceContent(); showToast("Akun dihapus.", "info"); }
 async function topUpCabangRealTime(uname, amt, btn, reopenModal = false) {
     setBtnLoading(btn, true, "...");
@@ -1530,7 +1537,7 @@ async function saveMasterSettings() {
     toggleSlideMenu(false);
     showToast(`Pembayaran tersimpan (Mode: ${qrisMode === "dynamic" ? "QRIS Dinamis DANA" : "QRIS Tetap"})!`);
 }
-function exportDB() { const a = document.createElement("a"); a.href = "data:text/json;charset=utf-8," + encodeURIComponent(JSON.stringify(db, null, 2)); a.download = "backup_mr_undangan.json"; a.click(); }
+function exportDB() { const a = document.createElement("a"); a.href = "data:text/json;charset=utf-8," + encodeURIComponent(JSON.stringify(db, null, 2)); a.download = "backup_lembarku.json"; a.click(); }
 async function addStockSong(e) { e.preventDefault(); setBtnLoading("btn-add-song", true, "Menyimpan..."); const list = [...(db.musicLibrary||[]), { id:Date.now(), title:document.getElementById("song-title").value.trim(), category:document.getElementById("song-cat").value.trim(), url:document.getElementById("song-url").value.trim() }]; db.musicLibrary = list; await apiAction({ action:"update_section", section:"musicLibrary", value:list }); setBtnLoading("btn-add-song", false); renderMasterWorkspaceContent(); showToast("Lagu ditambahkan!"); }
 async function delStockSong(i) { const list = [...db.musicLibrary]; list.splice(i, 1); db.musicLibrary = list; showLoading("Menghapus..."); await apiAction({ action:"update_section", section:"musicLibrary", value:list }); hideLoading(); renderMasterWorkspaceContent(); }
 async function addTestimonial(e) { e.preventDefault(); setBtnLoading("btn-add-testi", true, "Menyimpan..."); const list = [{ id:Date.now(), name:document.getElementById("t-name").value.trim(), category:document.getElementById("t-cat").value.trim(), rating:5, text:document.getElementById("t-text").value.trim() }, ...(db.testimonials||[])]; db.testimonials = list; await apiAction({ action:"update_section", section:"testimonials", value:list }); setBtnLoading("btn-add-testi", false); renderMasterWorkspaceContent(); showToast("Testimoni ditambahkan!"); }
