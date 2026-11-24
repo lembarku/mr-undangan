@@ -1,5 +1,5 @@
 // =========================================================================
-// MR UNDANGAN — ENGINE UNDANGAN, 3D PAGE-TURN & PORTAL CLIENT (js/invitation.js)
+// LEMBARKU — ENGINE UNDANGAN, 3D PAGE-TURN & PORTAL CLIENT (js/invitation.js)
 // =========================================================================
 let wizardState = {
     isEdit: false, adminDirectEdit: false, editInvId: null, isCabangBypass: false,
@@ -319,7 +319,7 @@ function renderWizardRestoreBar() {
 }
 
 function startCreateInvitation(isCabang = false, preCat = null, preTheme = null) {
-    if (isCabang) { const cab = getCurrentUserObj(); if (!cab || (cab.quota || 0) <= 0) return showToast("Kuota deposit habis! Hubungi Master Admin.", "error"); }
+    if (isCabang) { const cab = getCurrentUserObj(); if (!cab || (cab.quota || 0) <= 0) return showToast("Kuota deposit habis! Hubungi Founder.", "error"); }
     currentViewName = "wizard";
     const initCat = preCat || "Pernikahan";
     const activeList = getMergedThemes(initCat, false);
@@ -617,7 +617,7 @@ function openClientPortalView(inv, brandName) {
     document.getElementById("gl-back-btn").classList.add("hide");
 
     const kopEl = document.getElementById("gl-portal-kop-badge");
-    if (kopEl) kopEl.innerText = `${cleanBrand.toUpperCase()} • POWERED BY MR UNDANGAN`;
+    if (kopEl) kopEl.innerText = `${cleanBrand.toUpperCase()} • POWERED BY LEMBARKU`;
     document.getElementById("gl-portal-brand-title").innerText = `Undangan: ${inv.title}`;
 
     const brand = getInvBrandInfo(Object.assign({}, inv, { brandName: cleanBrand }));
@@ -773,7 +773,7 @@ function copyUniqueGuestUrl(id, g) { navigator.clipboard.writeText(buildGuestUrl
 function openSocialShareModal(id, g) {
     const inv = (clientPortalState.active && clientPortalState.invitation) ? clientPortalState.invitation : db.invitations.find(i => String(i.id) === String(id));
     if (!inv) return;
-    const url = buildGuestUrl(id, g), coverImg = (inv.photos && inv.photos[0]) || "./logo.png";
+    const url = buildGuestUrl(id, g), coverImg = (inv.photos && inv.photos[0]) || "./lembarku-logo.png";
     const text = formatWaMessage(inv, g, url);
     sharePayload = { invId: id, guestName: g, text, url, img: coverImg, title: `Undangan ${inv.title}`, confirmedSent: false };
     document.getElementById("share-cover-preview").src = coverImg;
@@ -1200,7 +1200,7 @@ function openGuestViewWithObject(inv, guestName, isDirectLink = false) {
                 ${bodyInner}${closingHtml}${bankHtml}${wishHtml}${galHtml}
                 <footer class="text-center pt-6 border-t border-current/20 opacity-85 space-y-1">
                     <p class="text-xs font-bold">${escHtml(brand.footerMain)}</p>
-                    <p class="text-[9px] uppercase tracking-widest">${escHtml(brand.footerSub)}</p>
+                    ${brand.footerSub ? `<p class="text-[9px] uppercase tracking-widest">${escHtml(brand.footerSub)}</p>` : ""}
                     <p class="text-[10px] opacity-65 pt-2">Tarik ke bawah lagi untuk info buat berkasmu sendiri ✨</p>
                 </footer>
             </div>
