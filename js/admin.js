@@ -1,18 +1,28 @@
 // =========================================================================
-// LEMBARKU — FOUNDER PANEL FULL-SCREEN, ANALITIK PWA, FOLLOWERS & PROJECT
-// File: js/admin.js (V14.3)
+// LEMBARKU & TITIK GOWES — ADMIN, WORKSPACE & FLEET CONTROLLER (js/admin.js)
+// Versi: V14.3 (Modular Super-App Ekosistem)
 // =========================================================================
+
 let masterThemeCatFilter = "Pernikahan", masterThemeSearch = "", masterOrdersFilter = "all";
 let tbPhotosDraft = { cover: "", pria: "", wanita: "", couple: "", g1: "", g2: "", g3: "" };
 let pbTempUploadedImg = "";
 let _soloFollowersSearch = "";
 let _soloProjectSearch = "";
 let _soloProjectTypeFilter = "all";
+let _soloProjectDomainFilter = "all"; // 'all' | 'lembarku' | 'gowes'
+let _masterAnalyticsDomain = "lembarku"; // 'lembarku' | 'gowes'
 let _publicProjectsCache = {};
 let _adminStockAudio = null;
 let _adminStockPlayingUrl = "";
 
-window._soloStatsViewState = { open: false, targetUsername: "", mode: "followers", masterCat: "user", projectCat: "proses" };
+window._soloStatsViewState = {
+    open: false,
+    targetUsername: "",
+    mode: "followers",
+    masterCat: "user",
+    projectCat: "proses",
+    projectDomain: "all"
+};
 
 function _normAdminUserKey(uname) {
     const k = String(uname || "").trim().toLowerCase();
@@ -128,7 +138,8 @@ function _findMasterStatsBox() {
 }
 
 function renderMasterHeaderStats() {
-    const m = getCurrentUserObj(); if (!m) return;
+    const m = getCurrentUserObj();
+    if (!m) return;
 
     const bEl = document.getElementById("mprof-banner");
     if (bEl) bEl.style.backgroundImage = m.banner ? `url('${m.banner}')` : "";
@@ -145,7 +156,7 @@ function renderMasterHeaderStats() {
     const uEl = document.getElementById("mprof-username");
     if (uEl) uEl.innerText = `@${m.username}`;
     const bioEl = document.getElementById("mprof-bio");
-    if (bioEl) bioEl.innerText = m.bio || "Founder Lembarku";
+    if (bioEl) bioEl.innerText = m.bio || "Founder Lembarku & Titik Gowes";
 
     const statsContainer = _findMasterStatsBox();
     if (statsContainer) {
@@ -153,11 +164,16 @@ function renderMasterHeaderStats() {
         const followingCount = (typeof _getFollowingListForUser === "function")
             ? _getFollowingListForUser(m).length
             : (Array.isArray(m.following) ? m.following.length : 0);
-        const allProj = (typeof _getProjectsForUser === "function")
-            ? _getProjectsForUser(m)
-            : [...(db.invitations || []), ...(db.portfolios || [])];
+
+        const allInvs = Array.isArray(db.invitations) ? db.invitations : [];
+        const allPfs = Array.isArray(db.portfolios) ? db.portfolios : [];
+        const allRentals = Array.isArray(db.gowesRentals) ? db.gowesRentals : [];
+        const totalProjectsCount = allInvs.length + allPfs.length + allRentals.length;
+
         const pendingUsersCnt = (db.users || []).filter(u => u && u.role !== "master" && u.status !== "Aktif").length;
-        const pendingProjCnt = allProj.filter(p => p && p.status !== "Aktif").length;
+        const pendingLbk = [...allInvs, ...allPfs].filter(p => p && (p.status !== "Aktif" || p.pendingRevision)).length;
+        const pendingGowes = allRentals.filter(r => r && (r.status === "Menunggu Pembayaran" || r.status === "Menunggu Verifikasi")).length;
+        const totalPendingProj = pendingLbk + pendingGowes;
 
         statsContainer.innerHTML = `
             <div class="app-card-soft border rounded-2xl p-2 shadow-sm">
@@ -172,9 +188,9 @@ function renderMasterHeaderStats() {
                         <span class="block text-[11px] app-muted font-medium">Following</span>
                     </button>
                     <button type="button" onclick="openSoloProjectModal('${esc(m.username)}')" class="py-2 px-1 rounded-xl hover:bg-black/5 active:scale-98 transition relative">
-                        <span class="block text-sm sm:text-base font-extrabold tracking-tight">${escHtml(_formatInstagramMetric(allProj.length))}</span>
+                        <span class="block text-sm sm:text-base font-extrabold tracking-tight">${escHtml(_formatInstagramMetric(totalProjectsCount))}</span>
                         <span class="block text-[11px] app-muted font-medium">Project</span>
-                        ${pendingProjCnt > 0 ? `<span class="absolute top-1 right-1.5 min-w-[16px] h-4 px-1 rounded-full bg-red-500 text-white text-[9px] font-extrabold flex items-center justify-center">${pendingProjCnt}</span>` : ""}
+                        ${totalPendingProj > 0 ? `<span class="absolute top-1 right-1.5 min-w-[16px] h-4 px-1 rounded-full bg-red-500 text-white text-[9px] font-extrabold flex items-center justify-center">${totalPendingProj}</span>` : ""}
                     </button>
                 </div>
             </div>
@@ -193,10 +209,11 @@ function openMasterWorkspace(name, fromNav = false) {
     stopAdminStockSongPreview();
 
     const meta = {
-        overview: { title: "Grafik & Analitik Bisnis", sub: "Omzet, tren pesanan & pemasangan aplikasi (PWA)" },
+        overview: { title: "Grafik & Analitik Ekosistem", sub: "Omzet berkas Lembarku, rental Titik Gowes & data PWA" },
         themes: { title: "Kelola Tema & Harga", sub: "Foto template, nama contoh & harga CV/Lamaran" },
         home_editor: { title: "Edit Banner Promosi (12:4.4)", sub: "Atur slide promosi utama di Beranda" },
-        media: { title: "Stok Musik & Testimoni", sub: "Upload lagu dari perangkat & ulasan pelanggan" }
+        media: { title: "Stok Musik & Testimoni", sub: "Upload lagu dari perangkat & ulasan pelanggan" },
+        gowes_fleet: { title: "Kelola Armada Titik Gowes", sub: "Input unit sepeda, atur tarif & status servis" }
     };
     const info = meta[currentMasterWorkspace] || { title: "Panel Founder", sub: "Pengaturan Mandiri Lembarku" };
     const tEl = document.getElementById("master-active-panel-title");
@@ -225,6 +242,12 @@ function closeMasterWorkspaceFullscreen(fromNav = false) {
     }
 }
 
+function switchMasterAnalyticsDomain(domain) {
+    _masterAnalyticsDomain = domain || "lembarku";
+    renderMasterWorkspaceContent();
+}
+
+// ================= 2. ANALITIK BERKAS DIGITAL LEMBARKU =================
 function buildMasterAnalyticsHtml() {
     const invs = db.invitations || [];
     const pfs = db.portfolios || [];
@@ -299,131 +322,133 @@ function buildMasterAnalyticsHtml() {
     const pendingUsers = users.filter(u => u.status !== "Aktif");
     const logs = (db.adminLogs || []).slice(0, 6);
 
-    return `<div class="space-y-5">
-        <div class="grid grid-cols-2 sm:grid-cols-4 gap-3">
-            <div class="app-card border rounded-2xl p-3.5 space-y-1 shadow-sm">
-                <span class="text-[10px] app-muted font-bold uppercase block">Omzet Aktif</span>
-                <strong class="text-base sm:text-lg font-extrabold app-accent block truncate">${fmtRp(totalRev)}</strong>
-                <span class="text-[10px] app-muted">${invActive.length} Undangan • ${cvActive.length + lamActive.length} CV/Lam</span>
-            </div>
-            <div class="app-card border rounded-2xl p-3.5 space-y-1 shadow-sm">
-                <span class="text-[10px] app-muted font-bold uppercase block">Omzet Undangan</span>
-                <strong class="text-base sm:text-lg font-extrabold block truncate">${fmtRp(revInv)}</strong>
-                <span class="text-[10px] text-emerald-600 font-semibold">${invActive.length} aktif</span>
-            </div>
-            <div class="app-card border rounded-2xl p-3.5 space-y-1 shadow-sm">
-                <span class="text-[10px] app-muted font-bold uppercase block">Omzet CV &amp; Lamaran</span>
-                <strong class="text-base sm:text-lg font-extrabold block truncate">${fmtRp(revPf)}</strong>
-                <span class="text-[10px] text-blue-600 font-semibold">${cvActive.length + lamActive.length} aktif</span>
-            </div>
-            <div class="app-card border rounded-2xl p-3.5 space-y-1 shadow-sm">
-                <span class="text-[10px] app-muted font-bold uppercase block">Pendaftar Baru</span>
-                <strong class="text-base sm:text-lg font-extrabold text-amber-500 block">${pendingUsers.length} Akun</strong>
-                <span class="text-[10px] app-muted">Kelola di Followers</span>
-            </div>
-        </div>
-
-        <div class="app-card border rounded-3xl p-4 sm:p-5 space-y-4 shadow-sm">
-            <div class="flex flex-wrap items-center justify-between gap-2">
-                <div>
-                    <h4 class="text-xs font-extrabold uppercase app-accent"><i class="fa-solid fa-mobile-screen-button mr-1.5"></i>Statistik Install &amp; Uninstall Aplikasi (PWA)</h4>
-                    <p class="text-[10px] app-muted mt-0.5">Pelacakan perangkat yang memasang ikon Lembarku dan yang terindikasi mencopot aplikasi</p>
+    return `
+        <div class="space-y-5">
+            <div class="grid grid-cols-2 sm:grid-cols-4 gap-3">
+                <div class="app-card border rounded-2xl p-3.5 space-y-1 shadow-sm border-l-4 border-l-blue-500">
+                    <span class="text-[10px] app-muted font-bold uppercase block">Omzet Digital Aktif</span>
+                    <strong class="text-base sm:text-lg font-extrabold app-accent block truncate">${fmtRp(totalRev)}</strong>
+                    <span class="text-[10px] app-muted">${invActive.length} Undangan • ${cvActive.length + lamActive.length} CV/Lam</span>
                 </div>
-                <span class="text-[10px] px-2.5 py-1 rounded-full bg-emerald-500/15 text-emerald-600 font-extrabold">Retensi: ${retentionPct}%</span>
-            </div>
-
-            <div class="grid grid-cols-3 gap-2.5 text-center">
-                <div class="app-card-soft border rounded-2xl p-3">
-                    <span class="text-[10px] app-muted font-bold uppercase block">Aktif Terpasang</span>
-                    <strong class="text-xl font-extrabold text-emerald-600 block mt-0.5">${activeInstalled}</strong>
+                <div class="app-card border rounded-2xl p-3.5 space-y-1 shadow-sm">
+                    <span class="text-[10px] app-muted font-bold uppercase block">Omzet Undangan</span>
+                    <strong class="text-base sm:text-lg font-extrabold block truncate">${fmtRp(revInv)}</strong>
+                    <span class="text-[10px] text-emerald-600 font-semibold">${invActive.length} aktif</span>
                 </div>
-                <div class="app-card-soft border rounded-2xl p-3">
-                    <span class="text-[10px] app-muted font-bold uppercase block">Total Install</span>
-                    <strong class="text-xl font-extrabold text-blue-600 block mt-0.5">${totalInstalled}</strong>
+                <div class="app-card border rounded-2xl p-3.5 space-y-1 shadow-sm">
+                    <span class="text-[10px] app-muted font-bold uppercase block">Omzet CV &amp; Lamaran</span>
+                    <strong class="text-base sm:text-lg font-extrabold block truncate">${fmtRp(revPf)}</strong>
+                    <span class="text-[10px] text-blue-600 font-semibold">${cvActive.length + lamActive.length} aktif</span>
                 </div>
-                <div class="app-card-soft border rounded-2xl p-3">
-                    <span class="text-[10px] app-muted font-bold uppercase block">Uninstall</span>
-                    <strong class="text-xl font-extrabold text-red-500 block mt-0.5">${totalUninstalled}</strong>
+                <div class="app-card border rounded-2xl p-3.5 space-y-1 shadow-sm">
+                    <span class="text-[10px] app-muted font-bold uppercase block">Pendaftar Baru</span>
+                    <strong class="text-base sm:text-lg font-extrabold text-amber-500 block">${pendingUsers.length} Akun</strong>
+                    <span class="text-[10px] app-muted">Kelola di Followers</span>
                 </div>
             </div>
 
-            <div class="space-y-2">
-                <div class="flex items-center justify-between text-[10px] app-muted px-1">
-                    <span>Tren 6 Bulan Terakhir</span>
-                    <div class="flex items-center gap-3 font-bold">
-                        <span class="flex items-center gap-1"><span class="w-2.5 h-2.5 rounded-sm bg-emerald-500 inline-block"></span>Install</span>
-                        <span class="flex items-center gap-1"><span class="w-2.5 h-2.5 rounded-sm bg-red-500 inline-block"></span>Uninstall</span>
+            <div class="app-card border rounded-3xl p-4 sm:p-5 space-y-4 shadow-sm">
+                <div class="flex flex-wrap items-center justify-between gap-2">
+                    <div>
+                        <h4 class="text-xs font-extrabold uppercase app-accent"><i class="fa-solid fa-mobile-screen-button mr-1.5"></i>Statistik Install &amp; Uninstall Aplikasi (PWA)</h4>
+                        <p class="text-[10px] app-muted mt-0.5">Pelacakan perangkat yang memasang ikon Lembarku dan yang terindikasi mencopot aplikasi</p>
+                    </div>
+                    <span class="text-[10px] px-2.5 py-1 rounded-full bg-emerald-500/15 text-emerald-600 font-extrabold">Retensi: ${retentionPct}%</span>
+                </div>
+
+                <div class="grid grid-cols-3 gap-2.5 text-center">
+                    <div class="app-card-soft border rounded-2xl p-3">
+                        <span class="text-[10px] app-muted font-bold uppercase block">Aktif Terpasang</span>
+                        <strong class="text-xl font-extrabold text-emerald-600 block mt-0.5">${activeInstalled}</strong>
+                    </div>
+                    <div class="app-card-soft border rounded-2xl p-3">
+                        <span class="text-[10px] app-muted font-bold uppercase block">Total Install</span>
+                        <strong class="text-xl font-extrabold text-blue-600 block mt-0.5">${totalInstalled}</strong>
+                    </div>
+                    <div class="app-card-soft border rounded-2xl p-3">
+                        <span class="text-[10px] app-muted font-bold uppercase block">Uninstall</span>
+                        <strong class="text-xl font-extrabold text-red-500 block mt-0.5">${totalUninstalled}</strong>
                     </div>
                 </div>
-                <div class="h-36 flex items-end justify-between gap-2 pt-3 px-2 app-card-soft border rounded-2xl pb-2">
-                    ${pwaMonths.map(pm => {
-                        const hIn = pm.installs > 0 ? Math.max(12, Math.round((pm.installs / maxPwa) * 100)) : 5;
-                        const hUn = pm.uninstalls > 0 ? Math.max(12, Math.round((pm.uninstalls / maxPwa) * 100)) : 5;
-                        return `<div class="flex-1 flex flex-col items-center gap-1 h-full justify-end">
-                            <div class="flex items-end gap-1 h-24 w-full justify-center">
-                                <div class="w-3 sm:w-4 rounded-t-md bg-emerald-500 transition-all" style="height:${hIn}%" title="${pm.label} Install: ${pm.installs}"></div>
-                                <div class="w-3 sm:w-4 rounded-t-md bg-red-500/85 transition-all" style="height:${hUn}%" title="${pm.label} Uninstall: ${pm.uninstalls}"></div>
-                            </div>
-                            <span class="text-[9.5px] font-bold">${pm.installs}/${pm.uninstalls}</span>
-                            <span class="text-[9.5px] app-muted font-semibold">${pm.label}</span>
-                        </div>`;
-                    }).join("")}
-                </div>
-            </div>
-        </div>
 
-        <div class="grid md:grid-cols-2 gap-4">
-            <div class="app-card border rounded-3xl p-4 space-y-3 shadow-sm">
-                <div class="flex items-center justify-between">
-                    <h4 class="text-xs font-extrabold uppercase app-accent">Tren Pesanan (6 Bulan)</h4>
-                    <span class="text-[10px] app-muted">Total: ${allDocs.length} berkas</span>
-                </div>
-                <div class="h-40 flex items-end justify-between gap-2 pt-4 px-1">
-                    ${months.map(m => {
-                        const hPct = Math.max(8, Math.round((m.orders / maxOrders) * 100));
-                        return `<div class="flex-1 flex flex-col items-center gap-1.5 h-full justify-end">
-                            <span class="text-[10px] font-bold">${m.orders}</span>
-                            <div class="w-full max-w-[34px] rounded-t-xl gold-gradient transition-all duration-500 shadow-sm" style="height:${hPct}%" title="${m.label}: ${m.orders} pesanan (${fmtRp(m.rev)})"></div>
-                            <span class="text-[10px] app-muted font-semibold">${m.label}</span>
-                        </div>`;
-                    }).join("")}
-                </div>
-            </div>
-
-            <div class="app-card border rounded-3xl p-4 space-y-4 shadow-sm">
-                <h4 class="text-xs font-extrabold uppercase app-accent">Komposisi Produk &amp; Akun</h4>
-                <div class="flex items-center gap-5">
-                    <svg width="96" height="96" viewBox="0 0 96 96" class="shrink-0 -rotate-90">
-                        <circle cx="48" cy="48" r="38" fill="none" stroke="rgba(148,163,184,0.22)" stroke-width="12"/>
-                        <circle cx="48" cy="48" r="38" fill="none" stroke="#eab308" stroke-width="12" stroke-dasharray="${dInv} ${circ}" stroke-dashoffset="0"/>
-                        <circle cx="48" cy="48" r="38" fill="none" stroke="#3b82f6" stroke-width="12" stroke-dasharray="${dCv} ${circ}" stroke-dashoffset="${-dInv}"/>
-                        <circle cx="48" cy="48" r="38" fill="none" stroke="#10b981" stroke-width="12" stroke-dasharray="${dLam} ${circ}" stroke-dashoffset="${-(dInv + dCv)}"/>
-                    </svg>
-                    <div class="flex-1 space-y-1.5 text-xs">
-                        <div class="flex items-center justify-between"><span class="flex items-center gap-1.5"><span class="w-2.5 h-2.5 rounded-full bg-amber-400"></span>Undangan</span><strong>${cInv}</strong></div>
-                        <div class="flex items-center justify-between"><span class="flex items-center gap-1.5"><span class="w-2.5 h-2.5 rounded-full bg-blue-500"></span>Curriculum Vitae</span><strong>${cCv}</strong></div>
-                        <div class="flex items-center justify-between"><span class="flex items-center gap-1.5"><span class="w-2.5 h-2.5 rounded-full bg-emerald-500"></span>Surat Lamaran</span><strong>${cLam}</strong></div>
+                <div class="space-y-2">
+                    <div class="flex items-center justify-between text-[10px] app-muted px-1">
+                        <span>Tren 6 Bulan Terakhir</span>
+                        <div class="flex items-center gap-3 font-bold">
+                            <span class="flex items-center gap-1"><span class="w-2.5 h-2.5 rounded-sm bg-emerald-500 inline-block"></span>Install</span>
+                            <span class="flex items-center gap-1"><span class="w-2.5 h-2.5 rounded-sm bg-red-500 inline-block"></span>Uninstall</span>
+                        </div>
+                    </div>
+                    <div class="h-36 flex items-end justify-between gap-2 pt-3 px-2 app-card-soft border rounded-2xl pb-2">
+                        ${pwaMonths.map(pm => {
+                            const hIn = pm.installs > 0 ? Math.max(12, Math.round((pm.installs / maxPwa) * 100)) : 5;
+                            const hUn = pm.uninstalls > 0 ? Math.max(12, Math.round((pm.uninstalls / maxPwa) * 100)) : 5;
+                            return `<div class="flex-1 flex flex-col items-center gap-1 h-full justify-end">
+                                <div class="flex items-end gap-1 h-24 w-full justify-center">
+                                    <div class="w-3 sm:w-4 rounded-t-md bg-emerald-500 transition-all" style="height:${hIn}%" title="${pm.label} Install: ${pm.installs}"></div>
+                                    <div class="w-3 sm:w-4 rounded-t-md bg-red-500/85 transition-all" style="height:${hUn}%" title="${pm.label} Uninstall: ${pm.uninstalls}"></div>
+                                </div>
+                                <span class="text-[9.5px] font-bold">${pm.installs}/${pm.uninstalls}</span>
+                                <span class="text-[9.5px] app-muted font-semibold">${pm.label}</span>
+                            </div>`;
+                        }).join("")}
                     </div>
                 </div>
-                <div class="space-y-2 pt-2 border-t gold-border text-[11px]">
-                    ${[
-                        { lbl: "User Reguler", val: uReg, col: "bg-slate-400" },
-                        { lbl: "Akun Pro (Centang Biru)", val: uPro, col: "bg-blue-500" },
-                        { lbl: "Admin Cabang", val: uCab, col: "bg-amber-500" },
-                        { lbl: "Tim Administrasi", val: uStaff, col: "bg-emerald-500" }
-                    ].map(row => `<div class="space-y-0.5"><div class="flex justify-between"><span class="app-muted">${row.lbl}</span><strong>${row.val}</strong></div><div class="w-full h-1.5 rounded-full app-btn-sec overflow-hidden"><div class="h-full ${row.col} rounded-full" style="width:${Math.max(4, Math.round((row.val / maxU) * 100))}%"></div></div></div>`).join("")}
+            </div>
+
+            <div class="grid md:grid-cols-2 gap-4">
+                <div class="app-card border rounded-3xl p-4 space-y-3 shadow-sm">
+                    <div class="flex items-center justify-between">
+                        <h4 class="text-xs font-extrabold uppercase app-accent">Tren Pesanan Berkas (6 Bulan)</h4>
+                        <span class="text-[10px] app-muted">Total: ${allDocs.length} berkas</span>
+                    </div>
+                    <div class="h-40 flex items-end justify-between gap-2 pt-4 px-1">
+                        ${months.map(m => {
+                            const hPct = Math.max(8, Math.round((m.orders / maxOrders) * 100));
+                            return `<div class="flex-1 flex flex-col items-center gap-1.5 h-full justify-end">
+                                <span class="text-[10px] font-bold">${m.orders}</span>
+                                <div class="w-full max-w-[34px] rounded-t-xl gold-gradient transition-all duration-500 shadow-sm" style="height:${hPct}%" title="${m.label}: ${m.orders} pesanan (${fmtRp(m.rev)})"></div>
+                                <span class="text-[10px] app-muted font-semibold">${m.label}</span>
+                            </div>`;
+                        }).join("")}
+                    </div>
+                </div>
+
+                <div class="app-card border rounded-3xl p-4 space-y-4 shadow-sm">
+                    <h4 class="text-xs font-extrabold uppercase app-accent">Komposisi Produk Digital &amp; Akun</h4>
+                    <div class="flex items-center gap-5">
+                        <svg width="96" height="96" viewBox="0 0 96 96" class="shrink-0 -rotate-90">
+                            <circle cx="48" cy="48" r="38" fill="none" stroke="rgba(148,163,184,0.22)" stroke-width="12"/>
+                            <circle cx="48" cy="48" r="38" fill="none" stroke="#eab308" stroke-width="12" stroke-dasharray="${dInv} ${circ}" stroke-dashoffset="0"/>
+                            <circle cx="48" cy="48" r="38" fill="none" stroke="#3b82f6" stroke-width="12" stroke-dasharray="${dCv} ${circ}" stroke-dashoffset="${-dInv}"/>
+                            <circle cx="48" cy="48" r="38" fill="none" stroke="#10b981" stroke-width="12" stroke-dasharray="${dLam} ${circ}" stroke-dashoffset="${-(dInv + dCv)}"/>
+                        </svg>
+                        <div class="flex-1 space-y-1.5 text-xs">
+                            <div class="flex items-center justify-between"><span class="flex items-center gap-1.5"><span class="w-2.5 h-2.5 rounded-full bg-amber-400"></span>Undangan</span><strong>${cInv}</strong></div>
+                            <div class="flex items-center justify-between"><span class="flex items-center gap-1.5"><span class="w-2.5 h-2.5 rounded-full bg-blue-500"></span>Curriculum Vitae</span><strong>${cCv}</strong></div>
+                            <div class="flex items-center justify-between"><span class="flex items-center gap-1.5"><span class="w-2.5 h-2.5 rounded-full bg-emerald-500"></span>Surat Lamaran</span><strong>${cLam}</strong></div>
+                        </div>
+                    </div>
+                    <div class="space-y-2 pt-2 border-t gold-border text-[11px]">
+                        ${[
+                            { lbl: "User Reguler", val: uReg, col: "bg-slate-400" },
+                            { lbl: "Akun Pro (Centang Biru)", val: uPro, col: "bg-blue-500" },
+                            { lbl: "Admin Cabang", val: uCab, col: "bg-amber-500" },
+                            { lbl: "Tim Administrasi", val: uStaff, col: "bg-emerald-500" }
+                        ].map(row => `<div class="space-y-0.5"><div class="flex justify-between"><span class="app-muted">${row.lbl}</span><strong>${row.val}</strong></div><div class="w-full h-1.5 rounded-full app-btn-sec overflow-hidden"><div class="h-full ${row.col} rounded-full" style="width:${Math.max(4, Math.round((row.val / maxU) * 100))}%"></div></div></div>`).join("")}
+                    </div>
                 </div>
             </div>
-        </div>
 
-        <div class="app-card border rounded-3xl p-4 space-y-2.5 shadow-sm">
-            <h4 class="text-xs font-extrabold uppercase app-accent">Aktivitas Verifikasi &amp; Edit Terbaru</h4>
-            ${logs.length ? logs.map(l => `<div class="app-card-soft border rounded-xl px-3 py-2 flex items-center justify-between gap-2 text-[11px]"><div class="min-w-0"><strong class="app-accent">@${escHtml(l.actor)}</strong> <span class="text-[9px] uppercase px-1.5 py-0.5 rounded app-btn-sec font-bold mr-1">${escHtml(l.role)}</span><span>${escHtml(l.msg)}</span></div><span class="text-[10px] app-muted shrink-0">${escHtml(l.time)}</span></div>`).join("") : '<p class="text-xs app-muted">Belum ada catatan aktivitas verifikasi.</p>'}
+            <div class="app-card border rounded-3xl p-4 space-y-2.5 shadow-sm">
+                <h4 class="text-xs font-extrabold uppercase app-accent">Aktivitas Verifikasi &amp; Edit Terbaru</h4>
+                ${logs.length ? logs.map(l => `<div class="app-card-soft border rounded-xl px-3 py-2 flex items-center justify-between gap-2 text-[11px]"><div class="min-w-0"><strong class="app-accent">@${escHtml(l.actor)}</strong> <span class="text-[9px] uppercase px-1.5 py-0.5 rounded app-btn-sec font-bold mr-1">${escHtml(l.role)}</span><span>${escHtml(l.msg)}</span></div><span class="text-[10px] app-muted shrink-0">${escHtml(l.time)}</span></div>`).join("") : '<p class="text-xs app-muted">Belum ada catatan aktivitas verifikasi.</p>'}
+            </div>
         </div>
-    </div>`;
+    `;
 }
 
-// ================= 2. ROLE ADMINISTRASI & KARTU PROJECT LENGKAP =================
+// ================= 3. TIM ADMINISTRASI & BUKTI BAYAR TERPADU =================
 function isCabangOwnedDoc(item) {
     if (!item) return false;
     if (item.brandName && String(item.brandName).trim()) return true;
@@ -432,15 +457,18 @@ function isCabangOwnedDoc(item) {
 }
 
 function renderStaffAdmin() {
-    const st = getCurrentUserObj(); if (!st) return;
+    const st = getCurrentUserObj();
+    if (!st) return;
     const avEl = document.getElementById("staff-avatar");
     if (avEl) {
         avEl.src = st.avatar || DEFAULT_AVATAR;
         avEl.onclick = () => openExpandedAvatarLightbox(st.avatar || DEFAULT_AVATAR, st.name || st.username);
         avEl.classList.add("cursor-pointer", "active:scale-95", "transition");
     }
-    const nmEl = document.getElementById("staff-name"); if (nmEl) nmEl.innerText = st.name || "Tim Administrasi";
-    const usEl = document.getElementById("staff-username"); if (usEl) usEl.innerText = `@${st.username}`;
+    const nmEl = document.getElementById("staff-name");
+    if (nmEl) nmEl.innerText = st.name || "Tim Administrasi";
+    const usEl = document.getElementById("staff-username");
+    if (usEl) usEl.innerText = `@${st.username}`;
 
     if (typeof _mountProfileIgStats === "function") {
         _mountProfileIgStats("view-staff-admin", "staff-ig-stats-mount", st);
@@ -448,97 +476,40 @@ function renderStaffAdmin() {
 
     const userInvs = (db.invitations || []).filter(i => !isCabangOwnedDoc(i));
     const userPfs = (db.portfolios || []).filter(p => !isCabangOwnedDoc(p));
-    const pendingCnt = userInvs.filter(i => i.status !== "Aktif").length + userPfs.filter(p => p.status !== "Aktif").length;
+    const pendingLbk = userInvs.filter(i => i.status !== "Aktif" || i.pendingRevision).length + userPfs.filter(p => p.status !== "Aktif" || p.pendingRevision).length;
 
-    const pbEl = document.getElementById("staff-pending-badge"); if (pbEl) pbEl.innerText = `${pendingCnt} Menunggu`;
+    const allRentals = Array.isArray(db.gowesRentals) ? db.gowesRentals : [];
+    const pendingGowes = allRentals.filter(r => r.status === "Menunggu Pembayaran" || r.status === "Menunggu Verifikasi").length;
+
+    const totalPending = pendingLbk + pendingGowes;
+    const pbEl = document.getElementById("staff-pending-badge");
+    if (pbEl) {
+        pbEl.innerText = `${totalPending} Menunggu (${pendingLbk} Berkas, ${pendingGowes} Sepeda)`;
+    }
     if (typeof updateChatBadges === "function") updateChatBadges();
 }
 
-function buildFullOrderCardHtml(item, options = {}) {
-    const isStaffMode = !!options.isStaffMode;
-    const closeModalBeforeAction = !!options.closeModalBeforeAction;
-    const preCloseJs = closeModalBeforeAction ? "closeSoloStatsModal();closeUserProfileModalCustom();" : "";
-
-    const isPf = item._kind === "pf";
-    const hasRev = !!item.pendingRevision;
-    const typeTag = isPf ? (item.docType === "lamaran" ? "SURAT LAMARAN" : "CV") : `UNDANGAN • ${escHtml(item.category)}`;
-    const priceInfo = item.totalPay ? `${fmtRp(item.totalPay)} (kode unik)` : (item.price ? fmtRp(item.price) : "");
-
-    return `<div class="app-card border rounded-2xl p-4 flex flex-col md:flex-row md:items-center justify-between gap-3 shadow-sm">
-        <div class="min-w-0">
-            <div class="flex flex-wrap items-center gap-1.5">
-                <span class="text-[9px] px-2 py-0.5 rounded-full app-accent-bg app-accent font-extrabold">${typeTag}</span>
-                <span class="text-[10px] px-2 py-0.5 rounded-full font-bold ${item.status==="Aktif"?"bg-emerald-500/20 text-emerald-600":"bg-amber-500/20 app-accent"}">● ${escHtml(item.status)}</span>
-                ${hasRev ? `<span class="text-[9px] px-2 py-0.5 rounded-full bg-purple-500/20 text-purple-600 font-extrabold">REVISI MASUK</span>` : ""}
-            </div>
-            <h4 class="font-bold text-sm mt-1 truncate">${escHtml(item.title)} <span class="text-xs app-muted font-normal">(@${escHtml(item.owner)}${item.brandName ? ` • ${escHtml(item.brandName)}` : ""})</span></h4>
-            <p class="text-xs app-muted">${escHtml(isPf ? (item.themeName || item.themeId) : item.theme)} ${priceInfo ? `• <strong class="app-accent">${priceInfo}</strong>` : ""} • Revisi: ${item.editCount || 0}/2</p>
-        </div>
-        <div class="flex flex-wrap gap-1.5">
-            ${item.owner ? `<button type="button" onclick="${preCloseJs}openFullChatOverlay('${esc(item.owner)}')" class="px-3 py-1.5 rounded-xl bg-emerald-600/15 border border-emerald-500/40 text-emerald-600 text-xs font-bold" title="Kirim Pesan ke Pemilik Order"><i class="fa-solid fa-comments mr-1"></i>Chat</button>` : ""}
-            ${item.paymentProof ? `<button type="button" onclick="viewOrderProof('${item._kind}',${item.id})" class="px-3 py-1.5 rounded-xl bg-blue-600/15 border border-blue-500/40 text-blue-600 text-xs font-bold">Bukti / SS</button>` : ""}
-            <button type="button" onclick="${preCloseJs}${isPf ? `openEditPortfolio(${item.id},true)` : `openEditInvitation(${item.id},true)`}" class="px-3 py-1.5 rounded-xl app-card-soft border app-accent text-xs font-bold"><i class="fa-solid fa-pen mr-1"></i>Edit</button>
-            ${hasRev ? `
-                <button type="button" onclick="${preCloseJs}${isPf ? `openPortfolioDocPreview(${item.id},true)` : `previewPendingRevision(${item.id})`}" class="px-3 py-1.5 rounded-xl app-btn-sec text-xs font-bold">Cek Revisi</button>
-                <button type="button" onclick="approveOrderRevision('${item._kind}',${item.id},this)" class="gold-pill-btn px-3.5 py-1.5 rounded-xl text-xs">✓ ACC Revisi</button>
-                <button type="button" onclick="rejectOrderRevision('${item._kind}',${item.id},this)" class="px-3 py-1.5 rounded-xl bg-red-600/15 text-red-500 text-xs font-bold">Tolak</button>
-            ` : `
-                <button type="button" onclick="${preCloseJs}${isPf ? `openPortfolioDocPreview(${item.id},false)` : `openGuestView(${item.id},'Review Admin')`}" class="px-3 py-1.5 rounded-xl app-btn-sec text-xs font-bold">Lihat</button>
-                ${item.status !== "Aktif"
-                    ? `<button type="button" onclick="setOrderStatus('${item._kind}',${item.id},'Aktif',this)" class="gold-pill-btn px-4 py-1.5 rounded-xl text-xs">✓ Konfirmasi</button>`
-                    : `<button type="button" onclick="setOrderStatus('${item._kind}',${item.id},'Menunggu Verifikasi',this)" class="px-3 py-1.5 rounded-xl bg-amber-600/15 app-accent text-xs font-bold">Tangguhkan</button>`}
-            `}
-            ${!isStaffMode ? `<button type="button" onclick="deleteOrderItem('${item._kind}',${item.id})" class="px-2.5 py-1.5 rounded-xl bg-red-600/15 text-red-500 text-xs"><i class="fa-solid fa-trash"></i></button>` : ""}
-        </div>
-    </div>`;
-}
-
-function buildUserOwnProjectCardHtml(doc, isCabangOwner = false) {
-    const isPf = doc._kind === "pf";
-    const isAktif = doc.status === "Aktif";
-    const isPay = doc.status === "Menunggu Pembayaran";
-    const edLeft = Math.max(0, 2 - Number(doc.editCount || 0));
-    const canEdit = isCabangOwner ? true : (isAktif && edLeft > 0);
-    const editLbl = isCabangOwner ? "Edit" : `Edit (${edLeft}x)`;
-    const typeTag = isPf ? (doc.docType === "lamaran" ? "SURAT LAMARAN" : "CV") : `UNDANGAN • ${escHtml(doc.category)}`;
-    const preClose = "closeSoloStatsModal();closeUserProfileModalCustom();";
-
-    return `<div class="app-card border rounded-2xl p-4 space-y-3 shadow-sm">
-        <div class="min-w-0">
-            <div class="flex flex-wrap items-center gap-1.5">
-                <span class="text-[9px] px-2 py-0.5 rounded-full app-accent-bg app-accent font-extrabold">${typeTag}</span>
-                <span class="text-[10px] px-2 py-0.5 rounded-full font-bold ${isAktif?"bg-emerald-500/20 text-emerald-600":"bg-amber-500/20 app-accent"}">● ${escHtml(doc.status)}</span>
-            </div>
-            <h4 class="font-bold text-sm mt-1 truncate">${escHtml(doc.title)}</h4>
-            <p class="text-xs app-muted">${escHtml(isPf ? (doc.themeName || doc.themeId) : doc.theme)} • Revisi: ${doc.editCount || 0}/2</p>
-        </div>
-        <div class="flex flex-wrap gap-1.5">
-            ${isPf
-                ? `<button type="button" onclick="${preClose}openPortfolioDocPreview(${doc.id},false)" class="px-3 py-1.5 rounded-xl app-btn-sec text-xs font-bold"><i class="fa-regular fa-eye mr-1"></i>Lihat</button>`
-                : (isAktif
-                    ? `<button type="button" onclick="${preClose}openGuestView(${doc.id},'Tamu Kehormatan')" class="px-3 py-1.5 rounded-xl app-btn-sec text-xs font-bold"><i class="fa-regular fa-eye mr-1"></i>Lihat</button>`
-                    : `<button type="button" disabled class="px-3 py-1.5 rounded-xl app-btn-sec opacity-50 text-xs font-bold"><i class="fa-solid fa-lock mr-1"></i>Lihat</button>`)}
-            ${canEdit
-                ? `<button type="button" onclick="${preClose}${isPf ? `openEditPortfolio(${doc.id},${isCabangOwner})` : `openEditInvitation(${doc.id},${isCabangOwner})`}" class="px-3 py-1.5 rounded-xl app-card-soft border app-accent text-xs font-bold"><i class="fa-solid fa-pen mr-1"></i>${editLbl}</button>`
-                : `<button type="button" disabled class="px-3 py-1.5 rounded-xl app-btn-sec opacity-50 text-xs font-bold"><i class="fa-solid fa-lock mr-1"></i>Edit</button>`}
-            ${isPay
-                ? `<button type="button" onclick="${preClose}openUnifiedPayment('${isPf ? "portfolio" : "inv"}',${doc.id})" class="gold-pill-btn px-3.5 py-1.5 rounded-xl text-xs"><i class="fa-solid fa-qrcode mr-1"></i>Konfirmasi</button>`
-                : (isAktif && isPf
-                    ? `<button type="button" onclick="${preClose}openSempurnakanModal(${doc.id})" class="gold-pill-btn px-3.5 py-1.5 rounded-xl text-xs"><i class="fa-solid fa-file-pdf mr-1"></i>Sempurnakan / PDF</button>`
-                    : (isAktif && !isPf
-                        ? `<button type="button" onclick="${preClose}openGuestListManager(${doc.id})" class="gold-pill-btn px-3.5 py-1.5 rounded-xl text-xs"><i class="fa-solid fa-share-nodes mr-1"></i>Tamu (${(doc.guests || []).length})</button>${isCabangOwner ? `<button type="button" onclick="${preClose}openClientPortalShareModal(${doc.id})" class="px-3 py-1.5 rounded-xl bg-blue-600/15 text-blue-600 text-xs font-bold">Link Klien</button>` : ""}`
-                        : ""))}
-        </div>
-    </div>`;
-}
-
 function viewOrderProof(kind, id) {
-    const item = kind === "pf"
-        ? (db.portfolios || []).find(p => String(p.id) === String(id))
-        : (db.invitations || []).find(i => String(i.id) === String(id));
-    if (!item || !item.paymentProof) return showToast("Bukti pembayaran belum tersedia.", "info");
+    let rawUrl = "";
+    let itemTitle = "Pesanan";
+    let itemOwner = "-";
 
-    const rawUrl = String(item.paymentProof || "").trim();
+    if (kind === "gowes_rental") {
+        const rental = (db.gowesRentals || []).find(r => String(r.id) === String(id));
+        if (!rental || !rental.paymentProof) return showToast("Bukti transfer rental belum tersedia.", "info");
+        rawUrl = String(rental.paymentProof).trim();
+        itemTitle = `Rental: ${rental.bikeName}`;
+        itemOwner = rental.customerUsername || "-";
+    } else {
+        const item = kind === "pf"
+            ? (db.portfolios || []).find(p => String(p.id) === String(id))
+            : (db.invitations || []).find(i => String(i.id) === String(id));
+        if (!item || !item.paymentProof) return showToast("Bukti pembayaran belum tersedia.", "info");
+        rawUrl = String(item.paymentProof || "").trim();
+        itemTitle = item.title || "Pesanan";
+        itemOwner = item.owner || "-";
+    }
+
     const isSafeUrl = /^(https?:\/\/|data:image\/)/i.test(rawUrl);
     if (!isSafeUrl) return showToast("Format bukti pembayaran tidak valid.", "error");
 
@@ -548,7 +519,7 @@ function viewOrderProof(kind, id) {
     const openLink = document.getElementById("proof-viewer-open-link");
 
     if (modal && imgEl) {
-        if (titleEl) titleEl.innerText = `Bukti — ${item.title || "Pesanan"} (@${item.owner || "-"})`;
+        if (titleEl) titleEl.innerText = `Bukti — ${itemTitle} (@${itemOwner})`;
         imgEl.src = rawUrl;
         if (openLink) {
             openLink.href = rawUrl;
@@ -566,6 +537,7 @@ function previewPendingRevision(id) {
     const inv = db.invitations.find(i => String(i.id) === String(id));
     if (inv && inv.pendingRevision) openGuestViewWithObject(Object.assign({}, inv, inv.pendingRevision), "Review Revisi");
 }
+
 async function setOrderStatus(kind, id, status, btn) {
     setBtnLoading(btn, true, "...");
     if (kind === "pf") {
@@ -577,17 +549,20 @@ async function setOrderStatus(kind, id, status, btn) {
     }
     refreshAfterAdminOrderAction(`Status berkas diperbarui: ${status}`);
 }
+
 async function approveOrderRevision(kind, id, btn) {
     if (!(await showConfirm("Setujui Revisi", "Versi lama otomatis digantikan versi revisi terbaru. Lanjutkan?", "fa-solid fa-check-double", "Ya, Setujui"))) return;
     setBtnLoading(btn, true, "...");
     await apiAction({ action: kind === "pf" ? "approve_portfolio_revision" : "approve_revision", id });
     refreshAfterAdminOrderAction("Revisi disetujui & aktif!");
 }
+
 async function rejectOrderRevision(kind, id, btn) {
     setBtnLoading(btn, true, "...");
     await apiAction({ action: kind === "pf" ? "reject_portfolio_revision" : "reject_revision", id });
     refreshAfterAdminOrderAction("Revisi ditolak, kembali ke versi aktif.");
 }
+
 async function deleteOrderItem(kind, id) {
     if (!(await showConfirm("Hapus Proyek", "Hapus berkas ini secara permanen?", "fa-solid fa-trash", "Ya, Hapus"))) return;
     showLoading("Menghapus...");
@@ -595,6 +570,7 @@ async function deleteOrderItem(kind, id) {
     hideLoading();
     refreshAfterAdminOrderAction("Proyek dihapus.");
 }
+
 function refreshAfterAdminOrderAction(msg) {
     const u = getCurrentUserObj();
     if (u && u.role === "administrasi") renderStaffAdmin();
@@ -607,63 +583,49 @@ function refreshAfterAdminOrderAction(msg) {
     showToast(msg);
 }
 
-// ================= 3. WORKSPACE FOUNDER FULL-SCREEN: TEMA, HARGA CV, BANNER & STOK MUSIK =================
-function renderMasterThemesGridOnly() {
-    const grid = document.getElementById("master-themes-grid");
-    const countEl = document.getElementById("master-themes-count");
-    if (!grid) return;
+// ================= 4. WORKSPACE FOUNDER ROUTER CONTENT =================
+function renderMasterWorkspaceContent() {
+    const box = document.getElementById("master-workspace-body");
+    if (!box) return;
 
-    let list = getMergedThemes(masterThemeCatFilter, true);
-    if (masterThemeSearch.trim()) {
-        const q = masterThemeSearch.trim().toLowerCase();
-        list = list.filter(t => String(t.name || "").toLowerCase().includes(q));
-    }
-
-    if (countEl) countEl.innerText = String(list.length);
-
-    if (!list.length) {
-        grid.innerHTML = `<p class="text-xs app-muted text-center py-8 sm:col-span-2 lg:col-span-3 app-card rounded-2xl border border-dashed">Tidak ada tema yang cocok dengan pencarian "${escHtml(masterThemeSearch)}".</p>`;
+    if (currentMasterWorkspace === "overview") {
+        box.innerHTML = `
+            <div class="space-y-4">
+                <div class="flex gap-2 border-b gold-border pb-3 overflow-x-auto no-scrollbar">
+                    <button type="button" onclick="switchMasterAnalyticsDomain('lembarku')" class="px-4 py-2 rounded-2xl text-xs font-extrabold whitespace-nowrap transition ${_masterAnalyticsDomain === 'lembarku' ? 'gold-pill-btn shadow' : 'app-btn-sec'}">
+                        <i class="fa-solid fa-file-pdf mr-1.5"></i>Analitik Bisnis Lembarku
+                    </button>
+                    <button type="button" onclick="switchMasterAnalyticsDomain('gowes')" class="px-4 py-2 rounded-2xl text-xs font-extrabold whitespace-nowrap transition ${_masterAnalyticsDomain === 'gowes' ? 'gowes-pill-btn shadow' : 'app-btn-sec'}">
+                        <i class="fa-solid fa-bicycle mr-1.5"></i>Analitik Titik Gowes
+                    </button>
+                </div>
+                <div id="master-analytics-subcontent">
+                    ${_masterAnalyticsDomain === 'gowes' && typeof buildGowesAnalyticsDashboardHtml === 'function'
+                        ? buildGowesAnalyticsDashboardHtml()
+                        : buildMasterAnalyticsHtml()}
+                </div>
+            </div>
+        `;
         return;
     }
 
-    grid.innerHTML = list.map(t => {
-        const cov = getThemeCoverPair(t.cat, t), pr = getThemePricing(t);
-        return `<div class="app-card border rounded-2xl overflow-hidden flex flex-col justify-between shadow-sm ${t.isHidden ? "opacity-55 border-dashed" : ""}">
-            <div class="flex gap-3 p-3">
-                <img src="${cov.src}" ${imgFbAttr(cov.fb)} loading="lazy" class="w-16 h-24 rounded-xl object-cover border gold-border shrink-0 bg-black">
-                <div class="flex-1 min-w-0 space-y-1">
-                    <div class="flex items-center gap-1 flex-wrap">
-                        ${t.isCustom ? `<span class="text-[9px] px-1.5 py-0.5 rounded-full bg-pink-500/20 text-pink-500 font-bold">KUSTOM</span>` : ""}
-                        ${t.badge ? `<span class="text-[9px] px-1.5 py-0.5 rounded-full bg-amber-400 text-black font-extrabold">${escHtml(t.badge)}</span>` : ""}
-                        ${t.isHidden ? `<span class="text-[9px] px-1.5 py-0.5 rounded-full bg-red-500/20 text-red-500 font-bold">DISEMBUNYIKAN</span>` : ""}
+    if (currentMasterWorkspace === "gowes_fleet") {
+        box.innerHTML = `
+            <div class="space-y-4">
+                <div class="flex flex-wrap items-center justify-between gap-3">
+                    <div>
+                        <h4 class="text-sm font-extrabold text-emerald-600"><i class="fa-solid fa-bicycle mr-1.5"></i>Manajemen Armada Sepeda</h4>
+                        <p class="text-[11px] app-muted">Atur unit sepeda sewaan, tarif paket, dan ketersediaan garasi.</p>
                     </div>
-                    <h4 class="font-bold text-xs truncate">${escHtml(t.name)}</h4>
-                    <p class="text-[11px] font-extrabold app-accent">${pr.hasDisc ? `<span class="line-through app-muted font-normal mr-1">${fmtRp(pr.origPrice)}</span>` : ""}${fmtRp(pr.price)}</p>
-                    <p class="text-[10px] app-muted truncate">${(t.demoData && t.demoData.title) ? `Contoh: ${escHtml(t.demoData.title)}` : "Contoh bawaan"}</p>
+                    <button type="button" onclick="if(typeof openMasterGowesBikeModal==='function')openMasterGowesBikeModal()" class="gowes-pill-btn px-4 py-2 rounded-xl text-xs shadow">
+                        <i class="fa-solid fa-plus mr-1"></i>+ Tambah Unit Sepeda
+                    </button>
+                </div>
+                <div class="space-y-3">
+                    ${typeof renderGowesBikesAdminList === 'function' ? renderGowesBikesAdminList() : '<p class="text-xs app-muted">Memuat armada...</p>'}
                 </div>
             </div>
-            <div class="grid grid-cols-5 gap-1 p-2 border-t gold-border text-[10px] font-bold">
-                <button onclick="openThemeLivePreview('${esc(t.cat)}','${esc(t.name)}')" class="py-1.5 rounded-lg app-btn-sec" title="Preview"><i class="fa-regular fa-eye"></i></button>
-                <button onclick="openThemeBuilderModal('${esc(t.cat)}','${esc(t.name)}',false)" class="py-1.5 rounded-lg gold-pill-btn col-span-2"><i class="fa-solid fa-pen mr-1"></i>Edit</button>
-                <button onclick="openThemeBuilderModal('${esc(t.cat)}','${esc(t.name)}',true)" class="py-1.5 rounded-lg bg-blue-500/15 text-blue-600" title="Duplikat"><i class="fa-regular fa-copy"></i></button>
-                <button onclick="copyThemeDemoLink('${esc(t.cat)}','${esc(t.name)}')" class="py-1.5 rounded-lg bg-emerald-500/15 text-emerald-600" title="Salin Link Demo"><i class="fa-solid fa-link"></i></button>
-            </div>
-            <div class="px-2 pb-2">
-                ${t.isCustom
-                    ? `<button onclick="deleteCustomTheme('${esc(t.id)}','${esc(t.name)}')" class="w-full py-1.5 rounded-lg bg-red-600/15 text-red-500 text-[10px] font-bold"><i class="fa-solid fa-trash mr-1"></i>Hapus Permanen</button>`
-                    : t.isHidden
-                        ? `<button onclick="toggleHideBuiltInTheme('${esc(t.key)}',false)" class="w-full py-1.5 rounded-lg bg-emerald-600/15 text-emerald-600 text-[10px] font-bold">Pulihkan Tema</button>`
-                        : `<button onclick="toggleHideBuiltInTheme('${esc(t.key)}',true)" class="w-full py-1.5 rounded-lg bg-red-600/10 text-red-500 text-[10px] font-bold">Sembunyikan</button>`}
-            </div>
-        </div>`;
-    }).join("");
-}
-
-function renderMasterWorkspaceContent() {
-    const box = document.getElementById("master-workspace-body"); if (!box) return;
-
-    if (currentMasterWorkspace === "overview") {
-        box.innerHTML = buildMasterAnalyticsHtml();
+        `;
         return;
     }
 
@@ -794,7 +756,7 @@ function renderMasterWorkspaceContent() {
                 <form onsubmit="addTestimonial(event)" class="app-card p-4 rounded-3xl border space-y-2.5 shadow-sm">
                     <h4 class="font-bold text-sm app-accent"><i class="fa-solid fa-star mr-1.5"></i>Tambah Testimoni Beranda</h4>
                     <input type="text" id="t-name" placeholder="Nama Pelanggan" class="app-input" required>
-                    <input type="text" id="t-cat" placeholder="Kategori (Undangan / CV & Lamaran)" class="app-input" required>
+                    <input type="text" id="t-cat" placeholder="Kategori (Undangan / CV & Lamaran / Titik Gowes)" class="app-input" required>
                     <textarea id="t-text" placeholder="Isi testimoni..." class="app-input h-20" required></textarea>
                     <button id="btn-add-testi" class="w-full gold-pill-btn py-2.5 rounded-xl text-xs">+ Tampilkan di Slideshow</button>
                 </form>
@@ -804,7 +766,7 @@ function renderMasterWorkspaceContent() {
     }
 }
 
-// ================= 4. BERANDA PROFIL PUBLIK & DETAIL TERPISAH =================
+// ================= 5. BERANDA PROFIL PUBLIK & DETAIL TERPISAH =================
 function openExpandedAvatarLightbox(imgSrc, labelText = "") {
     const src = imgSrc || DEFAULT_AVATAR;
     let box = document.getElementById("expanded-avatar-overlay");
@@ -866,6 +828,7 @@ function closeSoloStatsModal() {
     _soloFollowersSearch = "";
     _soloProjectSearch = "";
     _soloProjectTypeFilter = "all";
+    _soloProjectDomainFilter = "all";
     const mod = document.getElementById("solo-profile-stats-modal");
     if (mod) mod.classList.add("hide");
 }
@@ -877,7 +840,8 @@ window._restoreSoloStatsFromNav = function (stepObj) {
         targetUsername: _normAdminUserKey(stepObj.targetUsername),
         mode: stepObj.mode || "followers",
         masterCat: stepObj.masterCat || "user",
-        projectCat: stepObj.projectCat || "proses"
+        projectCat: stepObj.projectCat || "proses",
+        projectDomain: stepObj.projectDomain || "all"
     };
     const mod = _ensureSoloStatsModal();
     renderSoloStatsModal();
@@ -897,7 +861,6 @@ function _renderSoloAccountCard(uItem, isFounderOwner = false) {
     const roleLabel = uItem.role === "cabang" ? "Cabang" : uItem.role === "administrasi" ? "Administrasi" : uItem.role === "master" ? "Founder" : "User";
     const isPending = uItem.status && uItem.status !== "Aktif";
 
-    // Aksi Lengkap Pengelolaan Akun di Followers Founder
     const founderActionsHtml = isFounderOwner ? `
         <div class="flex flex-wrap items-center justify-between gap-2 pt-2.5 mt-2 border-t gold-border">
             <div class="flex flex-wrap items-center gap-1.5 text-[11px]">
@@ -943,13 +906,14 @@ function openSoloFollowersModal(targetUsername, fromNav = false) {
         targetUsername: tKey,
         mode: "followers",
         masterCat: "user",
-        projectCat: "proses"
+        projectCat: "proses",
+        projectDomain: "all"
     };
     _soloFollowersSearch = "";
     const mod = _ensureSoloStatsModal();
     renderSoloStatsModal();
     mod.classList.remove("hide");
-    if (!fromNav) _pushAdminNavStep({ type: "solo_stats", targetUsername: tKey, mode: "followers", masterCat: "user", projectCat: "proses" });
+    if (!fromNav) _pushAdminNavStep({ type: "solo_stats", targetUsername: tKey, mode: "followers", masterCat: "user", projectCat: "proses", projectDomain: "all" });
 }
 
 function openSoloFollowingModal(targetUsername, fromNav = false) {
@@ -962,12 +926,13 @@ function openSoloFollowingModal(targetUsername, fromNav = false) {
         targetUsername: tKey,
         mode: "following",
         masterCat: "user",
-        projectCat: "proses"
+        projectCat: "proses",
+        projectDomain: "all"
     };
     const mod = _ensureSoloStatsModal();
     renderSoloStatsModal();
     mod.classList.remove("hide");
-    if (!fromNav) _pushAdminNavStep({ type: "solo_stats", targetUsername: tKey, mode: "following", masterCat: "user", projectCat: "proses" });
+    if (!fromNav) _pushAdminNavStep({ type: "solo_stats", targetUsername: tKey, mode: "following", masterCat: "user", projectCat: "proses", projectDomain: "all" });
 }
 
 function openSoloProjectModal(targetUsername, fromNav = false) {
@@ -980,14 +945,16 @@ function openSoloProjectModal(targetUsername, fromNav = false) {
         targetUsername: tKey,
         mode: "project",
         masterCat: "user",
-        projectCat: "proses"
+        projectCat: "proses",
+        projectDomain: "all"
     };
     _soloProjectSearch = "";
     _soloProjectTypeFilter = "all";
+    _soloProjectDomainFilter = "all";
     const mod = _ensureSoloStatsModal();
     renderSoloStatsModal();
     mod.classList.remove("hide");
-    if (!fromNav) _pushAdminNavStep({ type: "solo_stats", targetUsername: tKey, mode: "project", masterCat: "user", projectCat: "proses" });
+    if (!fromNav) _pushAdminNavStep({ type: "solo_stats", targetUsername: tKey, mode: "project", masterCat: "user", projectCat: "proses", projectDomain: "all" });
 }
 
 function _syncTopSoloStatsNavState() {
@@ -996,6 +963,7 @@ function _syncTopSoloStatsNavState() {
     if (top && top.type === "solo_stats") {
         top.masterCat = window._soloStatsViewState.masterCat;
         top.projectCat = window._soloStatsViewState.projectCat;
+        top.projectDomain = window._soloStatsViewState.projectDomain;
     }
 }
 
@@ -1007,6 +975,13 @@ function setSoloMasterCat(cat) {
 
 function setSoloProjectCat(cat) {
     window._soloStatsViewState.projectCat = cat;
+    _syncTopSoloStatsNavState();
+    renderSoloStatsModal();
+}
+
+function setSoloProjectDomainFilter(domain) {
+    _soloProjectDomainFilter = domain || "all";
+    window._soloStatsViewState.projectDomain = _soloProjectDomainFilter;
     _syncTopSoloStatsNavState();
     renderSoloStatsModal();
 }
@@ -1035,6 +1010,7 @@ function _buildPublicReadOnlyProjectCardHtml(doc) {
     </div>`;
 }
 
+// ================= 6. RENDER MODAL SOLO STATS (FOLLOWERS / FOLLOWING / PROJECT TERPADU) =================
 function renderSoloStatsModal() {
     const st = window._soloStatsViewState;
     const targetObj = (db.users || []).find(u => _normAdminUserKey(u.username) === _normAdminUserKey(st.targetUsername));
@@ -1053,11 +1029,10 @@ function renderSoloStatsModal() {
     if (subBar) { subBar.classList.add("hide"); subBar.innerHTML = ""; }
     if (!bodyEl) return;
 
-    // ================= A. MODE FOLLOWERS =================
+    // A. MODE FOLLOWERS
     if (st.mode === "followers") {
         if (titleEl) titleEl.innerText = "Followers";
 
-        // Privasi Followers: jika pengguna lain melihat dan privasi dimatikan
         if (!isSelf && curU && curU.role !== "master" && curU.role !== "administrasi") {
             const priv = typeof getUserPrivacy === "function" ? getUserPrivacy(targetObj) : { showFollowers: true };
             if (!priv.showFollowers) {
@@ -1072,7 +1047,6 @@ function renderSoloStatsModal() {
             }
         }
 
-        // Followers Founder: Panel Lengkap Pengelolaan Akun (User, Administrasi, Cabang)
         if (isMasterProfile && isSelf) {
             const allNonMaster = (db.users || []).filter(u => u && u.role !== "master");
             const catMap = {
@@ -1094,7 +1068,6 @@ function renderSoloStatsModal() {
 
             if (subBar) {
                 subBar.classList.remove("hide");
-                const pendingCnt = catMap[activeCat].filter(u => u.status !== "Aktif").length;
                 subBar.innerHTML = `
                     <div class="flex items-center gap-2 overflow-x-auto no-scrollbar w-full">
                         <button type="button" onclick="setSoloMasterCat('user')" class="px-3.5 py-1.5 rounded-xl text-xs font-bold whitespace-nowrap ${activeCat === "user" ? "gold-pill-btn" : "app-btn-sec"}">User (${catMap.user.length})</button>
@@ -1131,7 +1104,7 @@ function renderSoloStatsModal() {
         return;
     }
 
-    // ================= B. MODE FOLLOWING =================
+    // B. MODE FOLLOWING
     if (st.mode === "following") {
         if (titleEl) titleEl.innerText = "Following";
 
@@ -1159,107 +1132,164 @@ function renderSoloStatsModal() {
         return;
     }
 
-    // ================= C. MODE PROJECT (VERIFIKASI ORDER & KELOLA LENGKAP) =================
-    if (titleEl) titleEl.innerText = "Project";
-    let allProj = (typeof _getProjectsForUser === "function") ? _getProjectsForUser(targetObj) : [];
+    // C. MODE PROJECT (PEMISAHAN 3 TAB: SEMUA | LEMBARKU | TITIK GOWES)
+    if (titleEl) titleEl.innerText = "Project & Transaksi";
+
     const isStaffScope = targetObj.role === "master" || targetObj.role === "administrasi";
     const isStaffViewer = !!(curU && (curU.role === "master" || curU.role === "administrasi"));
     const isAdminOnlyViewer = !!(curU && curU.role === "administrasi");
 
+    // Ambil dokumen Lembarku
+    let lbkDocs = (typeof _getProjectsForUser === "function") ? _getProjectsForUser(targetObj) : [];
     if (isAdminOnlyViewer) {
-        allProj = allProj.filter(x => !isCabangOwnedDoc(x));
+        lbkDocs = lbkDocs.filter(x => !isCabangOwnedDoc(x));
     }
 
-    // Founder & Tim Administrasi: Pengelolaan Order & Verifikasi Lengkap
+    // Ambil transaksi sewa Titik Gowes
+    let gowesDocs = [];
     if (isStaffScope && isStaffViewer) {
-        let filteredProj = [...allProj];
-        if (_soloProjectTypeFilter === "inv") filteredProj = filteredProj.filter(p => p._kind === "inv");
-        else if (_soloProjectTypeFilter === "pf") filteredProj = filteredProj.filter(p => p._kind === "pf");
+        gowesDocs = Array.isArray(db.gowesRentals) ? db.gowesRentals : [];
+    } else {
+        const uKey = _normAdminUserKey(targetObj.username);
+        gowesDocs = (Array.isArray(db.gowesRentals) ? db.gowesRentals : []).filter(
+            r => _normAdminUserKey(r.customerUsername) === uKey
+        );
+    }
 
-        if (_soloProjectSearch.trim()) {
-            const q = _soloProjectSearch.trim().toLowerCase();
-            filteredProj = filteredProj.filter(p =>
-                String(p.title || "").toLowerCase().includes(q) ||
-                String(p.owner || "").toLowerCase().includes(q) ||
-                String(p.brandName || "").toLowerCase().includes(q)
-            );
-        }
+    // Gabungkan item dengan penanda domain
+    const taggedLbk = lbkDocs.map(d => Object.assign({}, d, { _domain: "lembarku" }));
+    const taggedGowes = gowesDocs.map(r => Object.assign({}, r, { _domain: "gowes", _kind: "gowes_rental" }));
 
-        const prosesList = filteredProj.filter(p => p.status !== "Aktif" || p.pendingRevision);
-        const aktifList = filteredProj.filter(p => p.status === "Aktif" && !p.pendingRevision);
-        const pCat = st.projectCat === "aktif" ? "aktif" : "proses";
-        const shownList = pCat === "aktif" ? aktifList : prosesList;
+    // Terapkan Filter Domain Tab Utama: 'all' | 'lembarku' | 'gowes'
+    let domainFilteredItems = [];
+    if (_soloProjectDomainFilter === "lembarku") {
+        domainFilteredItems = [...taggedLbk];
+    } else if (_soloProjectDomainFilter === "gowes") {
+        domainFilteredItems = [...taggedGowes];
+    } else {
+        domainFilteredItems = [...taggedLbk, ...taggedGowes];
+    }
 
-        if (subBar) {
-            subBar.classList.remove("hide");
-            subBar.innerHTML = `
-                <div class="flex items-center gap-2 overflow-x-auto no-scrollbar w-full">
-                    <button type="button" onclick="setSoloProjectCat('proses')" class="px-3.5 py-1.5 rounded-xl text-xs font-bold whitespace-nowrap ${pCat === "proses" ? "gold-pill-btn" : "app-btn-sec"}">Proses / Revisi (${prosesList.length})</button>
-                    <button type="button" onclick="setSoloProjectCat('aktif')" class="px-3.5 py-1.5 rounded-xl text-xs font-bold whitespace-nowrap ${pCat === "aktif" ? "gold-pill-btn" : "app-btn-sec"}">Aktif (${aktifList.length})</button>
+    // Terapkan Filter Tipe Berkas Lembarku
+    if (_soloProjectTypeFilter === "inv") {
+        domainFilteredItems = domainFilteredItems.filter(p => p._kind === "inv");
+    } else if (_soloProjectTypeFilter === "pf") {
+        domainFilteredItems = domainFilteredItems.filter(p => p._kind === "pf");
+    }
+
+    // Terapkan Pencarian Teks
+    if (_soloProjectSearch.trim()) {
+        const q = _soloProjectSearch.trim().toLowerCase();
+        domainFilteredItems = domainFilteredItems.filter(p => {
+            const t = String(p.title || p.bikeName || "").toLowerCase();
+            const o = String(p.owner || p.customerUsername || "").toLowerCase();
+            const b = String(p.brandName || "").toLowerCase();
+            return t.includes(q) || o.includes(q) || b.includes(q);
+        });
+    }
+
+    // Pemisahan Status Proses/Verifikasi vs Aktif/Selesai
+    const isGowesProcess = (r) => r.status === "Menunggu Pembayaran" || r.status === "Menunggu Verifikasi" || r.status === "Terkonfirmasi" || r.status === "Sedang Digunakan";
+    const isLbkProcess = (p) => p.status !== "Aktif" || !!p.pendingRevision;
+
+    const prosesItems = domainFilteredItems.filter(item => item._domain === "gowes" ? isGowesProcess(item) : isLbkProcess(item));
+    const aktifItems = domainFilteredItems.filter(item => item._domain === "gowes" ? !isGowesProcess(item) : !isLbkProcess(item));
+
+    const pCat = st.projectCat === "aktif" ? "aktif" : "proses";
+    const shownItems = pCat === "aktif" ? aktifItems : prosesItems;
+
+    // SUBBAR DENGAN 3 TAB FILTER DOMAIN + TAB STATUS
+    if (subBar) {
+        subBar.classList.remove("hide");
+        const countLbk = taggedLbk.length;
+        const countGws = taggedGowes.length;
+        const countAll = countLbk + countGws;
+
+        subBar.innerHTML = `
+            <div class="flex flex-col gap-2 w-full">
+                <!-- 1. Pemisah Domain Layanan: Semua | Lembarku | Titik Gowes -->
+                <div class="flex items-center gap-1.5 overflow-x-auto no-scrollbar">
+                    <button type="button" onclick="setSoloProjectDomainFilter('all')" class="px-3 py-1.5 rounded-xl text-xs font-extrabold whitespace-nowrap transition ${_soloProjectDomainFilter === 'all' ? 'gold-pill-btn shadow' : 'app-btn-sec'}">
+                        Semua Layanan (${countAll})
+                    </button>
+                    <button type="button" onclick="setSoloProjectDomainFilter('lembarku')" class="px-3 py-1.5 rounded-xl text-xs font-extrabold whitespace-nowrap transition ${_soloProjectDomainFilter === 'lembarku' ? 'gold-pill-btn shadow' : 'app-btn-sec'}">
+                        <i class="fa-solid fa-file-pdf mr-1"></i>Berkas Lembarku (${countLbk})
+                    </button>
+                    <button type="button" onclick="setSoloProjectDomainFilter('gowes')" class="px-3 py-1.5 rounded-xl text-xs font-extrabold whitespace-nowrap transition ${_soloProjectDomainFilter === 'gowes' ? 'gowes-pill-btn shadow' : 'app-btn-sec'}">
+                        <i class="fa-solid fa-bicycle mr-1"></i>Titik Gowes (${countGws})
+                    </button>
                 </div>
-            `;
-        }
 
-        const controlsHtml = `
-            <div class="space-y-2 mb-2">
-                <div class="flex flex-col sm:flex-row gap-2">
-                    <input type="text" value="${esc(_soloProjectSearch)}" oninput="_soloProjectSearch=this.value;renderSoloStatsModal();" placeholder="Cari judul proyek atau @username..." class="app-input !py-2 text-xs flex-1">
-                    <div class="flex gap-1.5 overflow-x-auto">
-                        <button type="button" onclick="setSoloProjectTypeFilter('all')" class="px-3 py-1.5 rounded-xl text-[11px] font-bold ${_soloProjectTypeFilter==='all'?'gold-pill-btn':'app-btn-sec'}">Semua</button>
-                        <button type="button" onclick="setSoloProjectTypeFilter('inv')" class="px-3 py-1.5 rounded-xl text-[11px] font-bold ${_soloProjectTypeFilter==='inv'?'gold-pill-btn':'app-btn-sec'}">Undangan</button>
-                        <button type="button" onclick="setSoloProjectTypeFilter('pf')" class="px-3 py-1.5 rounded-xl text-[11px] font-bold ${_soloProjectTypeFilter==='pf'?'gold-pill-btn':'app-btn-sec'}">CV &amp; Lamaran</button>
-                    </div>
+                <!-- 2. Pemisah Status Transaksi: Proses vs Aktif/Selesai -->
+                <div class="flex items-center gap-1.5 overflow-x-auto no-scrollbar pt-1 border-t gold-border">
+                    <button type="button" onclick="setSoloProjectCat('proses')" class="px-3 py-1 rounded-lg text-[11px] font-bold whitespace-nowrap ${pCat === 'proses' ? 'bg-amber-500/20 text-amber-600 border border-amber-500/40' : 'app-btn-sec'}">
+                        ● Antrean / Proses (${prosesItems.length})
+                    </button>
+                    <button type="button" onclick="setSoloProjectCat('aktif')" class="px-3 py-1 rounded-lg text-[11px] font-bold whitespace-nowrap ${pCat === 'aktif' ? 'bg-emerald-500/20 text-emerald-600 border border-emerald-500/40' : 'app-btn-sec'}">
+                        ✓ Aktif / Selesai (${aktifItems.length})
+                    </button>
                 </div>
             </div>
         `;
+    }
 
-        bodyEl.innerHTML = controlsHtml + (shownList.length
-            ? shownList.map(doc => buildFullOrderCardHtml(doc, {
-                isStaffMode: isAdminOnlyViewer,
-                closeModalBeforeAction: true
-            })).join("")
-            : `<div class="app-card border border-dashed rounded-3xl p-8 text-center text-xs app-muted">Tidak ada proyek pada status ini.</div>`);
+    // Kontrol Pencarian & Filter Sub-Tipe Berkas Lembarku
+    const typeFilterControls = _soloProjectDomainFilter !== "gowes" ? `
+        <div class="flex gap-1.5 overflow-x-auto shrink-0">
+            <button type="button" onclick="setSoloProjectTypeFilter('all')" class="px-2.5 py-1.5 rounded-xl text-[11px] font-bold ${_soloProjectTypeFilter==='all'?'gold-pill-btn':'app-btn-sec'}">Semua</button>
+            <button type="button" onclick="setSoloProjectTypeFilter('inv')" class="px-2.5 py-1.5 rounded-xl text-[11px] font-bold ${_soloProjectTypeFilter==='inv'?'gold-pill-btn':'app-btn-sec'}">Undangan</button>
+            <button type="button" onclick="setSoloProjectTypeFilter('pf')" class="px-2.5 py-1.5 rounded-xl text-[11px] font-bold ${_soloProjectTypeFilter==='pf'?'gold-pill-btn':'app-btn-sec'}">CV &amp; Lamaran</button>
+        </div>
+    ` : "";
+
+    const controlsHtml = `
+        <div class="space-y-2 mb-2">
+            <div class="flex flex-col sm:flex-row gap-2">
+                <input type="text" value="${esc(_soloProjectSearch)}" oninput="_soloProjectSearch=this.value;renderSoloStatsModal();" placeholder="Cari pesanan berkas atau booking sepeda..." class="app-input !py-2 text-xs flex-1">
+                ${typeFilterControls}
+            </div>
+        </div>
+    `;
+
+    // Render Kartu Pesanan Berdasarkan Peran & Domain
+    if (!shownItems.length) {
+        bodyEl.innerHTML = controlsHtml + `
+            <div class="app-card border border-dashed rounded-3xl p-8 text-center text-xs app-muted">
+                Tidak ada pesanan atau proyek pada kategori ini.
+            </div>
+        `;
         return;
     }
 
-    if (isStaffViewer) {
-        bodyEl.innerHTML = allProj.length
-            ? allProj.map(doc => buildFullOrderCardHtml(doc, {
-                isStaffMode: isAdminOnlyViewer,
-                closeModalBeforeAction: true
-            })).join("")
-            : `<div class="app-card border border-dashed rounded-3xl p-8 text-center text-xs app-muted">Belum ada project yang dibuat.</div>`;
-        return;
-    }
-
-    if (isSelf) {
-        bodyEl.innerHTML = allProj.length
-            ? allProj.map(doc => buildUserOwnProjectCardHtml(doc, curU.role === "cabang")).join("")
-            : `<div class="app-card border border-dashed rounded-3xl p-8 text-center text-xs app-muted">Belum ada project yang dibuat.</div>`;
-        return;
-    }
-
-    // Pengunjung Publik: Periksa Privasi Postingan/Dokumen
-    if (targetObj.role !== "cabang") {
-        const priv = typeof getUserPrivacy === "function" ? getUserPrivacy(targetObj) : { showProjects: true };
-        if (!priv.showProjects) {
-            bodyEl.innerHTML = `
-                <div class="app-card border rounded-3xl p-8 text-center space-y-2 mt-4">
-                    <i class="fa-solid fa-lock text-3xl app-accent"></i>
-                    <h4 class="font-extrabold text-sm">Daftar Project Disembunyikan</h4>
-                    <p class="text-xs app-muted">Pengguna ini memilih untuk merahasiakan postingan dokumen dari publik.</p>
-                </div>
-            `;
-            return;
+    bodyEl.innerHTML = controlsHtml + shownItems.map(item => {
+        if (item._domain === "gowes") {
+            // Render kartu sewa Titik Gowes
+            if (isStaffViewer) {
+                return typeof buildGowesOrderCardHtml === "function"
+                    ? buildGowesOrderCardHtml(item, { isStaffMode: isAdminOnlyViewer, closeModalBeforeAction: true })
+                    : `<div class="p-3 app-card border rounded-xl">${item.bikeName}</div>`;
+            } else {
+                return typeof buildUserRentalCardHtml === "function"
+                    ? buildUserRentalCardHtml(item)
+                    : `<div class="p-3 app-card border rounded-xl">${item.bikeName}</div>`;
+            }
+        } else {
+            // Render kartu berkas digital Lembarku
+            if (isStaffViewer) {
+                return buildFullOrderCardHtml(item, {
+                    isStaffMode: isAdminOnlyViewer,
+                    closeModalBeforeAction: true
+                });
+            } else if (isSelf) {
+                return buildUserOwnProjectCardHtml(item, curU.role === "cabang");
+            } else {
+                return _buildPublicReadOnlyProjectCardHtml(item);
+            }
         }
-    }
-
-    const publicActiveProj = allProj.filter(p => p && p.status === "Aktif");
-    bodyEl.innerHTML = publicActiveProj.length
-        ? publicActiveProj.map(_buildPublicReadOnlyProjectCardHtml).join("")
-        : `<div class="app-card border border-dashed rounded-3xl p-8 text-center text-xs app-muted">Belum ada project publik aktif.</div>`;
+    }).join("");
 }
 
+// ================= 7. DETAIL PROFIL PUBLIK PENGGUNA =================
 function viewUserProfileModal(username, fromNav = false) {
     const cleanU = _normAdminUserKey(username);
     const u = (db.users || []).find(x => _normAdminUserKey(x.username) === cleanU);
@@ -1357,7 +1387,6 @@ function viewUserProfileModal(username, fromNav = false) {
 
     const gridColsClass = isCabangProfile ? "grid-cols-1" : "grid-cols-3";
 
-    // Tombol Blokir / Buka Blokir
     const canBlock = !isSelf && curU && curU.role !== "cabang" && u.role !== "master";
     const blockBtnHtml = canBlock ? `
         <button type="button" onclick="toggleBlockTargetUser('${esc(cleanU)}')" class="w-full py-2 rounded-2xl text-xs font-bold transition border ${isBlocked ? "bg-red-600/15 text-red-500 border-red-500/40" : "app-btn-sec"}">
@@ -1444,8 +1473,10 @@ function closeUserProfileModalCustom() {
     }
 }
 
+// ================= 8. AKUN KENDALI CEPAT (PRO, TOPUP, EDIT & HAPUS) =================
 async function toggleUserProQuick(uname, btn, reopenModal = false) {
-    const u = (db.users || []).find(x => _normAdminUserKey(x.username) === _normAdminUserKey(uname)); if (!u) return;
+    const u = (db.users || []).find(x => _normAdminUserKey(x.username) === _normAdminUserKey(uname));
+    if (!u) return;
     setBtnLoading(btn, true, "...");
     const nextPro = !u.isPro;
     await apiAction({ action: "upsert_user", oldUsername: u.username, user: Object.assign({}, u, { isPro: nextPro }) });
@@ -1475,11 +1506,13 @@ function openMasterUserModal(username = null, defaultRole = "user") {
 }
 
 async function submitMasterUserModal(e) {
-    e.preventDefault(); setBtnLoading("btn-mmu-save", true, "Menyimpan...");
+    e.preventDefault();
+    setBtnLoading("btn-mmu-save", true, "Menyimpan...");
     const oldU = document.getElementById("mmu-old-username").value;
     const roleVal = document.getElementById("mmu-role").value;
     const payload = {
-        role: roleVal, status: document.getElementById("mmu-status").value,
+        role: roleVal,
+        status: document.getElementById("mmu-status").value,
         isPro: document.getElementById("mmu-is-pro").checked,
         name: document.getElementById("mmu-name").value.trim(),
         username: document.getElementById("mmu-username").value.trim().toLowerCase(),
@@ -1500,7 +1533,8 @@ async function submitMasterUserModal(e) {
 }
 
 async function approveUserRealTime(uname, btn) {
-    const u = db.users.find(x => _normAdminUserKey(x.username) === _normAdminUserKey(uname)); if (!u) return;
+    const u = db.users.find(x => _normAdminUserKey(x.username) === _normAdminUserKey(uname));
+    if (!u) return;
     setBtnLoading(btn, true, "...");
     await apiAction({ action: "upsert_user", oldUsername: u.username, user: Object.assign({}, u, { status: "Aktif" }) });
     renderMasterHeaderStats();
@@ -1527,9 +1561,11 @@ async function topUpCabangRealTime(uname, amt, btn, reopenModal = false) {
     showToast(`+${amt} kuota ditambahkan!`);
 }
 
-// ================= 5. BANNER PROMOSI & HARGA CV =================
+// ================= 9. BANNER PROMOSI & HARGA CV =================
 function pickCroppedPromoBanner(inp) {
-    const file = inp.files[0]; if (!file) return; inp.value = "";
+    const file = inp.files[0];
+    if (!file) return;
+    inp.value = "";
     openImageCropper(file, 12 / 4.4, "Crop Banner Promosi (12 : 4.4)", 1200, 440, async (dataUrl) => {
         showLoading("Mengunggah banner promosi...");
         const up = await apiAction({ action: "upload_media", dataUrl, prefix: "promo_banner" });
@@ -1545,12 +1581,16 @@ function pickCroppedPromoBanner(inp) {
 
 function resetPromoBannerForm() {
     pbTempUploadedImg = "";
-    ["pb-id","pb-badge","pb-cta","pb-title","pb-sub","pb-img-url"].forEach(id => { const el = document.getElementById(id); if (el) el.value = ""; });
+    ["pb-id","pb-badge","pb-cta","pb-title","pb-sub","pb-img-url"].forEach(id => {
+        const el = document.getElementById(id);
+        if (el) el.value = "";
+    });
     document.getElementById("pb-preview-img").src = IMG("1519741497674-611481863552");
 }
 
 async function savePromoBannerForm(e) {
-    e.preventDefault(); setBtnLoading("btn-save-pb", true, "Menyimpan...");
+    e.preventDefault();
+    setBtnLoading("btn-save-pb", true, "Menyimpan...");
     const idVal = document.getElementById("pb-id").value;
     const tgt = document.getElementById("pb-target").value;
     const img = pbTempUploadedImg || document.getElementById("pb-img-url").value.trim() || document.getElementById("pb-preview-img").src || IMG("1519741497674-611481863552");
@@ -1566,17 +1606,22 @@ async function savePromoBannerForm(e) {
     };
     const list = [...(db.promoBanners || [])];
     const idx = list.findIndex(x => String(x.id) === String(slide.id));
-    if (idx >= 0) list[idx] = slide; else list.push(slide);
+    if (idx >= 0) list[idx] = slide;
+    else list.push(slide);
     db.promoBanners = list;
     idbSet("db_snapshot", db);
     const res = await apiAction({ action: "update_section", section: "promoBanners", value: list });
     setBtnLoading("btn-save-pb", false);
-    if (res && res.ok) { pbTempUploadedImg = ""; renderMasterWorkspaceContent(); showToast("Banner promosi beranda tersimpan permanen!"); }
-    else showToast("Gagal menyimpan banner.", "error");
+    if (res && res.ok) {
+        pbTempUploadedImg = "";
+        renderMasterWorkspaceContent();
+        showToast("Banner promosi beranda tersimpan permanen!");
+    } else showToast("Gagal menyimpan banner.", "error");
 }
 
 function editPromoBannerItem(i) {
-    const b = (db.promoBanners || [])[i]; if (!b) return;
+    const b = (db.promoBanners || [])[i];
+    if (!b) return;
     pbTempUploadedImg = "";
     document.getElementById("pb-id").value = b.id;
     document.getElementById("pb-badge").value = b.badge || "";
@@ -1591,10 +1636,13 @@ function editPromoBannerItem(i) {
 
 async function deletePromoBannerItem(i) {
     if ((db.promoBanners || []).length <= 1) return showToast("Minimal harus menyisakan 1 banner promosi.", "info");
-    const list = [...(db.promoBanners || [])]; list.splice(i, 1);
+    const list = [...(db.promoBanners || [])];
+    list.splice(i, 1);
     db.promoBanners = list;
-    showLoading("Menghapus banner..."); await apiAction({ action: "update_section", section: "promoBanners", value: list });
-    hideLoading(); renderMasterWorkspaceContent();
+    showLoading("Menghapus banner...");
+    await apiAction({ action: "update_section", section: "promoBanners", value: list });
+    hideLoading();
+    renderMasterWorkspaceContent();
 }
 
 async function saveCvThemePrice(themeId, btn) {
@@ -1610,7 +1658,7 @@ async function saveCvThemePrice(themeId, btn) {
     showToast("Harga desain CV / Lamaran diperbarui permanen!");
 }
 
-// ================= 6. VISUAL THEME BUILDER =================
+// ================= 10. VISUAL THEME BUILDER =================
 function copyThemeDemoLink(cat, themeName) {
     navigator.clipboard.writeText(`${getCleanBaseUrl()}?demo=${encodeURIComponent(cat)}&theme=${encodeURIComponent(themeName)}`);
     showToast(`Link Demo "${themeName}" disalin!`);
@@ -1632,7 +1680,8 @@ function renderThemeBuilderPhotoSlots() {
         { key:"g2", label:"Galeri Polaroid #2", fb:IMG("1511285560929-80b456fea0bc") },
         { key:"g3", label:"Galeri Polaroid #3", fb:IMG("1522673607200-164d1b6ce486") }
     ];
-    const grid = document.getElementById("tb-photo-slots-grid"); if (!grid) return;
+    const grid = document.getElementById("tb-photo-slots-grid");
+    if (!grid) return;
     grid.innerHTML = slots.map(s => {
         const cur = tbPhotosDraft[s.key] || "";
         return `<div class="app-card-soft border rounded-2xl p-2.5 text-center space-y-2 relative">
@@ -1651,7 +1700,9 @@ function clearThemeBuilderPhoto(slotKey) {
 }
 
 function pickThemeBuilderPhoto(inp, slotKey) {
-    const file = inp.files[0]; if (!file) return; inp.value = "";
+    const file = inp.files[0];
+    if (!file) return;
+    inp.value = "";
     const isCover = slotKey === "cover";
     openImageCropper(file, isCover ? 9 / 16 : 4 / 5, isCover ? "Sampul Utama Tema (9:16)" : `Foto Template (${slotKey})`, isCover ? 720 : 640, isCover ? 1280 : 800, async (dataUrl) => {
         showLoading("Mengunggah foto template...");
@@ -1717,7 +1768,8 @@ function openThemeBuilderModal(cat = null, themeName = null, isDuplicate = false
     liveImg.onerror = function() { if (this.dataset.fb && this.src !== this.dataset.fb) { this.src = this.dataset.fb; this.dataset.fb = ""; } };
     liveImg.src = tbPhotosDraft.cover || cov.src;
 
-    switchThemeBuilderTab("design"); updateThemeBuilderPreview();
+    switchThemeBuilderTab("design");
+    updateThemeBuilderPreview();
     document.getElementById("modal-theme-builder").classList.remove("hide");
     _pushAdminNavStep({ type: "modal", id: "modal-theme-builder" });
 }
@@ -1729,8 +1781,12 @@ function closeThemeBuilderModal() {
 
 function applyQuickColorPalette(key) {
     const map = { maroon:{bg:"#5c0a12",card:"#4a080f",text:"#fdf6ec",accent:"#f3d285"}, black:{bg:"#070709",card:"#121216",text:"#f4f4f5",accent:"#ffffff"}, emerald:{bg:"#04362a",card:"#074738",text:"#ecfdf5",accent:"#facc15"}, ivory:{bg:"#f7f4ef",card:"#ffffff",text:"#3b352f",accent:"#8c7658"}, navy:{bg:"#172433",card:"#1f3146",text:"#f1f5f9",accent:"#dbeafe"} };
-    const p = map[key]; if (!p) return;
-    document.getElementById("tb-c-bg").value = p.bg; document.getElementById("tb-c-card").value = p.card; document.getElementById("tb-c-text").value = p.text; document.getElementById("tb-c-accent").value = p.accent;
+    const p = map[key];
+    if (!p) return;
+    document.getElementById("tb-c-bg").value = p.bg;
+    document.getElementById("tb-c-card").value = p.card;
+    document.getElementById("tb-c-text").value = p.text;
+    document.getElementById("tb-c-accent").value = p.accent;
     updateThemeBuilderPreview();
 }
 
@@ -1777,20 +1833,29 @@ async function submitVisualThemeBuilder(e) {
     } else {
         const list = [...(db.customThemes || [])];
         themeData.img = cleanDemoPhotos.cover || IMG("1519741497674-611481863552");
-        if (idVal) { const idx = list.findIndex(x => String(x.id) === String(idVal)); if (idx >= 0) list[idx] = Object.assign({}, list[idx], themeData, { id: list[idx].id }); else list.unshift(Object.assign({ id: Date.now() }, themeData)); }
-        else list.unshift(Object.assign({ id: Date.now() }, themeData));
+        if (idVal) {
+            const idx = list.findIndex(x => String(x.id) === String(idVal));
+            if (idx >= 0) list[idx] = Object.assign({}, list[idx], themeData, { id: list[idx].id });
+            else list.unshift(Object.assign({ id: Date.now() }, themeData));
+        } else list.unshift(Object.assign({ id: Date.now() }, themeData));
         db.customThemes = list;
         idbSet("db_snapshot", db);
         await apiAction({ action: "update_section", section: "customThemes", value: list });
     }
-    setBtnLoading("btn-tb-save", false); closeThemeBuilderModal(); renderMasterHeaderStats(); renderMasterWorkspaceContent();
+    setBtnLoading("btn-tb-save", false);
+    closeThemeBuilderModal();
+    renderMasterHeaderStats();
+    renderMasterWorkspaceContent();
     showToast(`Tema "${name}" tersimpan permanen!`);
 }
 
 async function deleteCustomTheme(id, name) {
     if (!(await showConfirm("Hapus Tema", `Hapus permanen tema "${name}"?`, "fa-solid fa-trash", "Ya, Hapus"))) return;
-    showLoading("Menghapus..."); await apiAction({ action: "update_section", section: "customThemes", value: (db.customThemes || []).filter(t => String(t.id) !== String(id)) });
-    hideLoading(); renderMasterWorkspaceContent(); showToast("Tema dihapus.", "info");
+    showLoading("Menghapus...");
+    await apiAction({ action: "update_section", section: "customThemes", value: (db.customThemes || []).filter(t => String(t.id) !== String(id)) });
+    hideLoading();
+    renderMasterWorkspaceContent();
+    showToast("Tema dihapus.", "info");
 }
 
 async function toggleHideBuiltInTheme(key, hideIt) {
@@ -1799,13 +1864,17 @@ async function toggleHideBuiltInTheme(key, hideIt) {
     if (hideIt && !hid.includes(key)) hid.push(key);
     if (!hideIt) hid = hid.filter(k => k !== key);
     await apiAction({ action: "update_section", section: "hiddenThemes", value: hid });
-    hideLoading(); renderMasterWorkspaceContent(); showToast(hideIt ? "Tema disembunyikan." : "Tema dipulihkan!");
+    hideLoading();
+    renderMasterWorkspaceContent();
+    showToast(hideIt ? "Tema disembunyikan." : "Tema dipulihkan!");
 }
 
-// ================= 7. REKENING, QRIS DANA, MUSIK & TESTIMONI =================
+// ================= 11. REKENING, QRIS DANA, MUSIK & TESTIMONI =================
 function addMasterBankRow(bk = "BCA", no = "", holder = "") {
-    const box = document.getElementById("ms-banks-container"); if (!box) return;
-    const div = document.createElement("div"); div.className = "app-card-soft border rounded-xl p-2.5 space-y-2 ms-bank-row";
+    const box = document.getElementById("ms-banks-container");
+    if (!box) return;
+    const div = document.createElement("div");
+    div.className = "app-card-soft border rounded-xl p-2.5 space-y-2 ms-bank-row";
     div.innerHTML = `<div class="flex gap-1.5 items-center"><select class="ms-bk app-input !py-1.5 font-bold flex-1">${Object.keys(BANK_LOGOS).map(k => `<option value="${k}" ${k===bk?"selected":""}>${k}</option>`).join("")}</select><button type="button" onclick="removeMasterBankRow(this)" class="px-2.5 py-1.5 rounded-lg bg-red-600/15 text-red-500 text-xs"><i class="fa-solid fa-trash"></i></button></div><input type="text" value="${esc(no)}" placeholder="No. Rekening / DANA" class="ms-no app-input !py-1.5"><input type="text" value="${esc(holder)}" placeholder="Atas Nama" class="ms-ho app-input !py-1.5">`;
     box.appendChild(div);
 }
@@ -1830,7 +1899,9 @@ async function uploadMasterQRIS(inp) {
 
 async function saveMasterSettings() {
     const banks = Array.from(document.querySelectorAll(".ms-bank-row")).map(r => ({
-        bank: r.querySelector(".ms-bk").value, no: r.querySelector(".ms-no").value.trim(), holder: r.querySelector(".ms-ho").value.trim()
+        bank: r.querySelector(".ms-bk").value,
+        no: r.querySelector(".ms-no").value.trim(),
+        holder: r.querySelector(".ms-ho").value.trim()
     })).filter(b => b.no);
     if (!banks.length) return showToast("Isi minimal 1 nomor rekening.", "error");
     const qrisMode = document.getElementById("ms-qris-mode").value;
@@ -1840,11 +1911,17 @@ async function saveMasterSettings() {
     }
     setBtnLoading("btn-save-qris", true, "Menyimpan...");
     await apiAction({
-        action: "update_section", section: "masterSettings",
+        action: "update_section",
+        section: "masterSettings",
         value: Object.assign({}, db.masterSettings, {
-            banks, bankName: banks[0].bank, bankNo: banks[0].no, bankHolder: banks[0].holder,
+            banks,
+            bankName: banks[0].bank,
+            bankNo: banks[0].no,
+            bankHolder: banks[0].holder,
             priceText: document.getElementById("ms-p").value.trim(),
-            qrisMode, qrisDynamicString, qrisUniqueCode: document.getElementById("ms-qris-unique").checked
+            qrisMode,
+            qrisDynamicString,
+            qrisUniqueCode: document.getElementById("ms-qris-unique").checked
         })
     });
     setBtnLoading("btn-save-qris", false);
