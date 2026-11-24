@@ -1,7 +1,8 @@
 // =========================================================================
-// MR UNDANGAN — CORE CONFIG, CATALOGS, CROPPER & CLOUD ENGINE (js/config.js)
+// LEMBARKU — CORE CONFIG, CATALOGS, CROPPER & CLOUD ENGINE (js/config.js)
 // =========================================================================
 const CLOUD_API_URL = "https://script.google.com/macros/s/AKfycbyHsITJ02tiA59p0QIXkOQaO3VnBFQmDBp-7iUHcUkmrYjlOtRVwxhlGZCzL4RLKKNW/exec";
+const FOUNDER_USERNAME = "kausar.af";
 
 const SESSION_KEY = "MR_UNDANGAN_SESSION";
 const SESSION_TOKEN_KEY = "MR_UNDANGAN_SESSION_TOKEN";
@@ -256,13 +257,17 @@ function getLocalFallbackDB() {
             qrisDynamicString: "",
             qrisUniqueCode: true,
             priceText: "Rp 99.000",
-            banks: [{ bank: "DANA", no: "085117488828", holder: "Kausar.pictures" }]
+            banks: [{ bank: "DANA", no: "085117488828", holder: "Lembarku" }]
         }
     };
 }
 
 let db = getLocalFallbackDB();
 let currentSessionUser = localStorage.getItem(SESSION_KEY) || null;
+if (currentSessionUser && String(currentSessionUser).trim().toLowerCase() === "master") {
+    currentSessionUser = FOUNDER_USERNAME;
+    localStorage.setItem(SESSION_KEY, FOUNDER_USERNAME);
+}
 let currentSessionToken = localStorage.getItem(SESSION_TOKEN_KEY) || "";
 let guestChatId = localStorage.getItem(GUEST_CHAT_KEY);
 if (!guestChatId) {
@@ -406,20 +411,26 @@ function cycleAppThemeQuick() {
 // ================= HELPER USER, TEMA, HARGA, FAVORIT =================
 function getCurrentUserObj() {
     if (!currentSessionUser) return null;
-    return (db.users || []).find(u => String(u.username || "").toLowerCase() === String(currentSessionUser).toLowerCase()) || null;
+    const curKey = String(currentSessionUser).trim().toLowerCase();
+    const targetKey = curKey === "master" ? FOUNDER_USERNAME : curKey;
+    return (db.users || []).find(u => String(u.username || "").trim().toLowerCase() === targetKey)
+        || (curKey === "master" || curKey === FOUNDER_USERNAME
+            ? (db.users || []).find(u => String(u.role || "").toLowerCase() === "master")
+            : null)
+        || null;
 }
 
 function getMasterBanksList() {
     const ms = db.masterSettings || {};
     if (Array.isArray(ms.banks) && ms.banks.length) return ms.banks;
-    if (ms.bankNo) return [{ bank: ms.bankName || "DANA", no: ms.bankNo, holder: ms.bankHolder || "Mr Undangan" }];
-    return [{ bank: "DANA", no: "085117488828", holder: "Kausar.pictures" }];
+    if (ms.bankNo) return [{ bank: ms.bankName || "DANA", no: ms.bankNo, holder: ms.bankHolder || "Lembarku" }];
+    return [{ bank: "DANA", no: "085117488828", holder: "Lembarku" }];
 }
 
 function getInvBrandInfo(inv) {
     const b = (inv && inv.brandName && String(inv.brandName).trim()) ? String(inv.brandName).trim() : "";
-    if (b) return { topLabel: b, footerMain: b, footerSub: "Powered by Mr Undangan", waFooter: `${b} — Powered by Mr Undangan` };
-    return { topLabel: "MR UNDANGAN", footerMain: "Mr Undangan", footerSub: "Powered by Kausar.pictures", waFooter: "Mr Undangan — Powered by Kausar.pictures" };
+    if (b) return { topLabel: b, footerMain: b, footerSub: "Powered by Lembarku", waFooter: `${b} — Powered by Lembarku` };
+    return { topLabel: "LEMBARKU", footerMain: "Lembarku", footerSub: "", waFooter: "Lembarku" };
 }
 
 function deepCloneSafe(obj) {
