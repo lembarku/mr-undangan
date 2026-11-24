@@ -1,5 +1,5 @@
 // =========================================================================
-// MR UNDANGAN — SOROTAN ALBUM & BRANKAS RAHASIA ALA GALERI iPHONE (js/vault.js)
+// LEMBARKU — SOROTAN ALBUM & BRANKAS RAHASIA ALA GALERI iPHONE (js/vault.js)
 // =========================================================================
 const vaultCache = {};
 let activeVaultOwner = "";
@@ -108,7 +108,7 @@ function openAlbumFormModal(type, editAlb = null) {
         : (isSecret ? "Buat Album Rahasia Baru" : "Tautkan Link Google Drive");
     document.getElementById("af-id").value = editAlb ? editAlb.id : "";
     document.getElementById("af-type").value = type;
-    document.getElementById("af-cover-prev").src = afTempCoverUrl || "./logo.png";
+    document.getElementById("af-cover-prev").src = afTempCoverUrl || "./lembarku-logo.png";
     document.getElementById("af-name").value = editAlb ? (editAlb.title || "") : "";
     document.getElementById("af-drive-url").value = editAlb ? (editAlb.driveUrl || "") : "";
 
@@ -217,7 +217,7 @@ function handleHighlightClick(uname, albId) {
             const covEl = document.getElementById("da-modal-cover");
             const titEl = document.getElementById("da-modal-title");
             const editBtn = document.getElementById("da-modal-edit-btn");
-            if (covEl) covEl.src = alb.cover || "./logo.png";
+            if (covEl) covEl.src = alb.cover || "./lembarku-logo.png";
             if (titEl) titEl.innerText = alb.title || "Album Google Drive";
             if (editBtn) editBtn.classList.toggle("hide", !(isOwner || isMaster));
             modal.classList.remove("hide");
@@ -280,7 +280,7 @@ async function verifySecretAlbumPin() {
         document.getElementById("modal-pin-gate").classList.add("hide");
         openSecretAlbumViewer(uname, alb.id);
     } else {
-        showToast((res && res.message) || "PIN salah! Coba lagi atau ajukan bantuan ke Master Admin.", "error");
+        showToast((res && res.message) || "PIN salah! Coba lagi atau ajukan bantuan ke Founder.", "error");
         if (pinInp) pinInp.value = "";
     }
 }
@@ -288,12 +288,12 @@ async function verifySecretAlbumPin() {
 async function requestPinResetToMaster() {
     if (!pendingPinAlbum) return;
     const { uname, alb } = pendingPinAlbum;
-    showLoading("Mengirim pengajuan lupa PIN ke Master Admin...");
+    showLoading("Mengirim pengajuan lupa PIN ke Founder...");
     const res = await apiAction({ action: "request_pin_reset", username: uname, albumTitle: alb.title });
     hideLoading();
     document.getElementById("modal-pin-gate").classList.add("hide");
     if (res && res.ok) {
-        showToast("Pengajuan lupa PIN terkirim ke Live Chat Master Admin!", "info");
+        showToast("Pengajuan lupa PIN terkirim ke Live Chat Founder!", "info");
         if (typeof openFullChatOverlay === "function") openFullChatOverlay();
     } else showToast("Gagal mengirim pengajuan.", "error");
 }
