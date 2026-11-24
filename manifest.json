@@ -1,6 +1,6 @@
 {
-  "name": "Mr Undangan — Kausar.pictures",
-  "short_name": "Mr Undangan",
+  "name": "Lembarku",
+  "short_name": "Lembarku",
   "description": "Buat undangan digital elegan, CV, surat lamaran kerja siap PDF, dan brankas album pribadi langsung dari HP.",
   "start_url": "./",
   "scope": "./",
@@ -10,13 +10,13 @@
   "theme_color": "#f3f4f6",
   "icons": [
     {
-      "src": "./logo.png",
+      "src": "./lembarku-logo.png",
       "sizes": "192x192",
       "type": "image/png",
       "purpose": "any maskable"
     },
     {
-      "src": "./logo.png",
+      "src": "./lembarku-logo.png",
       "sizes": "512x512",
       "type": "image/png",
       "purpose": "any maskable"
