@@ -1,12 +1,12 @@
 // =========================================================================
-// MR UNDANGAN — SERVICE WORKER (PWA CACHE & OFFLINE RESILIENCE)
+// LEMBARKU — SERVICE WORKER (PWA CACHE & OFFLINE RESILIENCE)
 // File: sw.js
 // =========================================================================
-const CACHE_NAME = 'mr-undangan-cache-v5';
+const CACHE_NAME = 'lembarku-cache-v1';
 const STATIC_ASSETS = [
   './',
   './manifest.json',
-  './logo.png',
+  './lembarku-logo.png',
   './css/styles.css',
   './js/config.js',
   './js/qris.js',
@@ -64,7 +64,7 @@ self.addEventListener('fetch', (event) => {
   const isNavigation = req.mode === 'navigate';
   const isCode = /\.(html|css|js|json)$/i.test(url.pathname);
 
-  // Network-First untuk halaman utama & file kode agar update GitHub/Netlify langsung aktif
+  // Network-First untuk halaman utama & file kode agar update GitHub langsung aktif
   if (isNavigation || isCode) {
     event.respondWith(
       fetch(req)
@@ -105,10 +105,3 @@ self.addEventListener('fetch', (event) => {
     })
   );
 });
-```[cite: 28]
-
-### Langkah Pasang & Uji
-1. Tempel kode di atas ke **`sw.js`** di repositori GitHub dan tunggu *deployment* selesai[cite: 28].
-2. Tutup total tab/aplikasi di HP, lalu buka kembali dan uji klik kartu akun di **Followers/Following**, aksi lengkap di **Project**, tombol *Back* bertahap, serta ubah username / daftar akun[cite: 22, 23, 24, 25, 28].
-
-Silakan kabari hasilnya ya bro!
