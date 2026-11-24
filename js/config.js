@@ -1,5 +1,6 @@
 // =========================================================================
 // LEMBARKU — CORE CONFIG, CATALOGS, CROPPER & CLOUD ENGINE (js/config.js)
+// Versi: V14.3
 // =========================================================================
 const CLOUD_API_URL = "https://script.google.com/macros/s/AKfycbyHsITJ02tiA59p0QIXkOQaO3VnBFQmDBp-7iUHcUkmrYjlOtRVwxhlGZCzL4RLKKNW/exec";
 const FOUNDER_USERNAME = "kausar.af";
@@ -13,6 +14,18 @@ const LOGIN_REMIND_KEY = "MR_LOGIN_REMIND_TS";
 const DRAFT_INV_KEY = "MR_DRAFT_INV";
 const DRAFT_PF_KEY = "MR_DRAFT_PF";
 const GUEST_CHAT_KEY = "MR_GUEST_CHAT_ID";
+const APP_DEVICE_ID_KEY = "LBK_PWA_DEVICE_ID";
+const APP_INSTALLED_REPORTED_KEY = "LBK_PWA_STATUS_REPORTED";
+const NOTIF_READ_TS_KEY = "LBK_NOTIF_LAST_READ_TS";
+
+const DEFAULT_PRIVACY = {
+    showProjects: true,
+    showFollowers: true,
+    showFollowing: true,
+    showContact: false,
+    showInChatContacts: true,
+    allowDirectChat: true
+};
 
 const DEFAULT_AVATAR = "data:image/svg+xml;utf8," + encodeURIComponent(
     `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 120 120"><rect width="120" height="120" fill="#1e293b"/><circle cx="60" cy="44" r="22" fill="#94a3b8"/><path d="M22 110c4-24 22-36 38-36s34 12 38 36" fill="#94a3b8"/></svg>`
@@ -242,6 +255,12 @@ function getLocalFallbackDB() {
         themeOverrides: {},
         cvPriceOverrides: {},
         musicLibrary: [],
+        appStats: {
+            activeInstalled: 0,
+            totalInstalled: 0,
+            totalUninstalled: 0,
+            history: []
+        },
         testimonials: [
             { id: 1, name: "Rina & Dimas", category: "Undangan Pernikahan", rating: 5, text: "Undangan Adat Kalimantannya mewah banget, tamu-tamu pada puji animasi buka kertasnya!" },
             { id: 2, name: "Fajar Pratama", category: "CV & Lamaran PDF", rating: 5, text: "Fitur Sempurnakan + Auto-Scan KTP & Ijazah jadi 1 PDF di bawah 2 MB bikin lamaran saya langsung dipanggil HRD." }
@@ -408,7 +427,7 @@ function cycleAppThemeQuick() {
     applyAppTheme(order[(order.indexOf(cur) + 1) % order.length], true);
 }
 
-// ================= HELPER USER, TEMA, HARGA, FAVORIT =================
+// ================= HELPER USER, PRIVASI, BLOKIR, TEMA & HARGA =================
 function getCurrentUserObj() {
     if (!currentSessionUser) return null;
     const curKey = String(currentSessionUser).trim().toLowerCase();
@@ -418,6 +437,30 @@ function getCurrentUserObj() {
             ? (db.users || []).find(u => String(u.role || "").toLowerCase() === "master")
             : null)
         || null;
+}
+
+function getUserPrivacy(uObj) {
+    const raw = (uObj && uObj.privacy && typeof uObj.privacy === "object") ? uObj.privacy : {};
+    return {
+        showProjects: raw.showProjects !== false,
+        showFollowers: raw.showFollowers !== false,
+        showFollowing: raw.showFollowing !== false,
+        showContact: raw.showContact === true,
+        showInChatContacts: raw.showInChatContacts !== false,
+        allowDirectChat: raw.allowDirectChat !== false
+    };
+}
+
+function getBlockedUsersList(uObj) {
+    if (!uObj || !Array.isArray(uObj.blockedUsers)) return [];
+    return Array.from(new Set(uObj.blockedUsers.map(x => String(x || "").trim().toLowerCase()).filter(Boolean)));
+}
+
+function isUserBlockedByMe(username) {
+    const me = getCurrentUserObj();
+    if (!me) return false;
+    const key = String(username || "").trim().toLowerCase();
+    return getBlockedUsersList(me).includes(key);
 }
 
 function getMasterBanksList() {
@@ -522,20 +565,84 @@ async function toggleFavoriteItem(ev, favObj) {
     showToast(added ? "Disimpan ke Favorit!" : "Dihapus dari Favorit.", "info");
 }
 
+function _formatMiniCoverDate(dateStr, fallbackStr) {
+    if (!dateStr) return fallbackStr;
+    const d = new Date(dateStr);
+    if (isNaN(d.getTime())) return String(dateStr).toUpperCase();
+    return d.toLocaleDateString("id-ID", { weekday: "long", day: "numeric", month: "long", year: "numeric" }).toUpperCase();
+}
+
+// KARTU PROMOSI UNDANGAN BERANDA = HASIL JADI SAMPUL LENGKAP
 function buildMiniCoverCardHtml(cat, tObj, showFavBtn = true) {
     const cov = getThemeCoverPair(cat, tObj);
     const favKey = `inv::${cat}::${tObj.name}`;
     const isFav = isItemFavorited(favKey);
     const favObjStr = esc(JSON.stringify({ favKey, kind: "inv", cat, name: tObj.name }));
+
+    const preset = VISUAL_PRESETS[tObj.preset] || VISUAL_PRESETS["dark-gold"];
+    const dm = tObj.demoData || {};
+    const styleKey = tObj.layout || tObj.style || "";
+    const isMono = tObj.photoFilter === "mono" || styleKey === "premium_black";
+    const isVintage = tObj.photoFilter === "vintage";
+    const filterCss = isMono ? "filter:grayscale(100%) contrast(1.08);" : isVintage ? "filter:sepia(24%) contrast(1.04);" : "";
+
+    const headingFont = tObj.font || (preset.vars && preset.vars["--th-font-heading"]) || "'Great Vibes',cursive";
+    const accentCol = (tObj.customColors && tObj.customColors.accent) || (preset.vars && preset.vars["--th-accent"]) || "#f3d285";
+    const btnBg = (tObj.customColors && tObj.customColors.accent) || (preset.vars && preset.vars["--th-btn-bg"]) || "linear-gradient(90deg,#f3d285,#d4af37)";
+    const btnTxt = isMono ? "#09090b" : ((preset.vars && preset.vars["--th-btn-text"]) || "#1f0a0c");
+    const overlayBg = preset.coverOverlay || "linear-gradient(180deg,rgba(0,0,0,0.35) 0%,rgba(12,12,15,0.9) 100%)";
+
+    const badgeTop = cat === "Pernikahan" ? "THE WEDDING OF"
+        : cat === "Ulang Tahun" ? "BIRTHDAY INVITATION"
+        : cat === "Aqiqah" ? "TASYAKURAN AQIQAH"
+        : cat === "Syukuran" ? (tObj.isKhitan ? "WALIMATUL KHITAN" : "UNDANGAN SYUKURAN")
+        : "UNDANGAN RESMI";
+
+    const sampleTitle = dm.title || (
+        cat === "Pernikahan" ? "Aqila & Fauzi"
+        : cat === "Ulang Tahun" ? "Arsyilla Fadillah"
+        : cat === "Aqiqah" ? "Ahmad Fathallah"
+        : cat === "Syukuran" ? (tObj.isKhitan ? "M. Al-Fatih" : "Syukuran Rumah")
+        : (tObj.demoTitle || "Acara Spesial")
+    );
+    const defaultDateMap = {
+        "Pernikahan": "SABTU, 20 FEBRUARI 2027",
+        "Ulang Tahun": "MINGGU, 14 MARET 2027",
+        "Aqiqah": "SENIN, 18 JANUARI 2027",
+        "Syukuran": "SABTU, 30 JANUARI 2027",
+        "Lainnya": "RABU, 10 FEBRUARI 2027"
+    };
+    const sampleDate = _formatMiniCoverDate(dm.date, defaultDateMap[cat] || "SABTU, 20 FEBRUARI 2027");
+    const isScriptFont = /vibes|brush/i.test(headingFont);
+    const titleSizeCls = isScriptFont ? "text-[22px] leading-[1.05]" : "text-[16px] leading-[1.15] font-bold";
+
     return `
-        <div class="relative aspect-[3/4] w-full overflow-hidden bg-zinc-900 select-none">
-            <img src="${cov.src}" ${imgFbAttr(cov.fb)} loading="lazy" class="w-full h-full object-cover group-hover:scale-105 transition duration-500">
-            <div class="absolute inset-0 bg-gradient-to-t from-black/90 via-black/25 to-transparent"></div>
-            ${tObj.badge ? `<span class="absolute top-2 left-2 z-20 text-[8px] font-extrabold px-1.5 py-0.5 rounded-full bg-amber-400 text-black uppercase shadow">${escHtml(tObj.badge)}</span>` : ""}
+        <div class="mini-inv-cover-stage bg-zinc-950 p-2.5 text-white">
+            <img src="${cov.src}" ${imgFbAttr(cov.fb)} loading="lazy" style="${filterCss}" class="absolute inset-0 w-full h-full object-cover object-center group-hover:scale-105 transition duration-500">
+            <div class="absolute inset-0" style="background:${overlayBg};"></div>
+
+            ${tObj.badge ? `<span class="absolute top-2 left-2 z-20 text-[7.5px] font-extrabold px-1.5 py-0.5 rounded-full bg-amber-400 text-black uppercase shadow">${escHtml(tObj.badge)}</span>` : ""}
             ${showFavBtn ? `<button type="button" data-fav-btn="${esc(favKey)}" onclick="toggleFavoriteItem(event, JSON.parse('${favObjStr}'))" class="fav-heart-btn ${isFav ? "is-fav" : ""}" title="Simpan ke Favorit"><i class="fa-${isFav ? "solid" : "regular"} fa-heart"></i></button>` : ""}
-            <div class="absolute inset-x-0 bottom-0 p-2.5 text-left">
-                <span class="text-[8px] uppercase font-bold px-1.5 py-0.5 rounded bg-white/20 text-white backdrop-blur">${escHtml(cat)}</span>
-                <h4 class="font-bold text-xs text-white truncate mt-1">${escHtml(tObj.name)}</h4>
+
+            <div class="relative z-10 pt-1">
+                <span class="text-[6.5px] uppercase tracking-[0.28em] text-white/85 font-semibold drop-shadow">LEMBARKU</span>
+            </div>
+
+            <div class="relative z-10 my-auto px-1 space-y-0.5">
+                <span class="block text-[6px] uppercase tracking-[0.22em] font-bold drop-shadow" style="color:${accentCol};">${badgeTop}</span>
+                <p class="${titleSizeCls} text-white drop-shadow-[0_2px_8px_rgba(0,0,0,0.85)] line-clamp-2" style="font-family:${headingFont};">${escHtml(sampleTitle)}</p>
+                <span class="block text-[6px] uppercase tracking-[0.14em] text-white/90 font-semibold pt-0.5 truncate">${escHtml(sampleDate)}</span>
+            </div>
+
+            <div class="relative z-10 space-y-1.5 pb-0.5">
+                <div class="bg-black/48 backdrop-blur-sm border border-white/25 rounded-lg px-2 py-1.5 leading-tight">
+                    <span class="block text-[5.2px] uppercase tracking-wider text-white/75">Kepada Yth. Bapak/Ibu/Saudara/i</span>
+                    <strong class="block text-[8px] font-bold truncate mt-0.5" style="color:${accentCol};">Tamu Kehormatan</strong>
+                    <span class="block text-[5px] text-white/65">di Tempat</span>
+                </div>
+                <div class="inline-flex items-center justify-center gap-1 px-3 py-1 rounded-full text-[6.5px] font-extrabold uppercase tracking-wider shadow-md" style="background:${btnBg};color:${btnTxt};">
+                    <i class="fa-solid fa-envelope-open-text text-[6px]"></i> Buka Undangan
+                </div>
             </div>
         </div>
     `;
@@ -543,15 +650,51 @@ function buildMiniCoverCardHtml(cat, tObj, showFavBtn = true) {
 
 function buildPriceStripHtml(tObj, compact = true) {
     const pr = getThemePricing(tObj);
+    const showInvMeta = !!(tObj && tObj.cat && tObj.name);
     return `
-        <div class="px-2.5 py-2 bg-[#111115] text-white flex items-center justify-between gap-1 border-t border-white/10">
-            <div class="leading-tight min-w-0">
-                ${pr.hasDisc ? `<span class="block text-[9px] text-zinc-400 line-through">${fmtRp(pr.origPrice)}</span>` : ""}
-                <strong class="text-xs text-amber-400 font-extrabold">${fmtRp(pr.price)}</strong>
+        <div class="px-2.5 py-2 bg-[#111115] text-white border-t border-white/10 space-y-1">
+            ${showInvMeta ? `<div class="flex items-center justify-between gap-1"><h4 class="font-bold text-[11px] text-white truncate">${escHtml(tObj.name)}</h4><span class="text-[7.5px] uppercase font-bold px-1.5 py-0.5 rounded bg-white/12 text-zinc-200 shrink-0">${escHtml(tObj.cat)}</span></div>` : ""}
+            <div class="flex items-center justify-between gap-1">
+                <div class="leading-tight min-w-0">
+                    ${pr.hasDisc ? `<span class="block text-[9px] text-zinc-400 line-through">${fmtRp(pr.origPrice)}</span>` : ""}
+                    <strong class="text-xs text-amber-400 font-extrabold">${fmtRp(pr.price)}</strong>
+                </div>
+                ${pr.hasDisc ? `<span class="text-[8px] px-1.5 py-0.5 rounded bg-red-600 text-white font-extrabold shrink-0">-${pr.discPct}%</span>` : ""}
             </div>
-            ${pr.hasDisc ? `<span class="text-[8px] px-1.5 py-0.5 rounded bg-red-600 text-white font-extrabold shrink-0">-${pr.discPct}%</span>` : ""}
         </div>
     `;
+}
+
+// ================= PELACAKAN INSTALL & UNINSTALL PWA =================
+function getOrCreateAppDeviceId() {
+    let id = localStorage.getItem(APP_DEVICE_ID_KEY);
+    if (!id) {
+        id = "dev_" + Date.now().toString(36) + "_" + Math.random().toString(36).slice(2, 9);
+        localStorage.setItem(APP_DEVICE_ID_KEY, id);
+    }
+    return id;
+}
+
+async function reportAppInstallState(eventType) {
+    const evt = eventType === "uninstalled" ? "uninstalled" : "installed";
+    const lastReported = localStorage.getItem(APP_INSTALLED_REPORTED_KEY) || "";
+    if (lastReported === evt) return;
+    localStorage.setItem(APP_INSTALLED_REPORTED_KEY, evt);
+    const ua = navigator.userAgent || "";
+    const platform = /iPad|iPhone|iPod/.test(ua) ? "iOS" : /Android/.test(ua) ? "Android" : "Desktop";
+    try {
+        const res = await fetchJsonWithTimeout(CLOUD_API_URL, {
+            method: "POST",
+            headers: { "Content-Type": "text/plain;charset=utf-8" },
+            body: JSON.stringify({
+                action: "track_app_event",
+                deviceId: getOrCreateAppDeviceId(),
+                eventType: evt,
+                platform
+            })
+        }, 12000);
+        if (res && res.ok && res.appStats) db.appStats = res.appStats;
+    } catch {}
 }
 
 // ================= INDEXEDDB CACHE RINGAN =================
@@ -605,6 +748,9 @@ function applyServerDb(data) {
     ["users", "invitations", "portfolios", "chats", "adminLogs"].forEach(k => {
         if (Array.isArray(data[k])) db[k] = data[k];
     });
+    if (data.appStats && typeof data.appStats === "object") {
+        db.appStats = data.appStats;
+    }
     idbSet("db_snapshot", db);
     idbSet("public_snapshot", {
         customThemes: db.customThemes,
@@ -649,6 +795,12 @@ async function fetchFullCloud() {
         return true;
     }
     return false;
+}
+
+async function fetchPublicUserProjects(username) {
+    const url = `${CLOUD_API_URL}?action=get_public_projects&username=${encodeURIComponent(username || "")}&token=${encodeURIComponent(currentSessionToken || "")}&t=${Date.now()}`;
+    const j = await fetchJsonWithTimeout(url, {}, 14000);
+    return (j && j.ok) ? j : { ok: false, hidden: false, projects: [] };
 }
 
 async function fetchSingleInvitationFast(id) {
@@ -898,8 +1050,9 @@ function applyImageCrop() {
     if (cb && dataUrl) cb(dataUrl);
 }
 
-// ================= AUDIO CROPPER INTERAKTIF (MP3 RINGAN ANTI GAGAL UPLOAD) =================
+// ================= AUDIO CROPPER INTERAKTIF (WIZARD & STOK MUSIK FOUNDER) =================
 let _acFile = null, _acBlobUrl = "", _acDuration = 45, _acTotalDur = 60, _acStartSec = 0, _acAudio = null, _acPlayTimer = null;
+let _acTargetMode = "wizard";
 
 function _fmtSec(s) {
     const n = Math.max(0, Math.floor(s || 0));
@@ -954,12 +1107,18 @@ function _bindAcDrag() {
     window.addEventListener("touchend", onUp);
 }
 
-function openAudioCropperFromInput(inp) {
+function openAudioCropperFromInput(inp, mode = "wizard") {
     const file = inp.files && inp.files[0]; if (!file) return; inp.value = "";
     if (file.size > 25 * 1024 * 1024) return showToast("Ukuran lagu maksimal 25 MB.", "error");
+    _acTargetMode = mode === "library" ? "library" : "wizard";
     _acFile = file;
     _acStartSec = 0;
     document.getElementById("ac-song-title").value = file.name.replace(/\.[^/.]+$/, "");
+    const catWrap = document.getElementById("ac-cat-wrap");
+    const catInp = document.getElementById("ac-song-cat");
+    if (catWrap) catWrap.classList.toggle("hide", _acTargetMode !== "library");
+    if (catInp && !catInp.value) catInp.value = "Pernikahan";
+
     if (_acBlobUrl) { try { URL.revokeObjectURL(_acBlobUrl); } catch {} _acBlobUrl = ""; }
     _acBlobUrl = URL.createObjectURL(file);
     if (_acAudio) { _acAudio.pause(); _acAudio = null; }
@@ -1123,6 +1282,10 @@ async function processAndUploadCroppedAudio() {
     setBtnLoading("btn-save-audio-crop", true, "Memotong & Kompresi MP3...");
     const clipLen = Math.min(_acTotalDur, _acDuration);
     const songTitle = (document.getElementById("ac-song-title")?.value || "").trim() || _acFile.name.replace(/\.[^/.]+$/, "");
+    const songCat = _acTargetMode === "library"
+        ? ((document.getElementById("ac-song-cat")?.value || "").trim() || "Pernikahan")
+        : ((typeof wizardState !== "undefined" && wizardState.category) || "Pernikahan");
+
     const audioDataUrl = await _sliceAudioFileDataUrl(_acFile, _acStartSec, clipLen);
     setBtnLoading("btn-save-audio-crop", true, "Mengunggah Lagu...");
     const up = await apiAction({ action: "upload_media", dataUrl: audioDataUrl, prefix: "audio_clip" });
@@ -1131,28 +1294,35 @@ async function processAndUploadCroppedAudio() {
         idbSet("audio_data_" + encodeURIComponent(up.url), audioDataUrl);
         const localBlobUrl = dataUrlToBlobUrl(audioDataUrl) || audioDataUrl;
         _audioBlobCache.set(up.url, localBlobUrl);
-        if (typeof wizardState !== "undefined") {
-            wizardState.customAudioUrl = up.url;
-            wizardState.customAudioTitle = songTitle;
-        }
+
         if (!Array.isArray(db.musicLibrary)) db.musicLibrary = [];
         if (!db.musicLibrary.some(m => m.url === up.url)) {
             db.musicLibrary.unshift({
                 id: Date.now(),
                 title: songTitle,
-                category: (typeof wizardState !== "undefined" && wizardState.category) || "Pernikahan",
+                category: songCat,
                 url: up.url
             });
-            apiAction({ action: "update_section", section: "musicLibrary", value: db.musicLibrary });
+            await apiAction({ action: "update_section", section: "musicLibrary", value: db.musicLibrary });
             if (typeof populateMusicDropdown === "function") populateMusicDropdown(up.url);
         }
-        const st = document.getElementById("audio-upload-status");
-        if (st) {
-            st.innerText = `✓ Lagu "${songTitle}" (${_fmtSec(_acStartSec)}–${_fmtSec(_acStartSec + clipLen)}) siap & masuk stok lagu!`;
-            st.classList.remove("hide");
+
+        if (_acTargetMode === "wizard") {
+            if (typeof wizardState !== "undefined") {
+                wizardState.customAudioUrl = up.url;
+                wizardState.customAudioTitle = songTitle;
+            }
+            const st = document.getElementById("audio-upload-status");
+            if (st) {
+                st.innerText = `✓ Lagu "${songTitle}" (${_fmtSec(_acStartSec)}–${_fmtSec(_acStartSec + clipLen)}) siap & masuk stok lagu!`;
+                st.classList.remove("hide");
+            }
+        } else {
+            if (typeof renderMasterWorkspaceContent === "function") renderMasterWorkspaceContent();
         }
+
         closeAudioCropper();
-        showToast("Potongan lagu MP3 tersimpan & otomatis masuk Stok Lagu!");
+        showToast(`Lagu "${songTitle}" berhasil diunggah ke Stok Lagu!`);
     } else {
         showToast("Gagal mengunggah lagu. Pastikan koneksi stabil atau pilih durasi lebih singkat.", "error");
     }
