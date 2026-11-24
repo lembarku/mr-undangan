@@ -1,5 +1,5 @@
 // =========================================================================
-// MR UNDANGAN — PORTFOLIO ENGINE (9 DESAIN CV UNIK, LAMARAN, AUTO-SCAN & PDF)
+// LEMBARKU — PORTFOLIO ENGINE (9 DESAIN CV UNIK, LAMARAN, AUTO-SCAN & PDF)
 // File: js/portfolio.js
 // =========================================================================
 let pfWizardState = {
@@ -267,7 +267,7 @@ function _pfEduStandard(edus, acc) {
 function renderPortfolioA4Html(doc, showWatermark = false) {
     const tObj = getPortfolioThemeObj(doc.docType || "cv", doc.themeId);
     const acc = tObj.accent || "#1b7a49";
-    const wmRow = `<div class="a4-wm-item"><img src="./logo.png" onerror="this.style.display='none'"><span>MR UNDANGAN</span></div>`;
+    const wmRow = `<div class="a4-wm-item"><img src="./lembarku-logo.png" onerror="this.style.display='none'"><span>LEMBARKU</span></div>`;
     const wmHtml = showWatermark
         ? `<div class="a4-watermark-overlay">${wmRow}${wmRow}${wmRow}${wmRow}${wmRow}</div>`
         : "";
@@ -857,7 +857,7 @@ function openSempurnakanFromPreview() {
 function startCreatePortfolio(isCabang = false, initType = "cv", initThemeId = null) {
     if (isCabang) {
         const cab = getCurrentUserObj();
-        if (!cab || (cab.quota || 0) <= 0) return showToast("Kuota deposit habis! Hubungi Master Admin.", "error");
+        if (!cab || (cab.quota || 0) <= 0) return showToast("Kuota deposit habis! Hubungi Founder.", "error");
     }
     currentViewName = "portfolio_wizard";
     const list = PORTFOLIO_CATALOG[initType] || PORTFOLIO_CATALOG.cv;
