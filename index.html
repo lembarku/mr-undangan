@@ -6,7 +6,6 @@
     <title>Lembarku</title>
     <meta property="og:title" content="Lembarku — Undangan Digital & Berkas Profesional">
     <meta property="og:description" content="Buat undangan digital elegan, CV, dan surat lamaran kerja siap PDF langsung dari HP.">
-    <!-- GitHub Pages: ganti ./lembarku-logo.png dengan URL lengkap https://username.github.io/nama-repo/lembarku-logo.png jika ingin thumbnail logo muncul di preview WA -->
     <meta property="og:image" content="./lembarku-logo.png">
     <meta name="theme-color" content="#f2f2f7">
     <link rel="icon" type="image/png" href="./lembarku-logo.png">
@@ -75,6 +74,90 @@
         body.in-home #header-dots-btn {
             display: none !important;
         }
+
+        /* Panel Pengaturan Full-Screen Premium (Anti-Menerobos Saat Di-scroll) */
+        #drawer-main .slide-drawer-panel {
+            display: flex !important;
+            flex-direction: column !important;
+            padding: 0 !important;
+            overflow: hidden !important;
+            width: 100% !important;
+            max-width: 100% !important;
+            height: 100% !important;
+            background: var(--app-bg, #f2f2f7) !important;
+        }
+        .lbk-fs-header {
+            position: relative;
+            z-index: 20;
+            flex-shrink: 0;
+            background: var(--app-header, rgba(255, 255, 255, 0.94));
+            backdrop-filter: blur(18px);
+            -webkit-backdrop-filter: blur(18px);
+            border-bottom: 1px solid var(--app-border, rgba(0, 0, 0, 0.08));
+            box-shadow: 0 2px 14px rgba(0, 0, 0, 0.04);
+        }
+        .lbk-fs-scroll {
+            flex: 1 1 auto;
+            min-height: 0;
+            overflow-y: auto;
+            -webkit-overflow-scrolling: touch;
+            overscroll-behavior: contain;
+        }
+
+        /* Toggle Switch Privasi Gaya iOS */
+        .lbk-switch {
+            position: relative;
+            display: inline-flex;
+            align-items: center;
+            width: 46px;
+            height: 26px;
+            flex-shrink: 0;
+            cursor: pointer;
+        }
+        .lbk-switch input {
+            opacity: 0;
+            width: 0;
+            height: 0;
+            position: absolute;
+        }
+        .lbk-switch-track {
+            position: absolute;
+            inset: 0;
+            border-radius: 9999px;
+            background: rgba(148, 163, 184, 0.42);
+            transition: background 0.22s ease;
+        }
+        .lbk-switch-track::after {
+            content: "";
+            position: absolute;
+            top: 3px;
+            left: 3px;
+            width: 20px;
+            height: 20px;
+            border-radius: 9999px;
+            background: #ffffff;
+            box-shadow: 0 2px 6px rgba(0, 0, 0, 0.22);
+            transition: transform 0.22s cubic-bezier(0.22, 1, 0.36, 1);
+        }
+        .lbk-switch input:checked + .lbk-switch-track {
+            background: var(--app-accent, #007aff);
+        }
+        .lbk-switch input:checked + .lbk-switch-track::after {
+            transform: translateX(20px);
+        }
+
+        /* Kartu Mini Sampul Jadi Undangan di Beranda */
+        .mini-inv-cover-stage {
+            position: relative;
+            aspect-ratio: 3 / 4.25;
+            width: 100%;
+            overflow: hidden;
+            display: flex;
+            flex-direction: column;
+            justify-content: space-between;
+            text-align: center;
+            user-select: none;
+        }
     </style>
 </head>
 <body class="min-h-screen flex flex-col in-home">
@@ -132,17 +215,17 @@
     </div>
 
     <!-- GLOBAL LOADING PILL, TOAST & CONFIRM -->
-    <div id="global-loading-bar" class="hide fixed top-4 left-1/2 -translate-x-1/2 z-[99] px-4 py-2 rounded-full app-card border shadow-2xl flex items-center gap-2.5 text-xs backdrop-blur-md">
+    <div id="global-loading-bar" class="hide fixed top-4 left-1/2 -translate-x-1/2 z-[160] px-4 py-2 rounded-full app-card border shadow-2xl flex items-center gap-2.5 text-xs backdrop-blur-md">
         <i class="fa-solid fa-circle-notch fa-spin app-accent"></i>
         <span id="global-loading-text" class="font-semibold">Memproses...</span>
     </div>
 
-    <div id="app-toast" class="hide fixed top-5 left-1/2 -translate-x-1/2 z-[102] max-w-sm w-[92%] px-4 py-3 rounded-2xl app-card border shadow-2xl backdrop-blur-md flex items-center gap-3 toast-anim">
+    <div id="app-toast" class="hide fixed top-5 left-1/2 -translate-x-1/2 z-[165] max-w-sm w-[92%] px-4 py-3 rounded-2xl app-card border shadow-2xl backdrop-blur-md flex items-center gap-3 toast-anim">
         <i id="app-toast-icon" class="fa-solid fa-circle-check text-emerald-500 text-base"></i>
         <p id="app-toast-msg" class="text-xs leading-snug flex-1 font-medium"></p>
     </div>
 
-    <div id="app-confirm-modal" class="hide fixed inset-0 z-[101] bg-black/75 backdrop-blur-sm flex items-center justify-center p-4">
+    <div id="app-confirm-modal" class="hide fixed inset-0 z-[162] bg-black/75 backdrop-blur-sm flex items-center justify-center p-4">
         <div class="app-card border rounded-3xl max-w-sm w-full p-6 text-center space-y-4 shadow-2xl">
             <div class="w-12 h-12 rounded-2xl app-accent-bg border gold-border app-accent flex items-center justify-center mx-auto text-xl">
                 <i id="app-confirm-icon" class="fa-solid fa-circle-question"></i>
@@ -159,7 +242,7 @@
     </div>
 
     <!-- 3. POPUP SARAN INSTALL APLIKASI -->
-    <div id="modal-install-welcome" class="hide fixed inset-0 z-[92] bg-black/75 backdrop-blur-sm flex items-center justify-center p-4">
+    <div id="modal-install-welcome" class="hide fixed inset-0 z-[130] bg-black/75 backdrop-blur-sm flex items-center justify-center p-4">
         <div class="app-card border rounded-3xl max-w-sm w-full p-6 text-center space-y-4 shadow-2xl">
             <div id="install-offer-state" class="space-y-4">
                 <div class="relative w-16 h-16 mx-auto">
@@ -210,7 +293,7 @@
     </div>
 
     <!-- 4. POPUP LOGIN / DAFTAR -->
-    <div id="modal-auth" class="hide fixed inset-0 z-[85] bg-black/75 backdrop-blur-sm flex items-center justify-center p-4">
+    <div id="modal-auth" class="hide fixed inset-0 z-[130] bg-black/75 backdrop-blur-sm flex items-center justify-center p-4">
         <div class="app-card border rounded-3xl max-w-sm w-full p-6 space-y-4 shadow-2xl relative">
             <button type="button" onclick="closeAuthModal()" class="absolute top-4 right-4 w-8 h-8 rounded-full app-btn-sec flex items-center justify-center text-xs"><i class="fa-solid fa-xmark"></i></button>
             <div class="text-center space-y-1.5 pt-1">
@@ -260,7 +343,11 @@
         </div>
         <div class="flex items-center gap-2">
             <div id="header-actions" class="flex items-center gap-2"></div>
-            <button id="header-dots-btn" onclick="toggleSlideMenu(true)" class="w-9 h-9 rounded-full app-card-soft border gold-border app-accent flex items-center justify-center hover:brightness-95 transition" title="Opsi &amp; Pengaturan">
+            <button id="header-notif-btn" type="button" onclick="openNotificationsFullscreen()" class="hide relative w-9 h-9 rounded-full app-card-soft border gold-border app-accent flex items-center justify-center hover:brightness-95 active:scale-95 transition" title="Notifikasi">
+                <i class="fa-regular fa-bell text-sm"></i>
+                <span id="header-notif-badge" class="hide absolute -top-1 -right-1 min-w-[18px] h-[18px] px-1 rounded-full bg-red-500 text-white text-[9px] font-extrabold flex items-center justify-center border-2 border-[var(--app-card)]">0</span>
+            </button>
+            <button id="header-dots-btn" type="button" onclick="toggleSlideMenu(true)" class="w-9 h-9 rounded-full app-card-soft border gold-border app-accent flex items-center justify-center hover:brightness-95 active:scale-95 transition" title="Opsi &amp; Pengaturan">
                 <i class="fa-solid fa-ellipsis-vertical text-sm"></i>
             </button>
         </div>
@@ -482,14 +569,14 @@
         </section>
 
         <!-- ========================================================= -->
-        <!-- 4. PROFIL FOUNDER                                         -->
+        <!-- 4. PROFIL FOUNDER (BERSIH — PANEL PENGATURAN FULL-SCREEN) -->
         <!-- ========================================================= -->
-        <section id="view-master-admin" class="hide space-y-4">
+        <section id="view-master-admin" class="hide space-y-3.5">
             <div class="app-card rounded-3xl border overflow-hidden shadow-md relative">
                 <div id="mprof-banner" class="h-32 md:h-40 bg-gradient-to-r from-blue-900 via-zinc-900 to-black bg-cover bg-center relative">
                     <div class="absolute inset-0 bg-gradient-to-t from-black/70 via-transparent to-black/20"></div>
                 </div>
-                <div class="px-5 pb-4 relative text-center md:text-left md:flex md:items-end md:justify-between gap-4">
+                <div class="px-5 pb-5 relative text-center md:text-left md:flex md:items-end md:justify-between gap-4">
                     <div class="flex flex-col md:flex-row items-center md:items-end gap-3 -mt-11 relative z-10">
                         <img id="mprof-avatar" src="" class="w-20 h-20 rounded-full object-cover border-4 border-[var(--app-card)] shadow-xl bg-zinc-800" alt="Founder">
                         <div>
@@ -502,30 +589,26 @@
                             <p id="mprof-bio" class="text-xs app-muted mt-0.5 max-w-md"></p>
                         </div>
                     </div>
-                    <div class="grid grid-cols-4 gap-2 text-center mt-3 md:mt-0">
-                        <div class="app-card-soft px-3 py-2 rounded-2xl border"><span id="stat-users" class="text-base font-extrabold block">0</span><span class="text-[10px] app-muted">Akun</span></div>
-                        <div class="app-card-soft px-3 py-2 rounded-2xl border"><span id="stat-pending" class="text-base font-extrabold text-amber-500 block">0</span><span class="text-[10px] app-muted">Antrean</span></div>
-                        <div class="app-card-soft px-3 py-2 rounded-2xl border"><span id="stat-active" class="text-base font-extrabold text-emerald-500 block">0</span><span class="text-[10px] app-muted">Aktif</span></div>
-                        <div class="app-card-soft px-3 py-2 rounded-2xl border"><span id="stat-pro" class="text-base font-extrabold text-blue-500 block">0</span><span class="text-[10px] app-muted">Akun Pro</span></div>
-                    </div>
+                    <div class="ig-master-stats-wrap w-full md:w-auto md:min-w-[290px] mt-3 md:mt-0"></div>
                 </div>
             </div>
 
-            <div class="app-card border rounded-3xl p-5 md:p-6 shadow-sm space-y-4">
-                <div class="flex flex-wrap items-center justify-between gap-2 border-b gold-border pb-3">
-                    <h3 id="master-active-panel-title" class="font-extrabold text-base">Grafik &amp; Analitik Bisnis</h3>
-                    <button id="master-back-overview-btn" onclick="openMasterWorkspace('overview')" class="hide px-3.5 py-1.5 rounded-xl app-card-soft border text-xs app-accent font-bold">
-                        <i class="fa-solid fa-chart-line mr-1"></i>Kembali ke Grafik
-                    </button>
+            <div class="app-card border rounded-3xl p-4 shadow-sm flex flex-wrap items-center justify-between gap-2.5">
+                <div class="min-w-0">
+                    <p class="text-xs font-extrabold">Pusat Kendali Founder</p>
+                    <p class="text-[11px] app-muted">Kelola akun di <strong>Followers</strong>, verifikasi order di <strong>Project</strong>, atau buka <strong>Pengaturan (⋮)</strong>.</p>
                 </div>
-                <div id="master-workspace-body"></div>
+                <div class="flex flex-wrap gap-2">
+                    <button type="button" onclick="openMasterWorkspace('overview')" class="px-3.5 py-2 rounded-xl app-card-soft border gold-border app-accent text-xs font-bold"><i class="fa-solid fa-chart-line mr-1.5"></i>Analitik</button>
+                    <button type="button" onclick="openFullChatOverlay()" class="gold-pill-btn px-3.5 py-2 rounded-xl text-xs"><i class="fa-solid fa-comments mr-1.5"></i>Live Chat</button>
+                </div>
             </div>
         </section>
 
         <!-- ========================================================= -->
         <!-- 5. PROFIL ROLE ADMINISTRASI                               -->
         <!-- ========================================================= -->
-        <section id="view-staff-admin" class="hide space-y-4">
+        <section id="view-staff-admin" class="hide space-y-3.5">
             <div class="app-card rounded-3xl border p-5 shadow-md flex flex-wrap items-center justify-between gap-4">
                 <div class="flex items-center gap-3.5">
                     <img id="staff-avatar" src="" class="w-16 h-16 rounded-full object-cover border-2 gold-border bg-zinc-800">
@@ -536,16 +619,16 @@
                     </div>
                 </div>
                 <div class="flex gap-2">
-                    <button onclick="openFullChatOverlay()" class="gold-pill-btn px-4 py-2.5 rounded-xl text-xs relative"><i class="fa-solid fa-comments mr-1.5"></i>Buka Live Chat <span id="staff-chat-pill-cnt" class="hide ml-1 px-1.5 py-0.2 rounded-full bg-red-600 text-white text-[10px]">0</span></button>
+                    <button type="button" onclick="openFullChatOverlay()" class="gold-pill-btn px-4 py-2.5 rounded-xl text-xs relative"><i class="fa-solid fa-comments mr-1.5"></i>Buka Live Chat <span id="staff-chat-pill-cnt" class="hide ml-1 px-1.5 py-0.2 rounded-full bg-red-600 text-white text-[10px]">0</span></button>
                 </div>
             </div>
 
-            <div class="app-card border rounded-3xl p-5 space-y-4 shadow-sm">
-                <div class="flex items-center justify-between border-b gold-border pb-3">
-                    <h3 class="font-bold text-base">Antrean Konfirmasi, Revisi &amp; Edit Proyek User</h3>
-                    <span id="staff-pending-badge" class="text-xs px-3 py-1 rounded-full app-accent-bg app-accent font-bold">0 Menunggu</span>
+            <div class="app-card border rounded-3xl p-4 shadow-sm flex flex-wrap items-center justify-between gap-2.5">
+                <div class="min-w-0">
+                    <p class="text-xs font-extrabold">Verifikasi &amp; Revisi Order User</p>
+                    <p class="text-[11px] app-muted">Buka menu <strong>Project</strong> di atas untuk verifikasi pembayaran, revisi, &amp; edit berkas user.</p>
                 </div>
-                <div id="staff-orders-body" class="space-y-3"></div>
+                <span id="staff-pending-badge" class="text-xs px-3 py-1 rounded-full app-accent-bg app-accent font-bold">0 Menunggu</span>
             </div>
         </section>
 
@@ -940,110 +1023,290 @@
     </div>
 
     <!-- ========================================================= -->
-    <!-- OVERLAY 2: MENU TITIK 3 POPUP PENUH                       -->
+    <!-- OVERLAY 2: MENU PENGATURAN FULL-SCREEN PREMIUM (FIXED HDR)-->
     <!-- ========================================================= -->
     <div id="drawer-main" class="slide-drawer-backdrop" onclick="if(event.target===this)toggleSlideMenu(false)">
-        <div class="slide-drawer-panel p-5 space-y-4">
-            <div class="flex items-center justify-between border-b gold-border pb-3 sticky top-0 bg-[var(--app-bg)] z-10 pt-1">
-                <h3 id="drawer-main-title" class="font-extrabold text-lg">Pengaturan</h3>
-                <button onclick="toggleSlideMenu(false)" class="px-3.5 py-1.5 rounded-full app-btn-sec text-xs font-bold">Selesai</button>
-            </div>
-
-            <div id="drawer-main-list" class="space-y-2.5 pb-10"></div>
-
-            <div id="drawer-sub-theme" class="hide space-y-3 pb-10">
-                <button onclick="backToMainSlideMenu()" class="text-xs app-accent font-bold"><i class="fa-solid fa-chevron-left mr-1"></i>Pengaturan</button>
-                <p class="text-xs app-muted">Pilih tampilan warna aplikasi (default gaya Pengaturan iOS):</p>
-                <div class="space-y-2">
-                    <button onclick="applyAppTheme('light',true)" data-topt="light" class="theme-opt-row menu-row-card"><span class="w-7 h-7 rounded-full bg-[#f2f2f7] border-2 border-[#007aff] shrink-0"></span><span class="flex-1 text-xs font-bold">iOS Terang (Default)</span><i class="fa-solid fa-check app-accent hide theme-chk"></i></button>
-                    <button onclick="applyAppTheme('dark',true)" data-topt="dark" class="theme-opt-row menu-row-card"><span class="w-7 h-7 rounded-full bg-[#1c1c1e] border-2 border-[#0a84ff] shrink-0"></span><span class="flex-1 text-xs font-bold">iOS Gelap</span><i class="fa-solid fa-check app-accent hide theme-chk"></i></button>
-                    <button onclick="applyAppTheme('gold',true)" data-topt="gold" class="theme-opt-row menu-row-card"><span class="w-7 h-7 rounded-full bg-gradient-to-tr from-[#f59e0b] to-[#eab308] border-2 border-amber-700 shrink-0"></span><span class="flex-1 text-xs font-bold">Emas Hangat</span><i class="fa-solid fa-check app-accent hide theme-chk"></i></button>
-                    <button onclick="applyAppTheme('blue',true)" data-topt="blue" class="theme-opt-row menu-row-card"><span class="w-7 h-7 rounded-full bg-[#1877f2] border-2 border-blue-200 shrink-0"></span><span class="flex-1 text-xs font-bold">Biru Klasik</span><i class="fa-solid fa-check app-accent hide theme-chk"></i></button>
-                    <button onclick="applyAppTheme('black',true)" data-topt="black" class="theme-opt-row menu-row-card"><span class="w-7 h-7 rounded-full bg-[#000000] border-2 border-white shrink-0"></span><span class="flex-1 text-xs font-bold">Hitam Pekat</span><i class="fa-solid fa-check app-accent hide theme-chk"></i></button>
-                    <button onclick="applyAppTheme('orange',true)" data-topt="orange" class="theme-opt-row menu-row-card"><span class="w-7 h-7 rounded-full bg-[#ea580c] border-2 border-orange-200 shrink-0"></span><span class="flex-1 text-xs font-bold">Oranye Hangat</span><i class="fa-solid fa-check app-accent hide theme-chk"></i></button>
+        <div class="slide-drawer-panel">
+            <div class="lbk-fs-header px-4 sm:px-6 py-3.5 flex items-center justify-between gap-3">
+                <div class="flex items-center gap-2.5 min-w-0">
+                    <button id="drawer-back-btn" type="button" onclick="handleDrawerBackBtn()" class="hide w-9 h-9 rounded-full app-btn-sec flex items-center justify-center text-xs shrink-0 active:scale-95 transition" title="Kembali">
+                        <i class="fa-solid fa-chevron-left"></i>
+                    </button>
+                    <h3 id="drawer-main-title" class="font-extrabold text-lg tracking-tight truncate">Pengaturan</h3>
                 </div>
+                <button type="button" onclick="toggleSlideMenu(false)" class="px-4 py-1.5 rounded-full app-btn-sec text-xs font-bold shrink-0">Selesai</button>
             </div>
 
-            <div id="drawer-sub-about" class="hide space-y-3.5 pb-10">
-                <button onclick="backToMainSlideMenu()" class="text-xs app-accent font-bold"><i class="fa-solid fa-chevron-left mr-1"></i>Pengaturan</button>
-                <div class="app-card border rounded-2xl p-4 space-y-2.5 text-xs leading-relaxed">
-                    <div class="flex items-center gap-2.5">
-                        <img src="./lembarku-logo.png" class="w-10 h-10 rounded-xl bg-white p-1 border border-black/10 object-contain" onerror="this.style.display='none'">
-                        <div><strong class="text-sm block">Lembarku</strong><span class="text-[10px] app-muted uppercase tracking-wider">Powered by Kausar.pictures</span></div>
+            <div id="drawer-scroll-body" class="lbk-fs-scroll">
+                <div class="max-w-2xl mx-auto p-4 sm:p-5 pb-14 space-y-4">
+                    <div id="drawer-main-list" class="space-y-2.5"></div>
+
+                    <div id="drawer-sub-theme" class="hide space-y-3">
+                        <p class="text-xs app-muted">Pilih tampilan warna aplikasi (default gaya Pengaturan iOS):</p>
+                        <div class="space-y-2">
+                            <button onclick="applyAppTheme('light',true)" data-topt="light" class="theme-opt-row menu-row-card"><span class="w-7 h-7 rounded-full bg-[#f2f2f7] border-2 border-[#007aff] shrink-0"></span><span class="flex-1 text-xs font-bold">iOS Terang (Default)</span><i class="fa-solid fa-check app-accent hide theme-chk"></i></button>
+                            <button onclick="applyAppTheme('dark',true)" data-topt="dark" class="theme-opt-row menu-row-card"><span class="w-7 h-7 rounded-full bg-[#1c1c1e] border-2 border-[#0a84ff] shrink-0"></span><span class="flex-1 text-xs font-bold">iOS Gelap</span><i class="fa-solid fa-check app-accent hide theme-chk"></i></button>
+                            <button onclick="applyAppTheme('gold',true)" data-topt="gold" class="theme-opt-row menu-row-card"><span class="w-7 h-7 rounded-full bg-gradient-to-tr from-[#f59e0b] to-[#eab308] border-2 border-amber-700 shrink-0"></span><span class="flex-1 text-xs font-bold">Emas Hangat</span><i class="fa-solid fa-check app-accent hide theme-chk"></i></button>
+                            <button onclick="applyAppTheme('blue',true)" data-topt="blue" class="theme-opt-row menu-row-card"><span class="w-7 h-7 rounded-full bg-[#1877f2] border-2 border-blue-200 shrink-0"></span><span class="flex-1 text-xs font-bold">Biru Klasik</span><i class="fa-solid fa-check app-accent hide theme-chk"></i></button>
+                            <button onclick="applyAppTheme('black',true)" data-topt="black" class="theme-opt-row menu-row-card"><span class="w-7 h-7 rounded-full bg-[#000000] border-2 border-white shrink-0"></span><span class="flex-1 text-xs font-bold">Hitam Pekat</span><i class="fa-solid fa-check app-accent hide theme-chk"></i></button>
+                            <button onclick="applyAppTheme('orange',true)" data-topt="orange" class="theme-opt-row menu-row-card"><span class="w-7 h-7 rounded-full bg-[#ea580c] border-2 border-orange-200 shrink-0"></span><span class="flex-1 text-xs font-bold">Oranye Hangat</span><i class="fa-solid fa-check app-accent hide theme-chk"></i></button>
+                        </div>
                     </div>
-                    <p class="app-muted">Aplikasi ringan serba bisa yang dirancang untuk mempermudah siapa saja membuat berbagai kebutuhan berkas digital secara cepat langsung dari HP:</p>
-                    <ul class="space-y-1.5 list-disc pl-4">
-                        <li><strong>Undangan Digital Interaktif:</strong> Berbagai desain pernikahan adat &amp; modern, Aqiqah, Ulang Tahun, Syukuran, &amp; Khitanan lengkap peta, amplop digital, musik potong sendiri, RSVP &amp; daftar tamu personal.</li>
-                        <li><strong>Portofolio CV &amp; Surat Lamaran:</strong> 9 desain CV modern + surat lamaran resmi, fitur <em>Sempurnakan</em> untuk Auto-Scan foto dokumen HP dan menggabungkannya menjadi 1 file PDF utuh.</li>
-                        <li><strong>Sorotan Album &amp; Brankas Rahasia:</strong> Tautkan folder Google Drive atau simpan foto &amp; catatan pribadi di Album Rahasia ber-PIN 4-digit.</li>
-                        <li><strong>Mitra Admin Cabang:</strong> Label brand sendiri dan Portal Kelola Tamu Mandiri untuk klien.</li>
-                    </ul>
-                    <div class="pt-2.5 border-t gold-border flex items-center justify-between text-[11px]">
-                        <span class="app-muted">Versi Aplikasi</span>
-                        <span class="px-2.5 py-0.5 rounded-full app-accent-bg app-accent font-extrabold">V14.2</span>
-                    </div>
-                </div>
-            </div>
 
-            <div id="drawer-sub-profil" class="hide space-y-3 pb-10">
-                <button onclick="backToMainSlideMenu()" class="text-xs app-accent font-bold"><i class="fa-solid fa-chevron-left mr-1"></i>Pengaturan</button>
-                <div class="flex items-center gap-3 app-card p-3 rounded-2xl border">
-                    <img id="set-prof-avatar-prev" src="" class="w-12 h-12 rounded-full object-cover bg-zinc-800 border gold-border">
-                    <div class="flex-1 flex flex-wrap gap-1.5">
-                        <label class="px-2.5 py-1.5 rounded-lg gold-pill-btn text-[10px] cursor-pointer"><i class="fa-solid fa-camera mr-1"></i>Ganti Foto<input type="file" accept="image/*" class="hide" onchange="pickCroppedProfileMedia(this,'avatar')"></label>
-                        <button type="button" onclick="removeProfileMedia('avatar')" class="px-2.5 py-1.5 rounded-lg bg-red-600/15 text-red-500 border border-red-500/30 text-[10px] font-bold"><i class="fa-solid fa-trash"></i></button>
-                    </div>
-                </div>
-                <div class="flex gap-2">
-                    <label class="flex-1 app-card border p-2.5 rounded-xl text-center cursor-pointer text-[11px] font-semibold"><i class="fa-solid fa-image mr-1 app-accent"></i>Ganti Sampul<input type="file" accept="image/*" class="hide" onchange="pickCroppedProfileMedia(this,'banner')"></label>
-                    <button type="button" onclick="removeProfileMedia('banner')" class="px-3 rounded-xl bg-red-600/15 text-red-500 border border-red-500/30 text-[11px] font-bold"><i class="fa-solid fa-trash"></i></button>
-                </div>
-                <div id="set-prof-brand-wrap" class="hide app-accent-bg border gold-border rounded-2xl p-3 space-y-1.5">
-                    <label class="app-label !mb-0 app-accent"><i class="fa-solid fa-tag mr-1"></i>Label Brand Cabang Anda</label>
-                    <input type="text" id="set-prof-brand" placeholder="Nama studio / usaha Anda" class="app-input">
-                    <p class="text-[10px] app-muted">Tampil sebagai: <em>"Label Anda — Powered by Lembarku"</em>.</p>
-                </div>
-                <div><label class="app-label">Nama Lengkap</label><input type="text" id="set-prof-name" class="app-input"></div>
-                <div><label class="app-label">Bio Singkat</label><input type="text" id="set-prof-bio" class="app-input"></div>
-                <div><label class="app-label">No. HP / WhatsApp</label><input type="tel" id="set-prof-phone" class="app-input"></div>
-                <div><label class="app-label">Alamat</label><textarea id="set-prof-address" class="app-input h-16"></textarea></div>
-                <button id="btn-save-prof" onclick="saveProfileInfo()" class="w-full gold-pill-btn py-3 rounded-xl text-xs">Simpan Profil</button>
-            </div>
+                    <div id="drawer-sub-privacy" class="hide space-y-4">
+                        <div class="app-card border rounded-3xl p-4 space-y-3.5 shadow-sm">
+                            <div class="border-b gold-border pb-2.5">
+                                <h4 class="font-extrabold text-sm">Visibilitas Profil &amp; Dokumen</h4>
+                                <p class="text-[11px] app-muted mt-0.5">Dokumen privat (Album Rahasia ber-PIN, draf belum aktif &amp; bukti transfer) <strong>selalu tersembunyi</strong> dan tidak pernah ditampilkan ke orang lain.</p>
+                            </div>
 
-            <div id="drawer-sub-akun" class="hide space-y-3 pb-10">
-                <button onclick="backToMainSlideMenu()" class="text-xs app-accent font-bold"><i class="fa-solid fa-chevron-left mr-1"></i>Pengaturan</button>
-                <div><label class="app-label">Username</label><input type="text" id="set-acc-user" class="app-input"></div>
-                <div><label class="app-label">Password Baru</label><div class="relative"><input type="password" id="set-acc-pass" class="app-input pr-10"><button type="button" onclick="togglePassVis('set-acc-pass',this)" class="absolute right-3 top-1/2 -translate-y-1/2 app-muted text-xs"><i class="fa-regular fa-eye"></i></button></div></div>
-                <button id="btn-save-acc" onclick="changeUserCredentials()" class="w-full gold-pill-btn py-3 rounded-xl text-xs">Simpan Perubahan Akun</button>
-                <div class="pt-4 border-t gold-border"><button onclick="confirmLogout()" class="w-full bg-red-600/15 hover:bg-red-600/25 text-red-500 border border-red-500/40 py-3 rounded-xl text-xs font-bold"><i class="fa-solid fa-right-from-bracket mr-1"></i> Keluar (Logout)</button></div>
-            </div>
+                            <div class="flex items-center justify-between gap-3">
+                                <div class="min-w-0">
+                                    <strong class="text-xs block">Tampilkan Postingan / Dokumen ke Publik</strong>
+                                    <span class="text-[10px] app-muted block">Jika dimatikan, orang lain tidak bisa melihat daftar project Anda.</span>
+                                </div>
+                                <label class="lbk-switch"><input type="checkbox" id="priv-show-projects" checked><span class="lbk-switch-track"></span></label>
+                            </div>
 
-            <div id="drawer-sub-qris" class="hide space-y-3 pb-10">
-                <button onclick="backToMainSlideMenu()" class="text-xs app-accent font-bold"><i class="fa-solid fa-chevron-left mr-1"></i>Pengaturan</button>
-                <div class="app-card border rounded-2xl p-3 space-y-2.5">
-                    <label class="app-label !mb-0 app-accent"><i class="fa-solid fa-qrcode mr-1"></i>Mode QRIS Pembayaran (DANA Bisnis)</label>
-                    <select id="ms-qris-mode" onchange="toggleQrisModeFields()" class="app-input font-bold">
-                        <option value="static">QRIS Tetap (Statis — Pembeli ketik nominal)</option>
-                        <option value="dynamic">QRIS Dinamis DANA (Otomatis isi nominal tiap transaksi)</option>
-                    </select>
-                    <div id="ms-qris-dynamic-wrap" class="hide space-y-2 pt-1">
-                        <label class="block gold-pill-btn py-2 rounded-xl text-center cursor-pointer text-[11px]"><i class="fa-solid fa-wand-magic-sparkles mr-1"></i>Baca Otomatis dari Gambar QRIS DANA Bisnis<input type="file" accept="image/*" class="hide" onchange="decodeQrisFromImageInput(this)"></label>
-                        <textarea id="ms-qris-dyn-str" placeholder="Atau tempel teks data QRIS DANA Bisnis (000201010211...)" class="app-input h-16 font-mono text-[10px]"></textarea>
-                        <label class="flex items-center gap-2 text-[11px] cursor-pointer"><input type="checkbox" id="ms-qris-unique" checked class="w-4 h-4 accent-blue-600"> Tambahkan 3 digit kode unik transaksi</label>
+                            <div class="flex items-center justify-between gap-3 border-t gold-border pt-3">
+                                <div class="min-w-0">
+                                    <strong class="text-xs block">Tampilkan Daftar Followers</strong>
+                                    <span class="text-[10px] app-muted block">Atur apakah daftar pengikut Anda boleh dilihat pengguna lain.</span>
+                                </div>
+                                <label class="lbk-switch"><input type="checkbox" id="priv-show-followers" checked><span class="lbk-switch-track"></span></label>
+                            </div>
+
+                            <div class="flex items-center justify-between gap-3 border-t gold-border pt-3">
+                                <div class="min-w-0">
+                                    <strong class="text-xs block">Tampilkan Daftar Following</strong>
+                                    <span class="text-[10px] app-muted block">Atur apakah akun yang Anda ikuti boleh dilihat orang lain.</span>
+                                </div>
+                                <label class="lbk-switch"><input type="checkbox" id="priv-show-following" checked><span class="lbk-switch-track"></span></label>
+                            </div>
+
+                            <div class="flex items-center justify-between gap-3 border-t gold-border pt-3">
+                                <div class="min-w-0">
+                                    <strong class="text-xs block">Tampilkan Nomor HP &amp; Alamat di Profil Publik</strong>
+                                    <span class="text-[10px] app-muted block">Sembunyikan info kontak pribadi dari pengunjung profil.</span>
+                                </div>
+                                <label class="lbk-switch"><input type="checkbox" id="priv-show-contact"><span class="lbk-switch-track"></span></label>
+                            </div>
+
+                            <div class="flex items-center justify-between gap-3 border-t gold-border pt-3">
+                                <div class="min-w-0">
+                                    <strong class="text-xs block">Tampil di Pencarian Kontak Chat (+)</strong>
+                                    <span class="text-[10px] app-muted block">Jika dimatikan, pengguna lain tidak melihat akun Anda di daftar kontak.</span>
+                                </div>
+                                <label class="lbk-switch"><input type="checkbox" id="priv-show-chat-contacts" checked><span class="lbk-switch-track"></span></label>
+                            </div>
+
+                            <div class="flex items-center justify-between gap-3 border-t gold-border pt-3">
+                                <div class="min-w-0">
+                                    <strong class="text-xs block">Izinkan Pesan Langsung dari Pengguna Lain</strong>
+                                    <span class="text-[10px] app-muted block">Jika dimatikan, hanya Founder &amp; Tim Administrasi yang bisa memulai chat.</span>
+                                </div>
+                                <label class="lbk-switch"><input type="checkbox" id="priv-allow-direct-chat" checked><span class="lbk-switch-track"></span></label>
+                            </div>
+
+                            <button type="button" id="btn-save-privacy" onclick="savePrivacySettings()" class="w-full gold-pill-btn py-3 rounded-xl text-xs uppercase mt-1">Simpan Pengaturan Privasi</button>
+                        </div>
+
+                        <div class="app-card border rounded-3xl p-4 space-y-3 shadow-sm">
+                            <div class="flex items-center justify-between border-b gold-border pb-2.5">
+                                <div>
+                                    <h4 class="font-extrabold text-sm"><i class="fa-solid fa-ban text-red-500 mr-1.5"></i>Daftar Akun Diblokir</h4>
+                                    <p class="text-[10px] app-muted">Akun yang diblokir tidak bisa melihat profil, project, atau mengikuti Anda.</p>
+                                </div>
+                                <span id="priv-blocked-count" class="text-[11px] px-2.5 py-0.5 rounded-full app-btn-sec font-bold">0</span>
+                            </div>
+                            <div id="priv-blocked-list" class="space-y-2"></div>
+                        </div>
                     </div>
-                    <div id="ms-qris-static-wrap" class="space-y-2 pt-1 text-center">
-                        <img id="ms-qris-prev" src="" class="w-32 h-32 mx-auto rounded-xl bg-white p-1 object-contain border">
-                        <label class="block app-card-soft border p-2 rounded-xl text-center cursor-pointer text-[11px] app-accent font-bold">Ganti Gambar QRIS Tetap<input type="file" accept="image/*" class="hide" onchange="uploadMasterQRIS(this)"></label>
+
+                    <div id="drawer-sub-about" class="hide space-y-3.5">
+                        <div class="app-card border rounded-3xl p-5 space-y-3 text-xs leading-relaxed shadow-sm">
+                            <div class="flex items-center gap-3">
+                                <img src="./lembarku-logo.png" class="w-11 h-11 rounded-xl bg-white p-1 border border-black/10 object-contain" onerror="this.style.display='none'">
+                                <div><strong class="text-sm block">Lembarku</strong><span class="text-[10px] app-muted uppercase tracking-wider">Powered by Kausar.pictures</span></div>
+                            </div>
+                            <p class="app-muted">Aplikasi ringan serba bisa yang dirancang untuk mempermudah siapa saja membuat berbagai kebutuhan berkas digital secara cepat langsung dari HP:</p>
+                            <ul class="space-y-1.5 list-disc pl-4">
+                                <li><strong>Undangan Digital Interaktif:</strong> Berbagai desain pernikahan adat &amp; modern, Aqiqah, Ulang Tahun, Syukuran, &amp; Khitanan lengkap peta, amplop digital, musik potong sendiri, RSVP &amp; daftar tamu personal.</li>
+                                <li><strong>Portofolio CV &amp; Surat Lamaran:</strong> 9 desain CV modern + surat lamaran resmi, fitur <em>Sempurnakan</em> untuk Auto-Scan foto dokumen HP dan menggabungkannya menjadi 1 file PDF utuh.</li>
+                                <li><strong>Sorotan Album &amp; Brankas Rahasia:</strong> Tautkan folder Google Drive atau simpan foto &amp; catatan pribadi di Album Rahasia ber-PIN 4-digit.</li>
+                                <li><strong>Mitra Admin Cabang:</strong> Label brand sendiri dan Portal Kelola Tamu Mandiri untuk klien.</li>
+                            </ul>
+                            <div class="pt-3 border-t gold-border flex items-center justify-between text-[11px]">
+                                <span class="app-muted">Versi Aplikasi</span>
+                                <span class="px-2.5 py-0.5 rounded-full app-accent-bg app-accent font-extrabold">V14.3</span>
+                            </div>
+                        </div>
                     </div>
-                </div>
-                <div class="flex items-center justify-between pt-1"><span class="text-xs font-bold app-accent">Daftar Rekening Bank</span><button type="button" onclick="addMasterBankRow()" class="text-[11px] app-accent font-bold hover:underline">+ Rekening</button></div>
-                <div id="ms-banks-container" class="space-y-2"></div>
-                <div><label class="app-label">Harga Default Undangan</label><input type="text" id="ms-p" placeholder="Rp 150.000" class="app-input"></div>
-                <div class="flex gap-2">
-                    <button id="btn-save-qris" onclick="saveMasterSettings()" class="flex-1 gold-pill-btn py-2.5 rounded-xl text-xs">Simpan Pembayaran</button>
-                    <button onclick="exportDB()" class="px-3 app-btn-sec py-2.5 rounded-xl text-xs font-bold">Backup</button>
+
+                    <div id="drawer-sub-profil" class="hide space-y-3.5">
+                        <div class="app-card border rounded-3xl p-4 space-y-3 shadow-sm">
+                            <div class="flex items-center gap-3 app-card-soft p-3 rounded-2xl border">
+                                <img id="set-prof-avatar-prev" src="" class="w-14 h-14 rounded-full object-cover bg-zinc-800 border gold-border">
+                                <div class="flex-1 flex flex-wrap gap-1.5">
+                                    <label class="px-3 py-1.5 rounded-lg gold-pill-btn text-[11px] cursor-pointer"><i class="fa-solid fa-camera mr-1"></i>Ganti Foto<input type="file" accept="image/*" class="hide" onchange="pickCroppedProfileMedia(this,'avatar')"></label>
+                                    <button type="button" onclick="removeProfileMedia('avatar')" class="px-2.5 py-1.5 rounded-lg bg-red-600/15 text-red-500 border border-red-500/30 text-[11px] font-bold"><i class="fa-solid fa-trash"></i></button>
+                                </div>
+                            </div>
+                            <div class="flex gap-2">
+                                <label class="flex-1 app-card-soft border p-2.5 rounded-xl text-center cursor-pointer text-xs font-semibold"><i class="fa-solid fa-image mr-1 app-accent"></i>Ganti Sampul Profil<input type="file" accept="image/*" class="hide" onchange="pickCroppedProfileMedia(this,'banner')"></label>
+                                <button type="button" onclick="removeProfileMedia('banner')" class="px-3.5 rounded-xl bg-red-600/15 text-red-500 border border-red-500/30 text-xs font-bold"><i class="fa-solid fa-trash"></i></button>
+                            </div>
+                            <div id="set-prof-brand-wrap" class="hide app-accent-bg border gold-border rounded-2xl p-3 space-y-1.5">
+                                <label class="app-label !mb-0 app-accent"><i class="fa-solid fa-tag mr-1"></i>Label Brand Cabang Anda</label>
+                                <input type="text" id="set-prof-brand" placeholder="Nama studio / usaha Anda" class="app-input">
+                                <p class="text-[10px] app-muted">Tampil sebagai: <em>"Label Anda — Powered by Lembarku"</em>.</p>
+                            </div>
+                            <div><label class="app-label">Nama Lengkap</label><input type="text" id="set-prof-name" class="app-input"></div>
+                            <div><label class="app-label">Bio Singkat</label><input type="text" id="set-prof-bio" class="app-input"></div>
+                            <div><label class="app-label">No. HP / WhatsApp</label><input type="tel" id="set-prof-phone" class="app-input"></div>
+                            <div><label class="app-label">Alamat</label><textarea id="set-prof-address" class="app-input h-16"></textarea></div>
+                            <button id="btn-save-prof" onclick="saveProfileInfo()" class="w-full gold-pill-btn py-3 rounded-xl text-xs uppercase">Simpan Profil</button>
+                        </div>
+                    </div>
+
+                    <div id="drawer-sub-akun" class="hide space-y-4">
+                        <div class="app-card border rounded-3xl p-4 space-y-3 shadow-sm">
+                            <h4 class="font-extrabold text-sm">Identitas Username</h4>
+                            <div>
+                                <label class="app-label">Username Akun</label>
+                                <input type="text" id="set-acc-user" class="app-input">
+                                <p id="set-acc-user-note" class="text-[10px] app-muted mt-1">Username dipakai untuk login &amp; profil Anda.</p>
+                            </div>
+                            <button type="button" id="btn-save-acc-user" onclick="changeUsernameOnly()" class="w-full gold-pill-btn py-2.5 rounded-xl text-xs uppercase">Simpan Username</button>
+                        </div>
+
+                        <div class="space-y-2">
+                            <button type="button" onclick="openSlideSub('password')" class="menu-row-card">
+                                <span class="menu-row-ic"><i class="fa-solid fa-key"></i></span>
+                                <div class="flex-1 min-w-0">
+                                    <strong class="text-xs block">Ganti Kata Sandi (Password)</strong>
+                                    <span class="text-[10px] app-muted block">Verifikasi sandi lama, buat sandi baru &amp; konfirmasi</span>
+                                </div>
+                                <i class="fa-solid fa-chevron-right text-[10px] app-muted"></i>
+                            </button>
+                        </div>
+
+                        <div class="pt-2">
+                            <button type="button" onclick="confirmLogout()" class="w-full bg-red-600/15 hover:bg-red-600/25 text-red-500 border border-red-500/40 py-3 rounded-2xl text-xs font-bold"><i class="fa-solid fa-right-from-bracket mr-1.5"></i>Keluar (Logout)</button>
+                        </div>
+                    </div>
+
+                    <div id="drawer-sub-password" class="hide space-y-4">
+                        <form onsubmit="submitSecurePasswordChange(event)" class="app-card border rounded-3xl p-5 space-y-4 shadow-sm" autocomplete="off">
+                            <div class="app-accent-bg border gold-border rounded-2xl p-3 text-[11px] leading-relaxed">
+                                <i class="fa-solid fa-shield-halved app-accent mr-1.5"></i>
+                                Demi keamanan akun Anda, masukkan <strong>Password Lama</strong> terlebih dahulu, lalu ketik <strong>Password Baru</strong> dua kali (minimal 6 karakter).
+                            </div>
+
+                            <div>
+                                <label class="app-label">Password Lama</label>
+                                <div class="relative">
+                                    <input type="password" id="pw-old" placeholder="Masukkan password saat ini" class="app-input pr-10" required>
+                                    <button type="button" onclick="togglePassVis('pw-old',this)" class="absolute right-3 top-1/2 -translate-y-1/2 app-muted text-xs"><i class="fa-regular fa-eye"></i></button>
+                                </div>
+                            </div>
+
+                            <div class="space-y-1.5">
+                                <label class="app-label">Password Baru</label>
+                                <div class="relative">
+                                    <input type="password" id="pw-new" oninput="evaluatePasswordStrengthUI()" placeholder="Minimal 6 karakter" class="app-input pr-10" minlength="6" required>
+                                    <button type="button" onclick="togglePassVis('pw-new',this)" class="absolute right-3 top-1/2 -translate-y-1/2 app-muted text-xs"><i class="fa-regular fa-eye"></i></button>
+                                </div>
+                                <div class="w-full h-1.5 rounded-full app-btn-sec overflow-hidden">
+                                    <div id="pw-strength-bar" class="h-full transition-all duration-300 bg-zinc-400" style="width:0%"></div>
+                                </div>
+                                <p id="pw-strength-text" class="text-[10px] app-muted">Gunakan kombinasi huruf &amp; angka agar lebih kuat.</p>
+                            </div>
+
+                            <div class="space-y-1">
+                                <label class="app-label">Ulangi Password Baru</label>
+                                <div class="relative">
+                                    <input type="password" id="pw-confirm" oninput="evaluatePasswordStrengthUI()" placeholder="Ketik ulang password baru" class="app-input pr-10" minlength="6" required>
+                                    <button type="button" onclick="togglePassVis('pw-confirm',this)" class="absolute right-3 top-1/2 -translate-y-1/2 app-muted text-xs"><i class="fa-regular fa-eye"></i></button>
+                                </div>
+                                <p id="pw-match-hint" class="text-[10px] hide"></p>
+                            </div>
+
+                            <button type="submit" id="btn-submit-change-pw" class="w-full gold-pill-btn py-3 rounded-xl text-xs uppercase shadow-lg">Ajukan Ganti Password</button>
+                        </form>
+                    </div>
+
+                    <div id="drawer-sub-qris" class="hide space-y-3.5">
+                        <div class="app-card border rounded-3xl p-4 space-y-3 shadow-sm">
+                            <label class="app-label !mb-0 app-accent"><i class="fa-solid fa-qrcode mr-1"></i>Mode QRIS Pembayaran (DANA Bisnis)</label>
+                            <select id="ms-qris-mode" onchange="toggleQrisModeFields()" class="app-input font-bold">
+                                <option value="static">QRIS Tetap (Statis — Pembeli ketik nominal)</option>
+                                <option value="dynamic">QRIS Dinamis DANA (Otomatis isi nominal tiap transaksi)</option>
+                            </select>
+                            <div id="ms-qris-dynamic-wrap" class="hide space-y-2 pt-1">
+                                <label class="block gold-pill-btn py-2 rounded-xl text-center cursor-pointer text-[11px]"><i class="fa-solid fa-wand-magic-sparkles mr-1"></i>Baca Otomatis dari Gambar QRIS DANA Bisnis<input type="file" accept="image/*" class="hide" onchange="decodeQrisFromImageInput(this)"></label>
+                                <textarea id="ms-qris-dyn-str" placeholder="Atau tempel teks data QRIS DANA Bisnis (000201010211...)" class="app-input h-16 font-mono text-[10px]"></textarea>
+                                <label class="flex items-center gap-2 text-[11px] cursor-pointer"><input type="checkbox" id="ms-qris-unique" checked class="w-4 h-4 accent-blue-600"> Tambahkan 3 digit kode unik transaksi</label>
+                            </div>
+                            <div id="ms-qris-static-wrap" class="space-y-2 pt-1 text-center">
+                                <img id="ms-qris-prev" src="" class="w-32 h-32 mx-auto rounded-xl bg-white p-1 object-contain border">
+                                <label class="block app-card-soft border p-2 rounded-xl text-center cursor-pointer text-[11px] app-accent font-bold">Ganti Gambar QRIS Tetap<input type="file" accept="image/*" class="hide" onchange="uploadMasterQRIS(this)"></label>
+                            </div>
+                        </div>
+                        <div class="app-card border rounded-3xl p-4 space-y-3 shadow-sm">
+                            <div class="flex items-center justify-between"><span class="text-xs font-bold app-accent">Daftar Rekening Bank</span><button type="button" onclick="addMasterBankRow()" class="text-[11px] app-accent font-bold hover:underline">+ Rekening</button></div>
+                            <div id="ms-banks-container" class="space-y-2"></div>
+                            <div><label class="app-label">Harga Default Undangan</label><input type="text" id="ms-p" placeholder="Rp 150.000" class="app-input"></div>
+                            <div class="flex gap-2">
+                                <button id="btn-save-qris" onclick="saveMasterSettings()" class="flex-1 gold-pill-btn py-2.5 rounded-xl text-xs">Simpan Pembayaran</button>
+                                <button onclick="exportDB()" class="px-4 app-btn-sec py-2.5 rounded-xl text-xs font-bold">Backup</button>
+                            </div>
+                        </div>
+                    </div>
                 </div>
             </div>
+        </div>
+    </div>
+
+    <!-- ========================================================= -->
+    <!-- OVERLAY 3: WORKSPACE FOUNDER FULL-SCREEN MANDIRI          -->
+    <!-- ========================================================= -->
+    <div id="modal-master-workspace" class="hide fixed inset-0 z-[74] bg-[var(--app-bg)] flex flex-col overflow-hidden">
+        <div class="lbk-fs-header px-4 sm:px-6 py-3.5 flex items-center justify-between gap-3">
+            <div class="flex items-center gap-2.5 min-w-0">
+                <button type="button" onclick="closeMasterWorkspaceFullscreen()" class="w-9 h-9 rounded-full app-btn-sec flex items-center justify-center text-xs shrink-0 active:scale-95 transition" title="Kembali">
+                    <i class="fa-solid fa-chevron-left"></i>
+                </button>
+                <div class="min-w-0">
+                    <h3 id="master-active-panel-title" class="font-extrabold text-base sm:text-lg truncate">Panel Founder</h3>
+                    <p id="master-active-panel-sub" class="text-[10px] app-muted truncate">Pengaturan Mandiri Lembarku</p>
+                </div>
+            </div>
+            <button type="button" onclick="closeMasterWorkspaceFullscreen()" class="px-4 py-1.5 rounded-full app-btn-sec text-xs font-bold shrink-0">Selesai</button>
+        </div>
+        <div class="lbk-fs-scroll">
+            <div id="master-workspace-body" class="max-w-5xl mx-auto p-4 sm:p-6 pb-24"></div>
+        </div>
+    </div>
+
+    <!-- ========================================================= -->
+    <!-- OVERLAY 4: HALAMAN NOTIFIKASI LONCENG FULL-SCREEN         -->
+    <!-- ========================================================= -->
+    <div id="modal-notifications" class="hide fixed inset-0 z-[125] bg-[var(--app-bg)] flex flex-col overflow-hidden">
+        <div class="lbk-fs-header px-4 sm:px-6 py-3.5 flex items-center justify-between gap-3">
+            <div class="flex items-center gap-2.5 min-w-0">
+                <button type="button" onclick="closeNotificationsFullscreen()" class="w-9 h-9 rounded-full app-btn-sec flex items-center justify-center text-xs shrink-0 active:scale-95 transition" title="Kembali">
+                    <i class="fa-solid fa-chevron-left"></i>
+                </button>
+                <div class="min-w-0">
+                    <h3 class="font-extrabold text-base sm:text-lg truncate">Notifikasi</h3>
+                    <p id="notif-subtitle" class="text-[10px] app-muted truncate">Aktivitas &amp; transaksi terbaru</p>
+                </div>
+            </div>
+            <button type="button" onclick="markAllNotificationsRead()" class="px-3.5 py-1.5 rounded-full app-card-soft border gold-border app-accent text-[11px] font-bold shrink-0">Tandai Dibaca</button>
+        </div>
+        <div class="lbk-fs-scroll">
+            <div id="notifications-list-body" class="max-w-2xl mx-auto p-4 space-y-2.5 pb-16"></div>
         </div>
     </div>
 
@@ -1051,7 +1314,7 @@
     <!-- MODALS                                                    -->
     <!-- ========================================================= -->
 
-    <div id="modal-create-choice" class="hide fixed inset-0 z-[78] bg-black/75 backdrop-blur-sm flex items-center justify-center p-4">
+    <div id="modal-create-choice" class="hide fixed inset-0 z-[80] bg-black/75 backdrop-blur-sm flex items-center justify-center p-4">
         <div class="app-card border rounded-3xl max-w-sm w-full p-6 space-y-4 shadow-2xl">
             <div class="flex justify-between items-center border-b gold-border pb-2.5">
                 <h3 class="font-extrabold text-base">Buat Berkasmu</h3>
@@ -1066,7 +1329,7 @@
         </div>
     </div>
 
-    <div id="modal-add-album-choice" class="hide fixed inset-0 z-[78] bg-black/75 backdrop-blur-sm flex items-center justify-center p-4">
+    <div id="modal-add-album-choice" class="hide fixed inset-0 z-[80] bg-black/75 backdrop-blur-sm flex items-center justify-center p-4">
         <div class="app-card border rounded-3xl max-w-sm w-full p-6 space-y-4 shadow-2xl">
             <div class="flex justify-between items-center border-b gold-border pb-2.5">
                 <h3 class="font-extrabold text-base">Tambah Sorotan Album</h3>
@@ -1300,7 +1563,7 @@
         </div>
     </div>
 
-    <div id="modal-theme-builder" class="hide fixed inset-0 z-[80] bg-black/85 backdrop-blur-sm flex items-center justify-center p-2.5 sm:p-4">
+    <div id="modal-theme-builder" class="hide fixed inset-0 z-[90] bg-black/85 backdrop-blur-sm flex items-center justify-center p-2.5 sm:p-4">
         <form onsubmit="submitVisualThemeBuilder(event)" class="app-card border rounded-3xl max-w-2xl w-full max-h-[93vh] flex flex-col overflow-hidden shadow-2xl">
             <div class="px-5 py-3.5 border-b gold-border flex items-center justify-between shrink-0">
                 <div>
@@ -1411,8 +1674,8 @@
         </div>
     </div>
 
-    <!-- MODAL KONTAK BARU ALA WHATSAPP UNTUK FOUNDER & TIM ADMINISTRASI -->
-    <div id="modal-chat-contacts" class="hide fixed inset-0 z-[86] bg-black/80 backdrop-blur-sm flex items-center justify-center p-4">
+    <!-- MODAL KONTAK BARU ALA WHATSAPP -->
+    <div id="modal-chat-contacts" class="hide fixed inset-0 z-[135] bg-black/80 backdrop-blur-sm flex items-center justify-center p-4">
         <div class="app-card border rounded-3xl max-w-md w-full max-h-[82vh] flex flex-col overflow-hidden shadow-2xl">
             <div class="px-5 py-3.5 border-b gold-border flex items-center justify-between shrink-0">
                 <div>
@@ -1429,7 +1692,7 @@
     </div>
 
     <!-- MODAL CROP GAMBAR & AUDIO CROPPER -->
-    <div id="modal-image-cropper" class="hide fixed inset-0 z-[98] bg-black/85 backdrop-blur-sm flex items-center justify-center p-4">
+    <div id="modal-image-cropper" class="hide fixed inset-0 z-[155] bg-black/85 backdrop-blur-sm flex items-center justify-center p-4">
         <div class="app-card border rounded-3xl max-w-md w-full p-5 space-y-4 shadow-2xl">
             <div class="flex justify-between items-center border-b gold-border pb-2.5">
                 <h3 id="crop-modal-title" class="font-bold text-sm"><i class="fa-solid fa-crop-simple app-accent mr-1.5"></i>Atur Rasio Foto</h3>
@@ -1450,7 +1713,7 @@
         </div>
     </div>
 
-    <div id="modal-audio-cropper" class="hide fixed inset-0 z-[98] bg-black/85 backdrop-blur-sm flex items-center justify-center p-4">
+    <div id="modal-audio-cropper" class="hide fixed inset-0 z-[155] bg-black/85 backdrop-blur-sm flex items-center justify-center p-4">
         <div class="app-card border rounded-3xl max-w-md w-full p-5 space-y-4 shadow-2xl">
             <div class="flex justify-between items-center border-b gold-border pb-2.5">
                 <h3 class="font-bold text-sm"><i class="fa-solid fa-sliders app-accent mr-1.5"></i>Pilih Bagian Lagu (Gaya IG Story)</h3>
@@ -1458,6 +1721,7 @@
             </div>
             <div class="space-y-3">
                 <div><label class="app-label">Judul Lagu (Otomatis Masuk Stok Lagu)</label><input type="text" id="ac-song-title" placeholder="Judul lagu Anda" class="app-input"></div>
+                <div id="ac-cat-wrap" class="hide"><label class="app-label">Kategori Lagu</label><input type="text" id="ac-song-cat" placeholder="Pernikahan / Islami / Ulang Tahun" class="app-input"></div>
                 <div class="flex items-center justify-between text-[11px]"><span class="app-muted">Durasi: <strong id="ac-total-dur">00:00</strong></span><span class="app-accent font-bold">Terpilih: <strong id="ac-clip-range-lbl">00:00 — 00:45</strong></span></div>
                 <div class="flex items-center justify-between gap-1.5">
                     <span class="text-[11px] app-muted">Panjang klip:</span>
@@ -1481,8 +1745,8 @@
         </div>
     </div>
 
-    <!-- MODAL PENAMPIL BUKTI TRANSFER / SCREENSHOT AMAN (PENGGANTI WINDOW.DOCUMENT.WRITE) -->
-    <div id="modal-proof-viewer" class="hide fixed inset-0 z-[97] bg-black/90 backdrop-blur-md flex items-center justify-center p-4" onclick="if(event.target===this)this.classList.add('hide')">
+    <!-- MODAL PENAMPIL BUKTI TRANSFER / SCREENSHOT AMAN -->
+    <div id="modal-proof-viewer" class="hide fixed inset-0 z-[149] bg-black/90 backdrop-blur-md flex items-center justify-center p-4" onclick="if(event.target===this)this.classList.add('hide')">
         <div class="app-card border rounded-3xl max-w-lg w-full overflow-hidden shadow-2xl flex flex-col max-h-[90vh]">
             <div class="px-5 py-3.5 border-b gold-border flex items-center justify-between gap-2 shrink-0">
                 <h3 id="proof-viewer-title" class="font-bold text-sm truncate"><i class="fa-solid fa-receipt app-accent mr-1.5"></i>Bukti Pembayaran</h3>
@@ -1498,8 +1762,8 @@
         </div>
     </div>
 
-    <!-- MODAL FOUNDER: INSPEKSI PROFIL USER / CABANG -->
-    <div id="modal-view-user-profile" class="hide fixed inset-0 z-[78] bg-black/80 backdrop-blur-sm flex items-center justify-center p-4">
+    <!-- MODAL PROFIL PUBLIK PENGGUNA -->
+    <div id="modal-view-user-profile" class="hide fixed inset-0 z-[135] bg-black/80 backdrop-blur-sm flex items-center justify-center p-4">
         <div class="app-card border rounded-3xl max-w-lg w-full overflow-hidden shadow-2xl max-h-[88vh] flex flex-col">
             <div class="flex justify-between items-center px-5 py-3.5 border-b gold-border">
                 <h3 class="font-bold text-sm"><i class="fa-solid fa-id-badge app-accent mr-1.5"></i>Detail Profil, Proyek &amp; Album Akun</h3>
@@ -1510,7 +1774,7 @@
     </div>
 
     <!-- MODAL FOUNDER CRUD USER / CABANG / ADMINISTRASI -->
-    <div id="modal-master-user" class="hide fixed inset-0 z-[79] bg-black/80 flex items-center justify-center p-4">
+    <div id="modal-master-user" class="hide fixed inset-0 z-[148] bg-black/80 flex items-center justify-center p-4">
         <form onsubmit="submitMasterUserModal(event)" class="app-card border rounded-3xl max-w-md w-full p-6 space-y-3">
             <div class="flex justify-between items-center border-b gold-border pb-2.5">
                 <h3 id="mmu-title" class="font-bold text-base">Tambah Akun</h3>
@@ -1530,7 +1794,7 @@
             </div>
             <div><label class="app-label">Nama Lengkap / Mitra</label><input type="text" id="mmu-name" class="app-input" required></div>
             <div><label class="app-label">Username</label><input type="text" id="mmu-username" class="app-input" required></div>
-            <div><label class="app-label">Password</label><div class="relative"><input type="password" id="mmu-password" class="app-input pr-10" required><button type="button" onclick="togglePassVis('mmu-password',this)" class="absolute right-3 top-1/2 -translate-y-1/2 app-muted text-xs"><i class="fa-regular fa-eye"></i></button></div></div>
+            <div><label class="app-label">Password</label><div class="relative"><input type="password" id="mmu-password" class="app-input pr-10" placeholder="Kosongkan saat edit jika tidak diubah"><button type="button" onclick="togglePassVis('mmu-password',this)" class="absolute right-3 top-1/2 -translate-y-1/2 app-muted text-xs"><i class="fa-regular fa-eye"></i></button></div></div>
             <div class="grid grid-cols-2 gap-2.5"><input type="tel" id="mmu-phone" placeholder="No. HP" class="app-input"><input type="text" id="mmu-address" placeholder="Alamat" class="app-input"></div>
             <label class="flex items-center justify-between app-card-soft border rounded-2xl p-3 text-xs font-bold cursor-pointer">
                 <span><i class="fa-solid fa-circle-check text-blue-500 mr-1.5"></i>Status Akun PRO (Centang Biru + Unlimited)</span>
@@ -1545,7 +1809,7 @@
     </div>
 
     <!-- MODAL SHARE SOSMED -->
-    <div id="modal-share-sosmed" class="hide fixed inset-0 z-[78] bg-black/80 flex items-center justify-center p-4">
+    <div id="modal-share-sosmed" class="hide fixed inset-0 z-[80] bg-black/80 flex items-center justify-center p-4">
         <div class="app-card border rounded-3xl max-w-md w-full p-6 space-y-4">
             <div class="flex justify-between items-center border-b gold-border pb-3">
                 <h3 class="font-bold text-base">Kirim Undangan Personal</h3>
