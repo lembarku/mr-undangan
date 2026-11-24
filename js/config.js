@@ -1,6 +1,6 @@
 // =========================================================================
-// LEMBARKU — CORE CONFIG, CATALOGS, CROPPER & CLOUD ENGINE (js/config.js)
-// Versi: V14.3
+// LEMBARKU & TITIK GOWES — CONFIG, CATALOGS & SHARED ENGINE (js/config.js)
+// Versi: V14.3 (Modular Super-App Ekosistem)
 // =========================================================================
 const CLOUD_API_URL = "https://script.google.com/macros/s/AKfycbyHsITJ02tiA59p0QIXkOQaO3VnBFQmDBp-7iUHcUkmrYjlOtRVwxhlGZCzL4RLKKNW/exec";
 const FOUNDER_USERNAME = "kausar.af";
@@ -9,6 +9,7 @@ const SESSION_KEY = "MR_UNDANGAN_SESSION";
 const SESSION_TOKEN_KEY = "MR_UNDANGAN_SESSION_TOKEN";
 const DISPLAY_NAME_KEY = "MR_UNDANGAN_DISPLAY_NAME";
 const APP_THEME_KEY = "MR_UNDANGAN_APP_THEME";
+const APP_MODE_KEY = "MR_APP_MODE"; // 'lembarku' | 'titik_gowes'
 const PWA_REMIND_KEY = "MR_PWA_REMIND_TS";
 const LOGIN_REMIND_KEY = "MR_LOGIN_REMIND_TS";
 const DRAFT_INV_KEY = "MR_DRAFT_INV";
@@ -29,6 +30,12 @@ const DEFAULT_PRIVACY = {
 
 const DEFAULT_AVATAR = "data:image/svg+xml;utf8," + encodeURIComponent(
     `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 120 120"><rect width="120" height="120" fill="#1e293b"/><circle cx="60" cy="44" r="22" fill="#94a3b8"/><path d="M22 110c4-24 22-36 38-36s34 12 38 36" fill="#94a3b8"/></svg>`
+);
+
+const LEMBARKU_LOGO_PATH = "./lembarku-logo.png";
+const GOWES_LOGO_PATH = "./titik-gowes-logo.png";
+const GOWES_LOGO_FALLBACK = "data:image/svg+xml;utf8," + encodeURIComponent(
+    `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" width="100%" height="100%"><circle cx="256" cy="220" r="160" fill="none" stroke="#000000" stroke-width="26"/><path d="M120 280 L256 460 L392 280" fill="none" stroke="#000000" stroke-width="26" stroke-linejoin="round"/><circle cx="180" cy="240" r="46" fill="none" stroke="#000000" stroke-width="18"/><circle cx="332" cy="240" r="46" fill="none" stroke="#000000" stroke-width="18"/><path d="M180 240 L235 240 L280 160 L215 160 Z" fill="none" stroke="#000000" stroke-width="18" stroke-linejoin="round"/><path d="M235 240 L210 120 M332 240 L280 160 L270 125 L300 125" fill="none" stroke="#000000" stroke-width="18" stroke-linecap="round"/><circle cx="256" cy="380" r="18" fill="#000000"/></svg>`
 );
 
 const DEFAULT_WA_TEMPLATE =
@@ -148,7 +155,67 @@ const PORTFOLIO_CATALOG = {
     ]
 };
 
-// ================= ETALASE 3: 6 DESAIN SERTIFIKAT PROFESIONAL =================
+// ================= KATALOG BAWAAN TITIK GOWES (ARMADA SEPEDA & SHELTER) =================
+const DEFAULT_GOWES_SHELTER = {
+    name: "Titik Gowes Shelter Utama",
+    address: "Jl. Mulawarman No. 88, Samarinda (Dekat Taman Kota)",
+    mapsUrl: "https://maps.google.com/?q=-0.502,117.153",
+    operationalHours: "Setiap Hari: 05.30 - 20.00 WITA",
+    csPhone: "085117488828"
+};
+
+const DEFAULT_GOWES_BIKES = [
+    {
+        id: "bike_1",
+        name: "Polygon Xtrada 6",
+        type: "MTB (Gunung)",
+        frameSize: "M (165-175 cm)",
+        gears: "1x11 Speed Shimano Deore",
+        price2Hours: 40000,
+        price6Hours: 75000,
+        priceFullDay: 120000,
+        status: "Tersedia",
+        description: "Suspensi empuk air fork, rem hidrolik pakem, cocok untuk rute aspal maupun off-road ringan.",
+        freeAccessories: ["Helm Sepeda", "Kunci Gembok Spiral", "Lampu Depan/Belakang"],
+        image: "https://images.unsplash.com/photo-1485965120184-e220f721d03e?auto=format&fit=crop&w=800&q=75",
+        totalRentedCount: 24,
+        createdAt: 1700000000000
+    },
+    {
+        id: "bike_2",
+        name: "United Milano Roadbike",
+        type: "Roadbike (Balap)",
+        frameSize: "S/M (160-172 cm)",
+        gears: "2x9 Speed Shimano Sora",
+        price2Hours: 50000,
+        price6Hours: 95000,
+        priceFullDay: 150000,
+        status: "Tersedia",
+        description: "Super ringan & kencang, geometri nyaman untuk gowes pagi keliling kota atau latihan endurance.",
+        freeAccessories: ["Helm Aero", "Pompa Mini Portabel", "Bottle Cage"],
+        image: "https://images.unsplash.com/photo-1532298229144-0ec0c57515c7?auto=format&fit=crop&w=800&q=75",
+        totalRentedCount: 38,
+        createdAt: 1700000000001
+    },
+    {
+        id: "bike_3",
+        name: "Pacific Noris Pro Lipat",
+        type: "Sepeda Lipat (Folding)",
+        frameSize: "All Size (Adjustable)",
+        gears: "8 Speed Shimano Tourney",
+        price2Hours: 35000,
+        price6Hours: 60000,
+        priceFullDay: 90000,
+        status: "Tersedia",
+        description: "Sangat ringkas & praktis, mudah dilipat ke dalam bagasi mobil, cocok untuk Car Free Day santai.",
+        freeAccessories: ["Helm Casual", "Tas Stang Depan", "Kunci Gembok"],
+        image: "https://images.unsplash.com/photo-1507035895480-2b3156c31fc8?auto=format&fit=crop&w=800&q=75",
+        totalRentedCount: 42,
+        createdAt: 1700000000002
+    }
+];
+
+// ================= ETALASE SERTIFIKAT =================
 const CERT_SHOWCASE = [
     {
         id: "cert_formal_qr",
@@ -255,6 +322,10 @@ function getLocalFallbackDB() {
         themeOverrides: {},
         cvPriceOverrides: {},
         musicLibrary: [],
+        gowesBikes: [...DEFAULT_GOWES_BIKES],
+        gowesRentals: [],
+        gowesShelter: Object.assign({}, DEFAULT_GOWES_SHELTER),
+        gowesAnalytics: null,
         appStats: {
             activeInstalled: 0,
             totalInstalled: 0,
@@ -263,12 +334,13 @@ function getLocalFallbackDB() {
         },
         testimonials: [
             { id: 1, name: "Rina & Dimas", category: "Undangan Pernikahan", rating: 5, text: "Undangan Adat Kalimantannya mewah banget, tamu-tamu pada puji animasi buka kertasnya!" },
-            { id: 2, name: "Fajar Pratama", category: "CV & Lamaran PDF", rating: 5, text: "Fitur Sempurnakan + Auto-Scan KTP & Ijazah jadi 1 PDF di bawah 2 MB bikin lamaran saya langsung dipanggil HRD." }
+            { id: 2, name: "Fajar Pratama", category: "CV & Lamaran PDF", rating: 5, text: "Fitur Sempurnakan + Auto-Scan KTP & Ijazah jadi 1 PDF di bawah 2 MB bikin lamaran saya langsung dipanggil HRD." },
+            { id: 3, name: "Bayu Kurniawan", category: "Rental Titik Gowes", rating: 5, text: "Sewa United Roadbike buat gowes pagi akhir pekan sangat mulus, unit bersih dan dapat helm gratis!" }
         ],
         promoBanners: [
             { id: 1, badge: "PROMO SPESIAL", title: "Undangan Digital, CV & Lamaran Siap PDF", subtitle: "Pilih Desain → Isi Data & Konfirmasi → Bagikan / Unduh PDF langsung dari HP.", ctaText: "Lihat Desain", targetType: "section", targetSection: "sec-undangan", img: IMG("1519741497674-611481863552") },
-            { id: 2, badge: "SIAP KERJA", title: "9 Desain CV Modern + Auto-Scan PDF", subtitle: "Gabungkan CV, Surat Lamaran, KTP & Ijazah dalam 1 file PDF bersih seperti scanner.", ctaText: "Pilih Tema CV", targetType: "section", targetSection: "sec-portofolio", img: IMG("1586281380349-632531db7ed4") },
-            { id: 3, badge: "SEGERA HADIR", title: "Desain Sertifikat: Sekali Buat, Nama Otomatis Berbeda", subtitle: "Input nama pemegang sertifikat seperti daftar tamu undangan, lalu bagikan dengan hasil berbeda-beda.", ctaText: "Lihat Contoh", targetType: "section", targetSection: "sec-sertifikat", img: IMG("1523240795612-9a054b0db644") }
+            { id: 2, badge: "TITIK GOWES", title: "Rental Sepeda Premium: MTB, Roadbike & Lipat", subtitle: "Gowes sehat dan seru keliling kota. Booking praktis via QRIS DANA & jaminan aman.", ctaText: "Lihat Armada Sepeda", targetType: "gowes", targetSection: "sec-gowes-catalog", img: "https://images.unsplash.com/photo-1517649763962-0c623266ddc0?auto=format&fit=crop&w=1200&q=75" },
+            { id: 3, badge: "SIAP KERJA", title: "9 Desain CV Modern + Auto-Scan PDF", subtitle: "Gabungkan CV, Surat Lamaran, KTP & Ijazah dalam 1 file PDF bersih seperti scanner.", ctaText: "Pilih Tema CV", targetType: "section", targetSection: "sec-portofolio", img: IMG("1586281380349-632531db7ed4") }
         ],
         masterSettings: {
             qrisMode: "static",
@@ -282,6 +354,7 @@ function getLocalFallbackDB() {
 }
 
 let db = getLocalFallbackDB();
+let currentAppMode = localStorage.getItem(APP_MODE_KEY) || "lembarku";
 let currentSessionUser = localStorage.getItem(SESSION_KEY) || null;
 if (currentSessionUser && String(currentSessionUser).trim().toLowerCase() === "master") {
     currentSessionUser = FOUNDER_USERNAME;
@@ -299,148 +372,329 @@ let activeMasterChatThread = null;
 let previewOpenCount = 0;
 let clientPortalState = { active: false, invId: null, key: "", brandName: "", invitation: null };
 
-// ================= UTILITAS UMUM =================
-const esc = (s) => String(s || "").replace(/\\/g, "\\\\").replace(/'/g, "\\'").replace(/"/g, "&quot;").replace(/\n/g, " ");
-const escHtml = (s) => String(s || "").replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
-const slugify = (s) => String(s || "berkas").toLowerCase().replace(/[^a-z0-9]+/g, "_").replace(/^_|_$/g, "").slice(0, 40) || "berkas";
-const fmtRp = (n) => "Rp " + Math.round(Number(n) || 0).toLocaleString("id-ID");
-const fmtBytes = (b) => {
-    const n = Number(b) || 0;
-    if (n <= 0) return "0 MB";
-    if (n >= 1073741824) return (n / 1073741824).toFixed(2) + " GB";
-    if (n >= 1048576) return (n / 1048576).toFixed(1) + " MB";
-    return Math.max(1, Math.round(n / 1024)) + " KB";
-};
-const getCleanBaseUrl = () => {
-    const cleanPath = (window.location.pathname || "/").replace(/\/index\.html$/i, "/");
-    return window.location.origin + (cleanPath.endsWith("/") ? cleanPath : cleanPath + "/");
-};
-const imgFbAttr = (fb) => `onerror="if(this.dataset.fb&&this.src!==this.dataset.fb){this.src=this.dataset.fb;this.dataset.fb='';}" data-fb="${esc(fb || IMG("1519741497674-611481863552"))}"`;
-
-function getDeterministicUniqueCode(docId) {
-    const num = Math.abs(parseInt(String(docId || "100").replace(/\D/g, ""), 10) || 100);
-    return (num % 899) + 101;
-}
-
-const _loadedScripts = {};
-function loadScriptOnce(url) {
-    if (_loadedScripts[url]) return _loadedScripts[url];
-    _loadedScripts[url] = new Promise((resolve, reject) => {
-        const s = document.createElement("script");
-        s.src = url; s.async = true;
-        s.onload = () => resolve(true);
-        s.onerror = () => {
-            delete _loadedScripts[url];
-            reject(new Error("Gagal memuat " + url));
-        };
-        document.head.appendChild(s);
-    });
-    return _loadedScripts[url];
-}
-
-// ================= UI FEEDBACK: LOADING, TOAST, CONFIRM, SPLASH, TEMA =================
-let _toastTimer = null;
-function showLoading(txt = "Memproses...") {
-    const bar = document.getElementById("global-loading-bar"), el = document.getElementById("global-loading-text");
-    if (el) el.innerText = txt;
-    if (bar) bar.classList.remove("hide");
-}
-function hideLoading() { document.getElementById("global-loading-bar")?.classList.add("hide"); }
-
-function showToast(msg, type = "success") {
-    const el = document.getElementById("app-toast"), txt = document.getElementById("app-toast-msg"), ic = document.getElementById("app-toast-icon");
-    if (!el || !txt) return;
-    txt.innerText = msg;
-    if (ic) {
-        ic.className = type === "error"
-            ? "fa-solid fa-circle-exclamation text-red-500 text-base"
-            : type === "info"
-                ? "fa-solid fa-circle-info app-accent text-base"
-                : "fa-solid fa-circle-check text-emerald-500 text-base";
-    }
-    el.classList.remove("hide");
-    clearTimeout(_toastTimer);
-    _toastTimer = setTimeout(() => el.classList.add("hide"), 3200);
-}
-
-function showConfirm(title, msg, icon = "fa-solid fa-circle-question", okText = "Ya, Lanjutkan") {
-    return new Promise((resolve) => {
-        const m = document.getElementById("app-confirm-modal"); if (!m) return resolve(confirm(msg));
-        document.getElementById("app-confirm-title").innerText = title || "Konfirmasi";
-        document.getElementById("app-confirm-msg").innerText = msg || "";
-        document.getElementById("app-confirm-icon").className = icon;
-        const okBtn = document.getElementById("app-confirm-ok"), canBtn = document.getElementById("app-confirm-cancel");
-        okBtn.innerText = okText;
-        const done = (val) => { m.classList.add("hide"); resolve(val); };
-        okBtn.onclick = () => done(true);
-        canBtn.onclick = () => done(false);
-        m.classList.remove("hide");
-    });
-}
-
-function setBtnLoading(btnOrId, isLoading, text = "Memproses...") {
-    const el = typeof btnOrId === "string" ? document.getElementById(btnOrId) : btnOrId;
+// ================= 1. PENGALIH MODE EKOSISTEM (LEMBARKU <-> TITIK GOWES) =================
+function toggleEcosystemDrawer(show) {
+    const el = document.getElementById("drawer-ecosystem");
+    const btn = document.getElementById("header-threads-btn");
     if (!el) return;
-    if (isLoading) {
-        if (!el.dataset.origHtml) el.dataset.origHtml = el.innerHTML;
-        el.disabled = true;
-        el.innerHTML = `<i class="fa-solid fa-circle-notch fa-spin mr-1"></i>${text}`;
+    if (show) {
+        renderEcosystemDrawerUser();
+        el.classList.add("open");
+        if (btn) btn.classList.add("is-active");
+        if (typeof mrNavPush === "function") mrNavPush({ type: "modal", id: "drawer-ecosystem" });
     } else {
-        el.disabled = false;
-        if (el.dataset.origHtml) { el.innerHTML = el.dataset.origHtml; delete el.dataset.origHtml; }
+        el.classList.remove("open");
+        if (btn) btn.classList.remove("is-active");
+        if (typeof _mrDropTopModalById === "function") _mrDropTopModalById("drawer-ecosystem");
     }
 }
 
-function togglePassVis(id, btn) {
-    const inp = document.getElementById(id); if (!inp) return;
-    const isP = inp.type === "password";
-    inp.type = isP ? "text" : "password";
-    if (btn) btn.innerHTML = `<i class="fa-regular fa-${isP ? "eye-slash" : "eye"}"></i>`;
+function renderEcosystemDrawerUser() {
+    const u = typeof getCurrentUserObj === "function" ? getCurrentUserObj() : null;
+    const avEl = document.getElementById("drawer-eco-avatar");
+    const nmEl = document.getElementById("drawer-eco-name");
+    const rlEl = document.getElementById("drawer-eco-role");
+    const defAv = typeof DEFAULT_AVATAR !== "undefined" ? DEFAULT_AVATAR : "./lembarku-logo.png";
+
+    if (!u) {
+        if (avEl) avEl.src = defAv;
+        if (nmEl) nmEl.innerText = "Tamu Pengunjung";
+        if (rlEl) rlEl.innerText = "Masuk akun untuk akses penuh";
+        return;
+    }
+
+    if (avEl) avEl.src = u.avatar || defAv;
+    if (nmEl) nmEl.innerText = u.name || u.username;
+    if (rlEl) {
+        const roleLabel = u.role === "master" ? "Founder Lembarku"
+            : u.role === "administrasi" ? "Tim Administrasi"
+            : u.role === "cabang" ? `Mitra Cabang (${u.brandName || "Resmi"})`
+            : "Pengguna Terdaftar";
+        rlEl.innerText = `@${u.username} • ${roleLabel}`;
+    }
 }
 
-function hideHelloSplash() {
-    const sp = document.getElementById("ios-hello-splash");
-    if (!sp || sp.classList.contains("hide")) return;
-    sp.classList.add("splash-out");
-    setTimeout(() => sp.classList.add("hide"), 520);
-}
-function showEnvelopeLoader(txt = "Membuka Undangan...") {
-    const el = document.getElementById("envelope-loader"), t = document.getElementById("envelope-loader-text");
-    if (t) t.innerText = txt;
-    if (el) el.classList.remove("hide");
-}
-function hideEnvelopeLoader() { document.getElementById("envelope-loader")?.classList.add("hide"); }
+function updateAppModeUI() {
+    const isGowes = currentAppMode === "titik_gowes";
+    const logoEl = document.getElementById("header-app-logo");
+    const authLogoEl = document.getElementById("auth-brand-logo");
+    const brandMainEl = document.getElementById("header-brand-main");
+    const brandSubEl = document.getElementById("header-brand-sub");
 
-function applyAppTheme(theme, save = true) {
-    const valid = ["light", "dark", "gold", "blue", "black", "orange"];
-    const t = valid.includes(theme) ? theme : "light";
-    document.documentElement.setAttribute("data-app-theme", t);
-    if (save) localStorage.setItem(APP_THEME_KEY, t);
-    document.querySelectorAll(".theme-opt-row").forEach(row => {
-        const chk = row.querySelector(".theme-chk");
-        if (chk) chk.classList.toggle("hide", row.dataset.topt !== t);
+    const optLbk = document.getElementById("eco-opt-lembarku");
+    const optGws = document.getElementById("eco-opt-gowes");
+    const chkLbk = document.getElementById("eco-chk-lembarku");
+    const chkGws = document.getElementById("eco-chk-gowes");
+
+    if (optLbk && optGws) {
+        optLbk.classList.toggle("is-active", !isGowes);
+        optGws.classList.toggle("is-active-gowes", isGowes);
+    }
+    if (chkLbk && chkGws) {
+        chkLbk.classList.toggle("hide", isGowes);
+        chkGws.classList.toggle("hide", !isGowes);
+    }
+
+    if (isGowes) {
+        if (logoEl) {
+            logoEl.src = GOWES_LOGO_PATH;
+            logoEl.onerror = function() { this.src = GOWES_LOGO_FALLBACK; };
+        }
+        if (authLogoEl) {
+            authLogoEl.src = GOWES_LOGO_PATH;
+            authLogoEl.onerror = function() { this.src = GOWES_LOGO_FALLBACK; };
+        }
+        if (brandMainEl) brandMainEl.innerText = "Titik Gowes";
+        if (brandSubEl) {
+            brandSubEl.innerText = "Rental Sepeda";
+            brandSubEl.classList.remove("hide");
+        }
+        document.body.classList.add("mode-gowes");
+    } else {
+        if (logoEl) {
+            logoEl.src = LEMBARKU_LOGO_PATH;
+            logoEl.onerror = null;
+        }
+        if (authLogoEl) {
+            authLogoEl.src = LEMBARKU_LOGO_PATH;
+            authLogoEl.onerror = null;
+        }
+        if (brandMainEl) brandMainEl.innerText = "Lembarku";
+        if (brandSubEl) {
+            brandSubEl.innerText = "";
+            brandSubEl.classList.add("hide");
+        }
+        document.body.classList.remove("mode-gowes");
+    }
+
+    // Toggle tampilan beranda utama jika sedang berada di layar beranda
+    if (currentViewName === "landing") {
+        const vLbk = document.getElementById("view-landing");
+        const vGws = document.getElementById("view-gowes");
+        if (vLbk && vGws) {
+            vLbk.classList.toggle("hide", isGowes);
+            vGws.classList.toggle("hide", !isGowes);
+        }
+        if (isGowes && typeof renderGowesLandingPage === "function") {
+            renderGowesLandingPage();
+        } else if (!isGowes && typeof renderLandingPage === "function") {
+            renderLandingPage();
+        }
+    }
+}
+
+function switchAppMode(mode) {
+    if (mode !== "lembarku" && mode !== "titik_gowes") mode = "lembarku";
+    currentAppMode = mode;
+    localStorage.setItem(APP_MODE_KEY, mode);
+    toggleEcosystemDrawer(false);
+    updateAppModeUI();
+
+    const toastMsg = mode === "titik_gowes"
+        ? "Beralih ke Titik Gowes (Rental Sepeda)"
+        : "Beralih ke Lembarku (Undangan & Berkas)";
+    if (typeof showToast === "function") showToast(toastMsg, "info");
+}
+
+// ================= 2. PWA DEVICE TRACKING & INDEXED-DB CACHE =================
+function getAppDeviceId() {
+    let id = localStorage.getItem(APP_DEVICE_ID_KEY);
+    if (!id) {
+        id = "dev_" + Date.now().toString(36) + "_" + Math.random().toString(36).slice(2, 9);
+        localStorage.setItem(APP_DEVICE_ID_KEY, id);
+    }
+    return id;
+}
+
+async function reportAppInstallState(eventType) {
+    const devId = getAppDeviceId();
+    const prev = localStorage.getItem(APP_INSTALLED_REPORTED_KEY);
+    if (prev === eventType) return;
+
+    const platform = /iPhone|iPad|iPod/.test(navigator.userAgent) ? "iOS"
+        : /Android/.test(navigator.userAgent) ? "Android"
+        : "Desktop";
+
+    try {
+        const res = await apiAction({
+            action: "track_app_event",
+            deviceId: devId,
+            eventType: eventType,
+            platform: platform
+        });
+        if (res && res.ok) {
+            localStorage.setItem(APP_INSTALLED_REPORTED_KEY, eventType);
+            if (res.appStats) db.appStats = res.appStats;
+        }
+    } catch {}
+}
+
+function openMrDb() {
+    return new Promise((resolve) => {
+        if (!("indexedDB" in window)) return resolve(null);
+        const req = indexedDB.open("MrUndanganLocalDB", 2);
+        req.onupgradeneeded = (e) => {
+            const idb = e.target.result;
+            if (!idb.objectStoreNames.contains("keyval")) {
+                idb.createObjectStore("keyval");
+            }
+        };
+        req.onsuccess = () => resolve(req.result);
+        req.onerror = () => resolve(null);
     });
 }
-function cycleAppThemeQuick() {
-    const order = ["light", "dark", "gold", "blue", "black", "orange"];
-    const cur = localStorage.getItem(APP_THEME_KEY) || "light";
-    applyAppTheme(order[(order.indexOf(cur) + 1) % order.length], true);
+
+async function idbGet(key) {
+    const idb = await openMrDb();
+    if (!idb) return null;
+    return new Promise((resolve) => {
+        try {
+            const tx = idb.transaction("keyval", "readonly");
+            const st = tx.objectStore("keyval");
+            const r = st.get(key);
+            r.onsuccess = () => resolve(r.result || null);
+            r.onerror = () => resolve(null);
+        } catch {
+            resolve(null);
+        }
+    });
 }
 
-// ================= HELPER USER, PRIVASI, BLOKIR, TEMA & HARGA =================
+async function idbSet(key, val) {
+    const idb = await openMrDb();
+    if (!idb) return;
+    try {
+        const tx = idb.transaction("keyval", "readwrite");
+        const st = tx.objectStore("keyval");
+        st.put(val, key);
+    } catch {}
+}
+
+async function idbRemove(key) {
+    const idb = await openMrDb();
+    if (!idb) return;
+    try {
+        const tx = idb.transaction("keyval", "readwrite");
+        const st = tx.objectStore("keyval");
+        st.delete(key);
+    } catch {}
+}
+
+// ================= 3. CLIENT CLOUD SYNC & API ACTION =================
+function applyPublicDb(remote) {
+    if (!remote || typeof remote !== "object") return;
+    ["customThemes", "hiddenThemes", "themeOverrides", "cvPriceOverrides", "musicLibrary", "testimonials", "promoBanners", "masterSettings"].forEach(k => {
+        if (remote[k] !== undefined) db[k] = remote[k];
+    });
+
+    if (remote.gowesPublic && typeof remote.gowesPublic === "object") {
+        if (Array.isArray(remote.gowesPublic.bikes)) db.gowesBikes = remote.gowesPublic.bikes;
+        if (remote.gowesPublic.shelterLocation) db.gowesShelter = remote.gowesPublic.shelterLocation;
+    }
+}
+
+function applyServerDb(remote) {
+    if (!remote || typeof remote !== "object") return;
+    ["users", "invitations", "portfolios", "chats", "adminLogs", "customThemes", "hiddenThemes", "themeOverrides", "cvPriceOverrides", "musicLibrary", "testimonials", "promoBanners", "masterSettings", "appStats"].forEach(k => {
+        if (remote[k] !== undefined) db[k] = remote[k];
+    });
+
+    if (remote.gowesData && typeof remote.gowesData === "object") {
+        if (Array.isArray(remote.gowesData.allBikes)) db.gowesBikes = remote.gowesData.allBikes;
+        else if (Array.isArray(remote.gowesData.bikes)) db.gowesBikes = remote.gowesData.bikes;
+
+        if (Array.isArray(remote.gowesData.rentals)) db.gowesRentals = remote.gowesData.rentals;
+        else if (Array.isArray(remote.gowesData.myRentals)) db.gowesRentals = remote.gowesData.myRentals;
+
+        if (remote.gowesData.shelterLocation) db.gowesShelter = remote.gowesData.shelterLocation;
+        if (remote.gowesData.analytics) db.gowesAnalytics = remote.gowesData.analytics;
+    }
+}
+
+async function apiAction(payload) {
+    if (!payload) return { ok: false, message: "Payload kosong." };
+    if (!payload.token && currentSessionToken) {
+        payload.token = currentSessionToken;
+    }
+    try {
+        const res = await fetch(CLOUD_API_URL, {
+            method: "POST",
+            headers: { "Content-Type": "text/plain;charset=utf-8" },
+            body: JSON.stringify(payload)
+        });
+        const json = await res.json();
+        if (json && json.data) {
+            applyServerDb(json.data);
+            idbSet("db_snapshot", db);
+        }
+        return json;
+    } catch (err) {
+        return { ok: false, message: err.message || "Gagal terhubung ke server." };
+    }
+}
+
+async function fetchPublicCloud() {
+    try {
+        const res = await fetch(`${CLOUD_API_URL}?action=get_public`, { cache: "no-store" });
+        const json = await res.json();
+        if (json && json.ok && json.data) {
+            applyPublicDb(json.data);
+            idbSet("public_snapshot", json.data);
+            return true;
+        }
+    } catch {}
+    return false;
+}
+
+async function fetchFullCloud() {
+    try {
+        let url = `${CLOUD_API_URL}?action=get_full`;
+        if (currentSessionToken) url += `&token=${encodeURIComponent(currentSessionToken)}`;
+        if (guestChatId) url += `&guestId=${encodeURIComponent(guestChatId)}`;
+
+        const res = await fetch(url, { cache: "no-store" });
+        const json = await res.json();
+        if (json && json.ok && json.data) {
+            applyServerDb(json.data);
+            idbSet("db_snapshot", db);
+            return true;
+        }
+    } catch {}
+    return false;
+}
+
+async function fetchSingleInvitationFast(id) {
+    try {
+        const res = await fetch(`${CLOUD_API_URL}?action=get_invitation&id=${encodeURIComponent(id)}`, { cache: "no-store" });
+        const json = await res.json();
+        if (json && json.ok && json.invitation) {
+            return json.invitation;
+        }
+    } catch {}
+    return null;
+}
+
+async function fetchClientPortalData(clientId, clientKey) {
+    try {
+        const res = await fetch(`${CLOUD_API_URL}?action=get_client_portal&client=${encodeURIComponent(clientId)}&key=${encodeURIComponent(clientKey || "")}`, { cache: "no-store" });
+        return await res.json();
+    } catch (e) {
+        return { ok: false, message: e.message || "Gagal memuat portal tamu." };
+    }
+}
+
+// ================= 4. SHARED HELPER UTILITIES =================
 function getCurrentUserObj() {
     if (!currentSessionUser) return null;
-    const curKey = String(currentSessionUser).trim().toLowerCase();
-    const targetKey = curKey === "master" ? FOUNDER_USERNAME : curKey;
-    return (db.users || []).find(u => String(u.username || "").trim().toLowerCase() === targetKey)
-        || (curKey === "master" || curKey === FOUNDER_USERNAME
-            ? (db.users || []).find(u => String(u.role || "").toLowerCase() === "master")
-            : null)
-        || null;
+    const cleanU = String(currentSessionUser).trim().toLowerCase();
+    const list = Array.isArray(db.users) ? db.users : [];
+    return list.find(u => String(u.username || "").trim().toLowerCase() === cleanU) || null;
 }
 
-function getUserPrivacy(uObj) {
-    const raw = (uObj && uObj.privacy && typeof uObj.privacy === "object") ? uObj.privacy : {};
+function getUserPrivacy(userObj) {
+    if (!userObj || typeof userObj !== "object") return DEFAULT_PRIVACY;
+    const raw = userObj.privacy;
+    if (!raw || typeof raw !== "object") return DEFAULT_PRIVACY;
     return {
         showProjects: raw.showProjects !== false,
         showFollowers: raw.showFollowers !== false,
@@ -451,879 +705,386 @@ function getUserPrivacy(uObj) {
     };
 }
 
-function getBlockedUsersList(uObj) {
-    if (!uObj || !Array.isArray(uObj.blockedUsers)) return [];
-    return Array.from(new Set(uObj.blockedUsers.map(x => String(x || "").trim().toLowerCase()).filter(Boolean)));
+function getBlockedUsersList(userObj) {
+    if (!userObj || !Array.isArray(userObj.blockedUsers)) return [];
+    return Array.from(new Set(userObj.blockedUsers.map(x => String(x || "").trim().toLowerCase()).filter(Boolean)));
 }
 
-function isUserBlockedByMe(username) {
-    const me = getCurrentUserObj();
-    if (!me) return false;
-    const key = String(username || "").trim().toLowerCase();
-    return getBlockedUsersList(me).includes(key);
+function isUserBlockedByMe(targetUname) {
+    const curU = getCurrentUserObj();
+    if (!curU) return false;
+    const tKey = String(targetUname || "").trim().toLowerCase();
+    return getBlockedUsersList(curU).includes(tKey);
 }
 
-function getMasterBanksList() {
-    const ms = db.masterSettings || {};
-    if (Array.isArray(ms.banks) && ms.banks.length) return ms.banks;
-    if (ms.bankNo) return [{ bank: ms.bankName || "DANA", no: ms.bankNo, holder: ms.bankHolder || "Lembarku" }];
-    return [{ bank: "DANA", no: "085117488828", holder: "Lembarku" }];
+function esc(str) {
+    if (str === null || str === undefined) return "";
+    return String(str)
+        .replace(/\\/g, "\\\\")
+        .replace(/'/g, "\\'")
+        .replace(/"/g, "&quot;");
 }
 
-function getInvBrandInfo(inv) {
-    const b = (inv && inv.brandName && String(inv.brandName).trim()) ? String(inv.brandName).trim() : "";
-    if (b) return { topLabel: b, footerMain: b, footerSub: "Powered by Lembarku", waFooter: `${b} — Powered by Lembarku` };
-    return { topLabel: "LEMBARKU", footerMain: "Lembarku", footerSub: "", waFooter: "Lembarku" };
+function escHtml(str) {
+    if (str === null || str === undefined) return "";
+    return String(str)
+        .replace(/&/g, "&amp;")
+        .replace(/</g, "&lt;")
+        .replace(/>/g, "&gt;")
+        .replace(/"/g, "&quot;")
+        .replace(/'/g, "&#39;");
+}
+
+function fmtRp(num) {
+    const n = Math.max(0, parseInt(num, 10) || 0);
+    return "Rp " + n.toLocaleString("id-ID");
+}
+
+function imgFbAttr(fb) {
+    if (!fb) return "";
+    return `data-fb="${esc(fb)}" onerror="if(this.dataset.fb && this.src!==this.dataset.fb){this.src=this.dataset.fb;this.dataset.fb='';}"`;
 }
 
 function deepCloneSafe(obj) {
-    try { return JSON.parse(JSON.stringify(obj)); } catch { return Object.assign({}, obj); }
+    try {
+        return JSON.parse(JSON.stringify(obj));
+    } catch {
+        return Object.assign({}, obj);
+    }
+}
+
+function getCleanBaseUrl() {
+    return window.location.origin + window.location.pathname;
+}
+
+// ================= 5. TEMA UNDANGAN & PORTOFOLIO CATALOG RESOLVERS =================
+function findThemeObject(cat, themeName) {
+    const catList = THEME_CATALOG[cat] || THEME_CATALOG["Pernikahan"] || [];
+    let found = catList.find(t => t.name.toLowerCase() === String(themeName).toLowerCase());
+    if (found) return found;
+
+    const custom = (db.customThemes || []).find(t => t.category === cat && t.name.toLowerCase() === String(themeName).toLowerCase());
+    if (custom) return custom;
+
+    return catList[0] || { name: themeName, preset: "dark-gold", style: "kalimantan_story", price: 99000, origPrice: 175000 };
+}
+
+function getThemeCoverPair(cat, tObj) {
+    const fallback = tObj.img || IMG("1519741497674-611481863552");
+    const ov = (db.themeOverrides && db.themeOverrides[`${cat}::${tObj.name}`]) || {};
+    const primary = ov.customCover || tObj.customCover || fallback;
+    return { src: primary, fb: fallback };
+}
+
+function getThemePricing(tObj) {
+    const ov = (db.themeOverrides && db.themeOverrides[`${tObj.cat || tObj.category}::${tObj.name}`]) || {};
+    const price = Number(ov.price !== undefined ? ov.price : tObj.price || 99000);
+    const origPrice = Number(ov.origPrice !== undefined ? ov.origPrice : tObj.origPrice || 175000);
+    return {
+        price,
+        origPrice,
+        hasDisc: origPrice > price && price > 0,
+        discPct: origPrice > price ? Math.round(((origPrice - price) / origPrice) * 100) : 0
+    };
 }
 
 function getMergedThemes(cat, includeHidden = false) {
     const builtIn = (THEME_CATALOG[cat] || []).map(t => {
-        const baseT = deepCloneSafe(t);
-        const key = `${cat}::${baseT.name}`;
-        const ov = deepCloneSafe((db.themeOverrides && db.themeOverrides[key]) || {});
+        const key = `${cat}::${t.name}`;
+        const ov = (db.themeOverrides && db.themeOverrides[key]) || {};
         const isHidden = (db.hiddenThemes || []).includes(key);
-        const merged = Object.assign({}, baseT, ov, { cat, key, isCustom: false, isHidden });
-        merged.demoPhotos = Object.assign({}, baseT.demoPhotos || {}, ov.demoPhotos || {});
-        merged.demoData = Object.assign({}, baseT.demoData || {}, ov.demoData || {});
-        return merged;
+        return Object.assign({}, t, ov, {
+            cat,
+            key,
+            isCustom: false,
+            isHidden,
+            demoPhotos: Object.assign({}, t.demoPhotos || {}, ov.demoPhotos || {}),
+            demoData: Object.assign({}, t.demoData || {}, ov.demoData || {})
+        });
     });
+
     const custom = (db.customThemes || []).filter(t => t.category === cat).map(t => {
-        const baseT = deepCloneSafe(t);
-        const merged = Object.assign({}, baseT, { cat, key: `custom::${baseT.id}`, isCustom: true, isHidden: false });
-        merged.demoPhotos = Object.assign({}, baseT.demoPhotos || {});
-        merged.demoData = Object.assign({}, baseT.demoData || {});
-        return merged;
-    });
-    const all = [...custom, ...builtIn];
-    return includeHidden ? all : all.filter(t => !t.isHidden);
-}
-
-function findThemeObject(cat, name) {
-    const list = getMergedThemes(cat || "Pernikahan", true);
-    return list.find(t => String(t.name).toLowerCase() === String(name || "").toLowerCase()) || list[0] || deepCloneSafe(THEME_CATALOG["Pernikahan"][0]);
-}
-
-function getThemePricing(tObj) {
-    const price = Number((tObj && tObj.price) || 99000);
-    const origPrice = Number((tObj && tObj.origPrice) || 0);
-    const hasDisc = origPrice > price && price > 0;
-    const discPct = hasDisc ? Math.round(((origPrice - price) / origPrice) * 100) : 0;
-    return { price, origPrice, hasDisc, discPct };
-}
-
-function getThemeCoverPair(cat, tObj) {
-    const fb = (tObj && tObj.img) || IMG("1519741497674-611481863552");
-    const src = (tObj && tObj.demoPhotos && tObj.demoPhotos.cover) || (tObj && tObj.customCover) || fb;
-    return { src, fb };
-}
-
-function getThemeSlotPair(tObj, slotKey, _file, fallback) {
-    const dp = (tObj && tObj.demoPhotos) || {};
-    if (dp[slotKey]) return { src: dp[slotKey], fb: fallback };
-    if (slotKey === "pria") return { src: "./assets/model-pria.jpg", fb: fallback };
-    if (slotKey === "wanita") return { src: "./assets/model-wanita.jpg", fb: fallback };
-    return { src: fallback, fb: fallback };
-}
-
-function getPortfolioThemeObj(docType, id) {
-    const list = PORTFOLIO_CATALOG[docType] || PORTFOLIO_CATALOG.cv;
-    const base = list.find(x => x.id === id) || list[0];
-    const ov = (db.cvPriceOverrides && db.cvPriceOverrides[base.id]) || {};
-    return Object.assign({}, base, ov);
-}
-
-function isItemFavorited(favKey) {
-    const u = getCurrentUserObj();
-    if (u && Array.isArray(u.favorites)) return u.favorites.some(f => f.favKey === favKey);
-    try { return JSON.parse(localStorage.getItem("MR_LOCAL_FAVS") || "[]").some(f => f.favKey === favKey); } catch { return false; }
-}
-
-async function toggleFavoriteItem(ev, favObj) {
-    if (ev) ev.stopPropagation();
-    const u = getCurrentUserObj();
-    let list = u ? [...(u.favorites || [])] : JSON.parse(localStorage.getItem("MR_LOCAL_FAVS") || "[]");
-    const idx = list.findIndex(f => f.favKey === favObj.favKey);
-    const added = idx === -1;
-    if (added) list.unshift(favObj); else list.splice(idx, 1);
-
-    document.querySelectorAll(`[data-fav-btn="${CSS.escape(favObj.favKey)}"]`).forEach(btn => {
-        btn.classList.toggle("is-fav", added);
-        btn.innerHTML = `<i class="fa-${added ? "solid" : "regular"} fa-heart"></i>`;
+        return Object.assign({}, t, {
+            cat,
+            key: `custom::${t.id}`,
+            isCustom: true,
+            isHidden: false
+        });
     });
 
-    if (u) {
-        u.favorites = list;
-        if (typeof renderProfileFavoritesShelf === "function") renderProfileFavoritesShelf();
-        apiAction({ action: "upsert_user", oldUsername: u.username, user: Object.assign({}, u, { favorites: list }) });
-    } else {
-        localStorage.setItem("MR_LOCAL_FAVS", JSON.stringify(list));
-    }
-    showToast(added ? "Disimpan ke Favorit!" : "Dihapus dari Favorit.", "info");
+    const combined = [...builtIn, ...custom];
+    return includeHidden ? combined : combined.filter(t => !t.isHidden);
 }
 
-function _formatMiniCoverDate(dateStr, fallbackStr) {
-    if (!dateStr) return fallbackStr;
-    const d = new Date(dateStr);
-    if (isNaN(d.getTime())) return String(dateStr).toUpperCase();
-    return d.toLocaleDateString("id-ID", { weekday: "long", day: "numeric", month: "long", year: "numeric" }).toUpperCase();
+function getPortfolioThemeObj(docType, themeId) {
+    const type = docType === "lamaran" ? "lamaran" : "cv";
+    const list = PORTFOLIO_CATALOG[type] || [];
+    const base = list.find(x => x.id === themeId) || list[0];
+    const ov = (db.cvPriceOverrides && db.cvPriceOverrides[themeId]) || {};
+    const price = Number(ov.price !== undefined ? ov.price : base.price);
+    const origPrice = Number(ov.origPrice !== undefined ? ov.origPrice : base.origPrice);
+    return Object.assign({}, base, {
+        price,
+        origPrice,
+        hasDisc: origPrice > price && price > 0,
+        discPct: origPrice > price ? Math.round(((origPrice - price) / origPrice) * 100) : 0
+    });
 }
 
-// KARTU PROMOSI UNDANGAN BERANDA = HASIL JADI SAMPUL LENGKAP
-function buildMiniCoverCardHtml(cat, tObj, showFavBtn = true) {
+function buildMiniCoverCardHtml(cat, tObj, isShelf = true) {
     const cov = getThemeCoverPair(cat, tObj);
-    const favKey = `inv::${cat}::${tObj.name}`;
-    const isFav = isItemFavorited(favKey);
-    const favObjStr = esc(JSON.stringify({ favKey, kind: "inv", cat, name: tObj.name }));
-
-    const preset = VISUAL_PRESETS[tObj.preset] || VISUAL_PRESETS["dark-gold"];
-    const dm = tObj.demoData || {};
-    const styleKey = tObj.layout || tObj.style || "";
-    const isMono = tObj.photoFilter === "mono" || styleKey === "premium_black";
-    const isVintage = tObj.photoFilter === "vintage";
-    const filterCss = isMono ? "filter:grayscale(100%) contrast(1.08);" : isVintage ? "filter:sepia(24%) contrast(1.04);" : "";
-
-    const headingFont = tObj.font || (preset.vars && preset.vars["--th-font-heading"]) || "'Great Vibes',cursive";
-    const accentCol = (tObj.customColors && tObj.customColors.accent) || (preset.vars && preset.vars["--th-accent"]) || "#f3d285";
-    const btnBg = (tObj.customColors && tObj.customColors.accent) || (preset.vars && preset.vars["--th-btn-bg"]) || "linear-gradient(90deg,#f3d285,#d4af37)";
-    const btnTxt = isMono ? "#09090b" : ((preset.vars && preset.vars["--th-btn-text"]) || "#1f0a0c");
-    const overlayBg = preset.coverOverlay || "linear-gradient(180deg,rgba(0,0,0,0.35) 0%,rgba(12,12,15,0.9) 100%)";
-
-    const badgeTop = cat === "Pernikahan" ? "THE WEDDING OF"
-        : cat === "Ulang Tahun" ? "BIRTHDAY INVITATION"
-        : cat === "Aqiqah" ? "TASYAKURAN AQIQAH"
-        : cat === "Syukuran" ? (tObj.isKhitan ? "WALIMATUL KHITAN" : "UNDANGAN SYUKURAN")
-        : "UNDANGAN RESMI";
-
-    const sampleTitle = dm.title || (
-        cat === "Pernikahan" ? "Aqila & Fauzi"
-        : cat === "Ulang Tahun" ? "Arsyilla Fadillah"
-        : cat === "Aqiqah" ? "Ahmad Fathallah"
-        : cat === "Syukuran" ? (tObj.isKhitan ? "M. Al-Fatih" : "Syukuran Rumah")
-        : (tObj.demoTitle || "Acara Spesial")
-    );
-    const defaultDateMap = {
-        "Pernikahan": "SABTU, 20 FEBRUARI 2027",
-        "Ulang Tahun": "MINGGU, 14 MARET 2027",
-        "Aqiqah": "SENIN, 18 JANUARI 2027",
-        "Syukuran": "SABTU, 30 JANUARI 2027",
-        "Lainnya": "RABU, 10 FEBRUARI 2027"
-    };
-    const sampleDate = _formatMiniCoverDate(dm.date, defaultDateMap[cat] || "SABTU, 20 FEBRUARI 2027");
-    const isScriptFont = /vibes|brush/i.test(headingFont);
-    const titleSizeCls = isScriptFont ? "text-[22px] leading-[1.05]" : "text-[16px] leading-[1.15] font-bold";
-
-    return `
-        <div class="mini-inv-cover-stage bg-zinc-950 p-2.5 text-white">
-            <img src="${cov.src}" ${imgFbAttr(cov.fb)} loading="lazy" style="${filterCss}" class="absolute inset-0 w-full h-full object-cover object-center group-hover:scale-105 transition duration-500">
-            <div class="absolute inset-0" style="background:${overlayBg};"></div>
-
-            ${tObj.badge ? `<span class="absolute top-2 left-2 z-20 text-[7.5px] font-extrabold px-1.5 py-0.5 rounded-full bg-amber-400 text-black uppercase shadow">${escHtml(tObj.badge)}</span>` : ""}
-            ${showFavBtn ? `<button type="button" data-fav-btn="${esc(favKey)}" onclick="toggleFavoriteItem(event, JSON.parse('${favObjStr}'))" class="fav-heart-btn ${isFav ? "is-fav" : ""}" title="Simpan ke Favorit"><i class="fa-${isFav ? "solid" : "regular"} fa-heart"></i></button>` : ""}
-
-            <div class="relative z-10 pt-1">
-                <span class="text-[6.5px] uppercase tracking-[0.28em] text-white/85 font-semibold drop-shadow">LEMBARKU</span>
-            </div>
-
-            <div class="relative z-10 my-auto px-1 space-y-0.5">
-                <span class="block text-[6px] uppercase tracking-[0.22em] font-bold drop-shadow" style="color:${accentCol};">${badgeTop}</span>
-                <p class="${titleSizeCls} text-white drop-shadow-[0_2px_8px_rgba(0,0,0,0.85)] line-clamp-2" style="font-family:${headingFont};">${escHtml(sampleTitle)}</p>
-                <span class="block text-[6px] uppercase tracking-[0.14em] text-white/90 font-semibold pt-0.5 truncate">${escHtml(sampleDate)}</span>
-            </div>
-
-            <div class="relative z-10 space-y-1.5 pb-0.5">
-                <div class="bg-black/48 backdrop-blur-sm border border-white/25 rounded-lg px-2 py-1.5 leading-tight">
-                    <span class="block text-[5.2px] uppercase tracking-wider text-white/75">Kepada Yth. Bapak/Ibu/Saudara/i</span>
-                    <strong class="block text-[8px] font-bold truncate mt-0.5" style="color:${accentCol};">Tamu Kehormatan</strong>
-                    <span class="block text-[5px] text-white/65">di Tempat</span>
-                </div>
-                <div class="inline-flex items-center justify-center gap-1 px-3 py-1 rounded-full text-[6.5px] font-extrabold uppercase tracking-wider shadow-md" style="background:${btnBg};color:${btnTxt};">
-                    <i class="fa-solid fa-envelope-open-text text-[6px]"></i> Buka Undangan
-                </div>
-            </div>
-        </div>
-    `;
-}
-
-function buildPriceStripHtml(tObj, compact = true) {
     const pr = getThemePricing(tObj);
-    const showInvMeta = !!(tObj && tObj.cat && tObj.name);
+    const u = getCurrentUserObj();
+    const isFav = !!(u && Array.isArray(u.favorites) && u.favorites.some(f => f.cat === cat && f.name === tObj.name));
+
     return `
-        <div class="px-2.5 py-2 bg-[#111115] text-white border-t border-white/10 space-y-1">
-            ${showInvMeta ? `<div class="flex items-center justify-between gap-1"><h4 class="font-bold text-[11px] text-white truncate">${escHtml(tObj.name)}</h4><span class="text-[7.5px] uppercase font-bold px-1.5 py-0.5 rounded bg-white/12 text-zinc-200 shrink-0">${escHtml(tObj.cat)}</span></div>` : ""}
-            <div class="flex items-center justify-between gap-1">
-                <div class="leading-tight min-w-0">
-                    ${pr.hasDisc ? `<span class="block text-[9px] text-zinc-400 line-through">${fmtRp(pr.origPrice)}</span>` : ""}
-                    <strong class="text-xs text-amber-400 font-extrabold">${fmtRp(pr.price)}</strong>
-                </div>
-                ${pr.hasDisc ? `<span class="text-[8px] px-1.5 py-0.5 rounded bg-red-600 text-white font-extrabold shrink-0">-${pr.discPct}%</span>` : ""}
+        <div class="mini-inv-cover-stage relative">
+            <img src="${cov.src}" ${imgFbAttr(cov.fb)} loading="lazy" class="absolute inset-0 w-full h-full object-cover">
+            <div class="absolute inset-0 bg-gradient-to-t from-black/85 via-black/35 to-black/30"></div>
+            <button type="button" onclick="event.stopPropagation();toggleFavoriteTheme('${esc(cat)}','${esc(tObj.name)}',this)" class="fav-heart-btn ${isFav ? "is-fav" : ""}" title="Simpan ke Favorit">
+                <i class="fa-${isFav ? "solid" : "regular"} fa-heart"></i>
+            </button>
+            <div class="relative z-10 p-2.5 flex items-start justify-between">
+                <span class="text-[8px] font-extrabold uppercase px-2 py-0.5 rounded-full ${tObj.badge ? "bg-amber-400 text-black" : "bg-black/60 text-white"}">${escHtml(tObj.badge || cat)}</span>
+            </div>
+            <div class="relative z-10 p-2.5 mt-auto text-center space-y-1">
+                <strong class="block text-xs font-serif-ed text-white drop-shadow truncate">${escHtml(tObj.name)}</strong>
+                <span class="inline-block px-3 py-1 text-[9px] font-bold rounded-full bg-white text-black shadow-md">Buka Undangan</span>
             </div>
         </div>
     `;
 }
 
-// ================= PELACAKAN INSTALL & UNINSTALL PWA =================
-function getOrCreateAppDeviceId() {
-    let id = localStorage.getItem(APP_DEVICE_ID_KEY);
-    if (!id) {
-        id = "dev_" + Date.now().toString(36) + "_" + Math.random().toString(36).slice(2, 9);
-        localStorage.setItem(APP_DEVICE_ID_KEY, id);
-    }
-    return id;
-}
-
-async function reportAppInstallState(eventType) {
-    const evt = eventType === "uninstalled" ? "uninstalled" : "installed";
-    const lastReported = localStorage.getItem(APP_INSTALLED_REPORTED_KEY) || "";
-    if (lastReported === evt) return;
-    localStorage.setItem(APP_INSTALLED_REPORTED_KEY, evt);
-    const ua = navigator.userAgent || "";
-    const platform = /iPad|iPhone|iPod/.test(ua) ? "iOS" : /Android/.test(ua) ? "Android" : "Desktop";
-    try {
-        const res = await fetchJsonWithTimeout(CLOUD_API_URL, {
-            method: "POST",
-            headers: { "Content-Type": "text/plain;charset=utf-8" },
-            body: JSON.stringify({
-                action: "track_app_event",
-                deviceId: getOrCreateAppDeviceId(),
-                eventType: evt,
-                platform
-            })
-        }, 12000);
-        if (res && res.ok && res.appStats) db.appStats = res.appStats;
-    } catch {}
-}
-
-// ================= INDEXEDDB CACHE RINGAN =================
-function openMrIdb() {
-    return new Promise((resolve) => {
-        if (!window.indexedDB) return resolve(null);
-        const req = indexedDB.open("MR_UNDANGAN_DB", 1);
-        req.onupgradeneeded = () => req.result.createObjectStore("kv");
-        req.onsuccess = () => resolve(req.result);
-        req.onerror = () => resolve(null);
-    });
-}
-async function idbGet(key) {
-    const dbi = await openMrIdb(); if (!dbi) return null;
-    return new Promise((resolve) => {
-        const tx = dbi.transaction("kv", "readonly");
-        const req = tx.objectStore("kv").get(key);
-        req.onsuccess = () => resolve(req.result || null);
-        req.onerror = () => resolve(null);
-    });
-}
-async function idbSet(key, val) {
-    const dbi = await openMrIdb(); if (!dbi) return;
-    return new Promise((resolve) => {
-        const tx = dbi.transaction("kv", "readwrite");
-        tx.objectStore("kv").put(val, key);
-        tx.oncomplete = () => resolve(true);
-        tx.onerror = () => resolve(false);
-    });
-}
-async function idbRemove(key) {
-    const dbi = await openMrIdb(); if (!dbi) return;
-    return new Promise((resolve) => {
-        const tx = dbi.transaction("kv", "readwrite");
-        tx.objectStore("kv").delete(key);
-        tx.oncomplete = () => resolve(true);
-        tx.onerror = () => resolve(false);
-    });
-}
-
-// ================= CLOUD SYNC & API =================
-function applyPublicDb(data) {
-    if (!data || typeof data !== "object") return;
-    ["customThemes", "hiddenThemes", "themeOverrides", "cvPriceOverrides", "musicLibrary", "testimonials", "promoBanners", "masterSettings"].forEach(k => {
-        if (data[k] !== undefined) db[k] = data[k];
-    });
-}
-function applyServerDb(data) {
-    if (!data || typeof data !== "object") return;
-    applyPublicDb(data);
-    ["users", "invitations", "portfolios", "chats", "adminLogs"].forEach(k => {
-        if (Array.isArray(data[k])) db[k] = data[k];
-    });
-    if (data.appStats && typeof data.appStats === "object") {
-        db.appStats = data.appStats;
-    }
-    idbSet("db_snapshot", db);
-    idbSet("public_snapshot", {
-        customThemes: db.customThemes,
-        hiddenThemes: db.hiddenThemes,
-        themeOverrides: db.themeOverrides,
-        cvPriceOverrides: db.cvPriceOverrides,
-        musicLibrary: db.musicLibrary,
-        testimonials: db.testimonials,
-        promoBanners: db.promoBanners,
-        masterSettings: db.masterSettings
-    });
-}
-
-async function fetchJsonWithTimeout(url, opts = {}, ms = 18000) {
-    const ctrl = new AbortController();
-    const t = setTimeout(() => ctrl.abort(), ms);
-    try {
-        const res = await fetch(url, Object.assign({}, opts, { signal: ctrl.signal, cache: "no-store" }));
-        clearTimeout(t);
-        return await res.json();
-    } catch {
-        clearTimeout(t);
-        return null;
-    }
-}
-
-async function fetchPublicCloud() {
-    const j = await fetchJsonWithTimeout(`${CLOUD_API_URL}?action=get_public&t=${Date.now()}`, {}, 14000);
-    if (j && j.ok && j.data) {
-        applyPublicDb(j.data);
-        idbSet("public_snapshot", j.data);
-        return true;
-    }
-    return false;
-}
-
-async function fetchFullCloud() {
-    const url = `${CLOUD_API_URL}?action=get_full&username=${encodeURIComponent(currentSessionUser || "")}&token=${encodeURIComponent(currentSessionToken || "")}&guestId=${encodeURIComponent(guestChatId || "")}&t=${Date.now()}`;
-    const j = await fetchJsonWithTimeout(url, {}, 18000);
-    if (j && j.ok && j.data) {
-        applyServerDb(j.data);
-        return true;
-    }
-    return false;
-}
-
-async function fetchPublicUserProjects(username) {
-    const url = `${CLOUD_API_URL}?action=get_public_projects&username=${encodeURIComponent(username || "")}&token=${encodeURIComponent(currentSessionToken || "")}&t=${Date.now()}`;
-    const j = await fetchJsonWithTimeout(url, {}, 14000);
-    return (j && j.ok) ? j : { ok: false, hidden: false, projects: [] };
-}
-
-async function fetchSingleInvitationFast(id) {
-    const j = await fetchJsonWithTimeout(`${CLOUD_API_URL}?action=get_invitation&id=${encodeURIComponent(id)}&t=${Date.now()}`, {}, 12000);
-    return (j && j.ok && j.invitation) ? j.invitation : null;
-}
-
-async function fetchClientPortalData(invId, key) {
-    return await fetchJsonWithTimeout(`${CLOUD_API_URL}?action=get_client_portal&client=${encodeURIComponent(invId)}&key=${encodeURIComponent(key || "")}&t=${Date.now()}`, {}, 14000);
-}
-
-async function apiAction(payload) {
+function buildPortfolioMiniCardHtml(docType, pObj, isShelf = true) {
     const u = getCurrentUserObj();
-    const enriched = Object.assign({
-        actor: currentSessionUser || "",
-        actorRole: (u && u.role) || "user",
-        token: currentSessionToken || "",
-        guestId: guestChatId || ""
-    }, payload);
-    const j = await fetchJsonWithTimeout(CLOUD_API_URL, {
-        method: "POST",
-        headers: { "Content-Type": "text/plain;charset=utf-8" },
-        body: JSON.stringify(enriched)
-    }, 35000);
+    const isFav = !!(u && Array.isArray(u.favorites) && u.favorites.some(f => f.docType === docType && f.id === pObj.id));
 
-    if (j && j.ok) {
-        if (j.data) {
-            applyServerDb(j.data);
-        } else if (j.user) {
-            const idx = (db.users || []).findIndex(x => String(x.username || "").toLowerCase() === String(j.user.username || "").toLowerCase());
-            if (idx >= 0) db.users[idx] = Object.assign({}, db.users[idx], j.user);
-            else db.users.push(j.user);
-            idbSet("db_snapshot", db);
-        }
+    return `
+        <div class="mini-inv-cover-stage relative p-3 text-white" style="background:linear-gradient(155deg, ${pObj.accent || "#1e293b"}, #09090b);">
+            <button type="button" onclick="event.stopPropagation();toggleFavoritePortfolio('${docType}','${pObj.id}',this)" class="fav-heart-btn ${isFav ? "is-fav" : ""}" title="Simpan ke Favorit">
+                <i class="fa-${isFav ? "solid" : "regular"} fa-heart"></i>
+            </button>
+            <div class="relative z-10 flex items-start justify-between">
+                <span class="text-[8px] font-extrabold uppercase px-2 py-0.5 rounded-full bg-black/60">${docType === "lamaran" ? "Lamaran" : "CV"}</span>
+            </div>
+            <div class="relative z-10 my-auto text-center space-y-1">
+                <div class="w-10 h-10 rounded-xl bg-white/15 border border-white/30 flex items-center justify-center mx-auto text-sm font-extrabold">
+                    <i class="fa-solid ${docType === "lamaran" ? "fa-file-signature" : "fa-id-card"}"></i>
+                </div>
+                <strong class="block text-xs font-extrabold leading-tight truncate px-1">${escHtml(pObj.name)}</strong>
+                <span class="text-[9px] opacity-80 block truncate">${escHtml(pObj.tag || "")}</span>
+            </div>
+            <div class="relative z-10 mt-auto text-center">
+                <span class="inline-block px-3 py-1 text-[9px] font-bold rounded-full bg-white text-black shadow-md">Lihat Desain</span>
+            </div>
+        </div>
+    `;
+}
+
+function buildPriceStripHtml(tObj, isShelf = true) {
+    const pr = tObj.price !== undefined && tObj.origPrice !== undefined ? {
+        price: tObj.price,
+        origPrice: tObj.origPrice,
+        hasDisc: tObj.origPrice > tObj.price && tObj.price > 0,
+        discPct: tObj.origPrice > tObj.price ? Math.round(((tObj.origPrice - tObj.price) / tObj.origPrice) * 100) : 0
+    } : getThemePricing(tObj);
+
+    return `
+        <div class="p-2.5 bg-black/90 text-white flex items-center justify-between border-t border-white/10 text-xs">
+            <div class="min-w-0">
+                ${pr.hasDisc ? `<span class="line-through text-[10px] text-zinc-400 block">${fmtRp(pr.origPrice)}</span>` : ""}
+                <strong class="app-accent font-extrabold block truncate">${fmtRp(pr.price)}</strong>
+            </div>
+            ${pr.hasDisc ? `<span class="px-2 py-0.5 rounded bg-red-600 text-white text-[9px] font-extrabold shrink-0">-${pr.discPct}%</span>` : ""}
+        </div>
+    `;
+}
+
+// ================= 6. TEMA APLIKASI & UI CONTROLS =================
+function applyAppTheme(themeKey, saveToStorage = false) {
+    const allowed = ["light", "dark", "gold", "blue", "black", "orange"];
+    const theme = allowed.includes(themeKey) ? themeKey : "light";
+    document.documentElement.setAttribute("data-app-theme", theme);
+    if (saveToStorage) localStorage.setItem(APP_THEME_KEY, theme);
+
+    document.querySelectorAll(".theme-opt-row").forEach(btn => {
+        const isMatch = btn.dataset.topt === theme;
+        btn.classList.toggle("gold-border", isMatch);
+        const chk = btn.querySelector(".theme-chk");
+        if (chk) chk.classList.toggle("hide", !isMatch);
+    });
+}
+
+function cycleAppThemeQuick() {
+    const allowed = ["light", "dark", "gold", "blue", "black", "orange"];
+    const cur = document.documentElement.getAttribute("data-app-theme") || "light";
+    const nextIdx = (allowed.indexOf(cur) + 1) % allowed.length;
+    applyAppTheme(allowed[nextIdx], true);
+    if (typeof showToast === "function") showToast(`Tema: ${allowed[nextIdx].toUpperCase()}`, "info");
+}
+
+function showToast(msg, type = "success") {
+    const toast = document.getElementById("app-toast");
+    const txt = document.getElementById("app-toast-msg");
+    const ic = document.getElementById("app-toast-icon");
+    if (!toast || !txt) return;
+
+    txt.innerText = msg;
+    if (ic) {
+        ic.className = type === "error" ? "fa-solid fa-circle-exclamation text-red-500 text-base"
+            : type === "info" ? "fa-solid fa-circle-info text-blue-500 text-base"
+            : "fa-solid fa-circle-check text-emerald-500 text-base";
     }
-    return j || { ok: false, message: "Koneksi server sedang sibuk, coba lagi." };
+
+    toast.classList.remove("hide");
+    clearTimeout(window.__mrToastTimer);
+    window.__mrToastTimer = setTimeout(() => {
+        toast.classList.add("hide");
+    }, 3200);
 }
 
-let _pollTimer = null;
-function scheduleAdaptivePoll() {
-    clearTimeout(_pollTimer);
-    const chatOpen = !document.getElementById("full-chat-overlay")?.classList.contains("hide");
-    if (!currentSessionUser && !chatOpen) return;
-    const delay = chatOpen ? 6000 : 20000;
-    _pollTimer = setTimeout(async () => {
-        if (!document.hidden && (currentSessionUser || chatOpen)) {
-            const ok = await fetchFullCloud();
-            if (ok && typeof refreshActiveViewSmart === "function") refreshActiveViewSmart();
-        }
-        scheduleAdaptivePoll();
-    }, delay);
+function showLoading(text = "Memproses...") {
+    const bar = document.getElementById("global-loading-bar");
+    const lbl = document.getElementById("global-loading-text");
+    if (lbl) lbl.innerText = text;
+    if (bar) bar.classList.remove("hide");
 }
 
-// ================= IMAGE RESIZER, AUDIO FALLBACK & CROPPER =================
-function quickResizeImage(file, maxSide = 820, quality = 0.80) {
+function hideLoading() {
+    document.getElementById("global-loading-bar")?.classList.add("hide");
+}
+
+function showConfirm(title, msg, iconClass = "fa-solid fa-circle-question", okText = "Ya, Lanjutkan") {
+    return new Promise((resolve) => {
+        const modal = document.getElementById("app-confirm-modal");
+        const tEl = document.getElementById("app-confirm-title");
+        const mEl = document.getElementById("app-confirm-msg");
+        const iEl = document.getElementById("app-confirm-icon");
+        const btnOk = document.getElementById("app-confirm-ok");
+        const btnCancel = document.getElementById("app-confirm-cancel");
+        if (!modal) return resolve(false);
+
+        if (tEl) tEl.innerText = title;
+        if (mEl) mEl.innerText = msg;
+        if (iEl) iEl.className = iconClass;
+        if (btnOk) btnOk.innerText = okText;
+
+        modal.classList.remove("hide");
+
+        const cleanup = () => {
+            modal.classList.add("hide");
+            btnOk.onclick = null;
+            btnCancel.onclick = null;
+        };
+
+        btnOk.onclick = () => { cleanup(); resolve(true); };
+        btnCancel.onclick = () => { cleanup(); resolve(false); };
+    });
+}
+
+function setBtnLoading(btnOrId, isLoading, loadingText = "...") {
+    const btn = typeof btnOrId === "string" ? document.getElementById(btnOrId) : btnOrId;
+    if (!btn) return;
+    if (isLoading) {
+        btn.dataset.origHtml = btn.innerHTML;
+        btn.disabled = true;
+        btn.innerHTML = `<i class="fa-solid fa-circle-notch fa-spin mr-1"></i>${loadingText}`;
+    } else {
+        btn.disabled = false;
+        if (btn.dataset.origHtml) btn.innerHTML = btn.dataset.origHtml;
+    }
+}
+
+function togglePassVis(inpId, btn) {
+    const inp = document.getElementById(inpId);
+    if (!inp) return;
+    const isPass = inp.type === "password";
+    inp.type = isPass ? "text" : "password";
+    const ic = btn.querySelector("i");
+    if (ic) {
+        ic.className = isPass ? "fa-regular fa-eye-slash" : "fa-regular fa-eye";
+    }
+}
+
+// ================= 7. IMAGE & AUDIO CROPPING ENGINE =================
+let activeCropperInstance = null;
+let cropperCallback = null;
+
+function openImageCropper(fileOrBlob, aspectRatio, titleText, outW = 800, outH = 600, callback = null) {
+    const modal = document.getElementById("modal-image-cropper");
+    const imgEl = document.getElementById("crop-source-img");
+    const titleEl = document.getElementById("crop-modal-title");
+    if (!modal || !imgEl) return;
+
+    if (titleEl && titleText) titleEl.innerText = titleText;
+    cropperCallback = callback;
+
+    const reader = new FileReader();
+    reader.onload = (e) => {
+        imgEl.src = e.target.result;
+        modal.classList.remove("hide");
+        if (activeCropperInstance) activeCropperInstance.destroy();
+
+        activeCropperInstance = new Cropper(imgEl, {
+            aspectRatio: aspectRatio || NaN,
+            viewMode: 1,
+            autoCropArea: 0.95,
+            responsive: true,
+            restore: false
+        });
+        window.__cropOutDimensions = { w: outW, h: outH };
+        if (typeof mrNavPush === "function") mrNavPush({ type: "modal", id: "modal-image-cropper" });
+    };
+    reader.readAsDataURL(fileOrBlob);
+}
+
+function closeImageCropper() {
+    if (activeCropperInstance) {
+        activeCropperInstance.destroy();
+        activeCropperInstance = null;
+    }
+    document.getElementById("modal-image-cropper")?.classList.add("hide");
+    if (typeof _mrDropTopModalById === "function") _mrDropTopModalById("modal-image-cropper");
+}
+
+function cropperZoom(ratio) {
+    if (activeCropperInstance) activeCropperInstance.zoom(ratio);
+}
+
+function applyImageCrop() {
+    if (!activeCropperInstance || !cropperCallback) return closeImageCropper();
+    const dims = window.__cropOutDimensions || { w: 800, h: 600 };
+    const cvs = activeCropperInstance.getCroppedCanvas({
+        maxWidth: dims.w,
+        maxHeight: dims.h,
+        imageSmoothingEnabled: true,
+        imageSmoothingQuality: "high"
+    });
+    const dataUrl = cvs.toDataURL("image/jpeg", 0.82);
+    const cb = cropperCallback;
+    closeImageCropper();
+    cb(dataUrl);
+}
+
+async function quickResizeImage(fileOrBlob, maxDim = 800, quality = 0.8) {
     return new Promise((resolve) => {
         const reader = new FileReader();
         reader.onload = (e) => {
             const img = new Image();
             img.onload = () => {
                 let w = img.width, h = img.height;
-                if (w > maxSide || h > maxSide) {
-                    const sc = maxSide / Math.max(w, h);
-                    w = Math.round(w * sc); h = Math.round(h * sc);
+                if (w > maxDim || h > maxDim) {
+                    if (w > h) { h = Math.round((h * maxDim) / w); w = maxDim; }
+                    else { w = Math.round((w * maxDim) / h); h = maxDim; }
                 }
-                const c = document.createElement("canvas");
-                c.width = w; c.height = h;
-                const ctx = c.getContext("2d");
-                ctx.imageSmoothingEnabled = true;
-                ctx.imageSmoothingQuality = "high";
+                const canvas = document.createElement("canvas");
+                canvas.width = w; canvas.height = h;
+                const ctx = canvas.getContext("2d");
                 ctx.drawImage(img, 0, 0, w, h);
-                resolve(c.toDataURL("image/jpeg", quality));
+                resolve(canvas.toDataURL("image/jpeg", quality));
             };
-            img.onerror = () => resolve(e.target.result);
             img.src = e.target.result;
         };
-        reader.readAsDataURL(file);
+        reader.readAsDataURL(fileOrBlob);
     });
-}
-
-const _audioBlobCache = new Map();
-const _audioPreloadJobs = new Map();
-
-function extractGoogleDriveAudioId(url) {
-    if (!url) return "";
-    const s = String(url).trim();
-    const m1 = s.match(/[?&]id=([a-zA-Z0-9_-]{15,})/);
-    if (m1) return m1[1];
-    const m2 = s.match(/\/d\/([a-zA-Z0-9_-]{15,})/);
-    if (m2) return m2[1];
-    return "";
-}
-
-function getAudioUrlCandidates(url) {
-    if (!url) return [];
-    const raw = String(url).trim();
-    if (!raw) return [];
-    if (raw.startsWith("data:audio/") || raw.startsWith("blob:")) return [raw];
-    const id = extractGoogleDriveAudioId(raw);
-    if (id) {
-        return [
-            `${CLOUD_API_URL}?action=stream_audio&id=${encodeURIComponent(id)}`,
-            `https://drive.usercontent.google.com/download?id=${id}&export=download&confirm=t`,
-            `https://docs.google.com/uc?export=download&id=${id}`,
-            `https://drive.google.com/uc?export=download&id=${id}`
-        ];
-    }
-    return [raw];
-}
-
-function dataUrlToBlobUrl(dataUrl) {
-    if (!dataUrl || typeof dataUrl !== "string") return "";
-    if (dataUrl.startsWith("blob:")) return dataUrl;
-    const match = dataUrl.match(/^data:([^;]+);base64,(.+)$/);
-    if (!match) return dataUrl;
-    const mime = match[1] || "audio/mpeg";
-    const bin = atob(match[2]);
-    const len = bin.length;
-    const bytes = new Uint8Array(len);
-    for (let i = 0; i < len; i++) bytes[i] = bin.charCodeAt(i);
-    const blob = new Blob([bytes], { type: mime });
-    return URL.createObjectURL(blob);
-}
-
-async function fetchAudioAsBlobUrl(rawUrl, candidates) {
-    const cacheKey = String(rawUrl || (candidates && candidates[0]) || "");
-    if (!cacheKey) return "";
-    if (_audioBlobCache.has(cacheKey)) {
-        const cachedVal = _audioBlobCache.get(cacheKey);
-        if (cachedVal && cachedVal.startsWith("data:")) {
-            const bUrl = dataUrlToBlobUrl(cachedVal);
-            _audioBlobCache.set(cacheKey, bUrl);
-            return bUrl;
-        }
-        return cachedVal;
-    }
-
-    const idbKey = "audio_data_" + encodeURIComponent(cacheKey);
-    const idbCachedData = await idbGet(idbKey);
-    if (idbCachedData && typeof idbCachedData === "string" && idbCachedData.startsWith("data:")) {
-        const bUrl = dataUrlToBlobUrl(idbCachedData);
-        if (bUrl) {
-            _audioBlobCache.set(cacheKey, bUrl);
-            return bUrl;
-        }
-    }
-
-    if (_audioPreloadJobs.has(cacheKey)) {
-        return await _audioPreloadJobs.get(cacheKey);
-    }
-
-    const job = (async () => {
-        const driveId = extractGoogleDriveAudioId(rawUrl) || extractGoogleDriveAudioId((candidates && candidates[0]) || "");
-        if (driveId) {
-            try {
-                const streamJson = await fetchJsonWithTimeout(`${CLOUD_API_URL}?action=stream_audio&id=${encodeURIComponent(driveId)}&t=${Date.now()}`, {}, 25000);
-                if (streamJson && streamJson.ok && streamJson.dataUrl) {
-                    idbSet(idbKey, streamJson.dataUrl);
-                    const bUrl = dataUrlToBlobUrl(streamJson.dataUrl);
-                    if (bUrl) {
-                        _audioBlobCache.set(cacheKey, bUrl);
-                        return bUrl;
-                    }
-                }
-            } catch {}
-        }
-
-        const list = (candidates && candidates.length) ? candidates : getAudioUrlCandidates(rawUrl);
-        for (const u of list) {
-            if (u.indexOf("action=stream_audio") !== -1) continue;
-            try {
-                const resp = await fetch(u, { mode: "cors", cache: "force-cache", redirect: "follow" });
-                if (!resp.ok) continue;
-                const buf = await resp.arrayBuffer();
-                if (!buf || buf.byteLength < 1024) continue;
-
-                const headStr = new TextDecoder().decode(buf.slice(0, 128)).trim().toLowerCase();
-                if (headStr.startsWith("<!doctype") || headStr.startsWith("<html") || headStr.includes("google-site-verification")) {
-                    continue;
-                }
-
-                let mime = (resp.headers.get("content-type") || "").split(";")[0].trim().toLowerCase();
-                if (!mime || mime === "application/octet-stream") {
-                    const sig = new Uint8Array(buf.slice(0, 4));
-                    if (sig[0] === 0x52 && sig[1] === 0x49 && sig[2] === 0x46 && sig[3] === 0x46) mime = "audio/wav";
-                    else if (sig[0] === 0x4F && sig[1] === 0x67 && sig[2] === 0x67 && sig[3] === 0x53) mime = "audio/ogg";
-                    else mime = "audio/mpeg";
-                }
-                const blob = new Blob([buf], { type: mime });
-                const blobUrl = URL.createObjectURL(blob);
-                _audioBlobCache.set(cacheKey, blobUrl);
-                return blobUrl;
-            } catch {}
-        }
-        return "";
-    })().finally(() => {
-        _audioPreloadJobs.delete(cacheKey);
-    });
-
-    _audioPreloadJobs.set(cacheKey, job);
-    return await job;
-}
-
-function preloadAudioInBackground(rawUrl) {
-    const cleanRaw = String(rawUrl || "").trim();
-    if (!cleanRaw) return;
-    fetchAudioAsBlobUrl(cleanRaw, getAudioUrlCandidates(cleanRaw)).catch(() => {});
-}
-
-async function resolveAudioUrl(url) {
-    const list = getAudioUrlCandidates(url);
-    const blobUrl = await fetchAudioAsBlobUrl(url, list);
-    return blobUrl || list[0] || "";
-}
-
-let _cropperInst = null, _cropCfg = { outW: 600, outH: 600, onDone: null };
-function openImageCropper(file, ratio = 1, title = "Atur Rasio Foto", outW = 600, outH = 600, onDone = null) {
-    _cropCfg = { outW, outH, onDone };
-    document.getElementById("crop-modal-title").innerHTML = `<i class="fa-solid fa-crop-simple app-accent mr-1.5"></i>${escHtml(title)}`;
-    const reader = new FileReader();
-    reader.onload = (e) => {
-        const img = document.getElementById("crop-source-img");
-        img.src = e.target.result;
-        document.getElementById("modal-image-cropper").classList.remove("hide");
-        if (_cropperInst) { _cropperInst.destroy(); _cropperInst = null; }
-        if (window.Cropper) {
-            _cropperInst = new window.Cropper(img, { aspectRatio: ratio, viewMode: 1, dragMode: "move", autoCropArea: 0.92, background: false });
-        }
-    };
-    reader.readAsDataURL(file);
-}
-function cropperZoom(d) { if (_cropperInst) _cropperInst.zoom(d); }
-function closeImageCropper() {
-    if (_cropperInst) { _cropperInst.destroy(); _cropperInst = null; }
-    document.getElementById("modal-image-cropper")?.classList.add("hide");
-}
-function applyImageCrop() {
-    let dataUrl = "";
-    if (_cropperInst) {
-        const c = _cropperInst.getCroppedCanvas({ width: _cropCfg.outW, height: _cropCfg.outH, imageSmoothingQuality: "high" });
-        dataUrl = c ? c.toDataURL("image/jpeg", 0.85) : "";
-    } else {
-        dataUrl = document.getElementById("crop-source-img")?.src || "";
-    }
-    const cb = _cropCfg.onDone;
-    closeImageCropper();
-    if (cb && dataUrl) cb(dataUrl);
-}
-
-// ================= AUDIO CROPPER INTERAKTIF (WIZARD & STOK MUSIK FOUNDER) =================
-let _acFile = null, _acBlobUrl = "", _acDuration = 45, _acTotalDur = 60, _acStartSec = 0, _acAudio = null, _acPlayTimer = null;
-let _acTargetMode = "wizard";
-
-function _fmtSec(s) {
-    const n = Math.max(0, Math.floor(s || 0));
-    return `${String(Math.floor(n / 60)).padStart(2, "0")}:${String(n % 60).padStart(2, "0")}`;
-}
-
-function _updateAcBoxUI() {
-    const win = document.getElementById("ac-select-window");
-    const lbl = document.getElementById("ac-clip-range-lbl");
-    const dur = Math.max(1, _acTotalDur);
-    const clipLen = Math.min(dur, _acDuration);
-    if (_acStartSec + clipLen > dur) _acStartSec = Math.max(0, dur - clipLen);
-
-    const leftPct = (_acStartSec / dur) * 100;
-    const widthPct = Math.max(12, (clipLen / dur) * 100);
-    if (win) {
-        win.style.left = `${leftPct}%`;
-        win.style.width = `${Math.min(100 - leftPct, widthPct)}%`;
-    }
-    if (lbl) lbl.innerText = `${_fmtSec(_acStartSec)} — ${_fmtSec(_acStartSec + clipLen)}`;
-}
-
-function _bindAcDrag() {
-    const track = document.getElementById("ac-wave-track");
-    const win = document.getElementById("ac-select-window");
-    if (!track || !win || track.dataset.dragBound) return;
-    track.dataset.dragBound = "1";
-
-    let dragging = false, startX = 0, origStartSec = 0;
-    const onDown = (clientX) => { dragging = true; startX = clientX; origStartSec = _acStartSec; };
-    const onMove = (clientX) => {
-        if (!dragging) return;
-        const rect = track.getBoundingClientRect();
-        const dx = clientX - startX;
-        const deltaSec = (dx / Math.max(1, rect.width)) * _acTotalDur;
-        const maxStart = Math.max(0, _acTotalDur - Math.min(_acTotalDur, _acDuration));
-        _acStartSec = Math.max(0, Math.min(maxStart, origStartSec + deltaSec));
-        _updateAcBoxUI();
-    };
-    const onUp = () => {
-        if (!dragging) return;
-        dragging = false;
-        if (_acAudio && !_acAudio.paused) _acAudio.currentTime = _acStartSec;
-    };
-
-    win.addEventListener("mousedown", (e) => { e.preventDefault(); onDown(e.clientX); });
-    window.addEventListener("mousemove", (e) => onMove(e.clientX));
-    window.addEventListener("mouseup", onUp);
-
-    win.addEventListener("touchstart", (e) => { onDown(e.touches[0].clientX); }, { passive: true });
-    window.addEventListener("touchmove", (e) => { if (dragging) onMove(e.touches[0].clientX); }, { passive: true });
-    window.addEventListener("touchend", onUp);
-}
-
-function openAudioCropperFromInput(inp, mode = "wizard") {
-    const file = inp.files && inp.files[0]; if (!file) return; inp.value = "";
-    if (file.size > 25 * 1024 * 1024) return showToast("Ukuran lagu maksimal 25 MB.", "error");
-    _acTargetMode = mode === "library" ? "library" : "wizard";
-    _acFile = file;
-    _acStartSec = 0;
-    document.getElementById("ac-song-title").value = file.name.replace(/\.[^/.]+$/, "");
-    const catWrap = document.getElementById("ac-cat-wrap");
-    const catInp = document.getElementById("ac-song-cat");
-    if (catWrap) catWrap.classList.toggle("hide", _acTargetMode !== "library");
-    if (catInp && !catInp.value) catInp.value = "Pernikahan";
-
-    if (_acBlobUrl) { try { URL.revokeObjectURL(_acBlobUrl); } catch {} _acBlobUrl = ""; }
-    _acBlobUrl = URL.createObjectURL(file);
-    if (_acAudio) { _acAudio.pause(); _acAudio = null; }
-    _acAudio = new Audio(_acBlobUrl);
-    _acAudio.onloadedmetadata = () => {
-        _acTotalDur = Math.max(10, Math.floor(_acAudio.duration || 60));
-        document.getElementById("ac-total-dur").innerText = _fmtSec(_acTotalDur);
-        _updateAcBoxUI();
-    };
-    const bars = document.getElementById("ac-wave-bars");
-    if (bars) bars.innerHTML = Array.from({ length: 40 }, () => `<span class="w-1 bg-blue-400/75 rounded-full" style="height:${20 + Math.floor(Math.random()*70)}%"></span>`).join("");
-    _bindAcDrag();
-    _updateAcBoxUI();
-    document.getElementById("modal-audio-cropper").classList.remove("hide");
-    if (typeof pushBackGuard === "function") pushBackGuard();
-}
-
-function setAudioClipDuration(sec) {
-    _acDuration = sec;
-    document.querySelectorAll(".ac-dur-btn").forEach(b => {
-        b.className = `ac-dur-btn px-2.5 py-1 rounded-lg text-[11px] font-bold ${Number(b.dataset.dur) === sec ? "gold-pill-btn" : "app-btn-sec"}`;
-    });
-    _updateAcBoxUI();
-}
-
-function toggleAudioCropPreview() {
-    if (!_acAudio) return;
-    if (_acAudio.paused) {
-        _acAudio.currentTime = _acStartSec;
-        _acAudio.play().catch(() => {});
-        clearInterval(_acPlayTimer);
-        _acPlayTimer = setInterval(() => {
-            if (!_acAudio || _acAudio.paused) return;
-            const clipLen = Math.min(_acTotalDur, _acDuration);
-            const rel = _acAudio.currentTime - _acStartSec;
-            if (rel >= clipLen) _acAudio.currentTime = _acStartSec;
-            const ph = document.getElementById("ac-playhead");
-            if (ph) ph.style.left = `${Math.max(0, Math.min(100, (rel / Math.max(1, clipLen)) * 100))}%`;
-        }, 120);
-    } else {
-        _acAudio.pause();
-        clearInterval(_acPlayTimer);
-    }
-}
-
-function closeAudioCropper() {
-    clearInterval(_acPlayTimer);
-    if (_acAudio) { _acAudio.pause(); _acAudio = null; }
-    if (_acBlobUrl) { try { URL.revokeObjectURL(_acBlobUrl); } catch {} _acBlobUrl = ""; }
-    document.getElementById("modal-audio-cropper")?.classList.add("hide");
-}
-
-async function _ensureLameJsReady() {
-    if (window.lamejs && window.lamejs.Mp3Encoder) return true;
-    const cdns = [
-        "https://cdn.jsdelivr.net/npm/lamejs@1.2.1/lame.min.js",
-        "https://unpkg.com/lamejs@1.2.1/lame.min.js"
-    ];
-    for (const url of cdns) {
-        try {
-            await loadScriptOnce(url);
-            if (window.lamejs && window.lamejs.Mp3Encoder) return true;
-        } catch {}
-    }
-    return false;
-}
-
-async function _sliceAudioFileDataUrl(file, startSec, clipSec) {
-    try {
-        await _ensureLameJsReady();
-        const AudioCtx = window.AudioContext || window.webkitAudioContext;
-        if (!AudioCtx) throw new Error("No AudioContext");
-        const arrBuf = await file.arrayBuffer();
-        const ctx = new AudioCtx();
-        const decoded = await ctx.decodeAudioData(arrBuf);
-        const origSr = decoded.sampleRate;
-        const hasMp3 = !!(window.lamejs && window.lamejs.Mp3Encoder);
-        const targetSr = hasMp3 ? 22050 : 11025;
-        const ratio = origSr / targetSr;
-        const startIdx = Math.max(0, Math.min(decoded.length - 1, Math.floor(startSec * origSr)));
-        const endIdx = Math.max(startIdx + origSr, Math.min(decoded.length, Math.floor((startSec + clipSec) * origSr)));
-        const outLen = Math.max(1, Math.floor((endIdx - startIdx) / ratio));
-
-        const ch0 = decoded.getChannelData(0);
-        const ch1 = decoded.numberOfChannels > 1 ? decoded.getChannelData(1) : ch0;
-        const monoSamples = new Int16Array(outLen);
-        for (let i = 0; i < outLen; i++) {
-            const srcIdx = Math.min(decoded.length - 1, startIdx + Math.floor(i * ratio));
-            const mixed = ((ch0[srcIdx] || 0) + (ch1[srcIdx] || 0)) * 0.5;
-            const s = Math.max(-1, Math.min(1, mixed));
-            monoSamples[i] = s < 0 ? s * 0x8000 : s * 0x7FFF;
-        }
-        if (ctx.close) ctx.close().catch(() => {});
-
-        if (hasMp3) {
-            const mp3enc = new window.lamejs.Mp3Encoder(1, targetSr, 80);
-            const mp3Data = [];
-            const sampleBlockSize = 1152;
-            for (let i = 0; i < monoSamples.length; i += sampleBlockSize) {
-                const chunk = monoSamples.subarray(i, i + sampleBlockSize);
-                const mp3buf = mp3enc.encodeBuffer(chunk);
-                if (mp3buf.length > 0) mp3Data.push(mp3buf);
-            }
-            const endBuf = mp3enc.flush();
-            if (endBuf.length > 0) mp3Data.push(endBuf);
-
-            let totalBytes = 0;
-            mp3Data.forEach(b => totalBytes += b.length);
-            const merged = new Uint8Array(totalBytes);
-            let pos = 0;
-            mp3Data.forEach(b => { merged.set(b, pos); pos += b.length; });
-
-            let bin = "";
-            const step = 0x8000;
-            for (let i = 0; i < merged.length; i += step) {
-                bin += String.fromCharCode.apply(null, merged.subarray(i, i + step));
-            }
-            return "data:audio/mpeg;base64," + btoa(bin);
-        }
-
-        const wavLen = 44 + monoSamples.length * 2;
-        const outBuf = new ArrayBuffer(wavLen);
-        const view = new DataView(outBuf);
-        const writeStr = (off, str) => { for (let i = 0; i < str.length; i++) view.setUint8(off + i, str.charCodeAt(i)); };
-        writeStr(0, "RIFF");
-        view.setUint32(4, 36 + monoSamples.length * 2, true);
-        writeStr(8, "WAVE");
-        writeStr(12, "fmt ");
-        view.setUint32(16, 16, true);
-        view.setUint16(20, 1, true);
-        view.setUint16(22, 1, true);
-        view.setUint32(24, targetSr, true);
-        view.setUint32(28, targetSr * 2, true);
-        view.setUint16(32, 2, true);
-        view.setUint16(34, 16, true);
-        writeStr(36, "data");
-        view.setUint32(40, monoSamples.length * 2, true);
-        let offset = 44;
-        for (let i = 0; i < monoSamples.length; i++) {
-            view.setInt16(offset, monoSamples[i], true);
-            offset += 2;
-        }
-        const bytes = new Uint8Array(outBuf);
-        let bin = "";
-        const chunk = 0x8000;
-        for (let i = 0; i < bytes.length; i += chunk) {
-            bin += String.fromCharCode.apply(null, bytes.subarray(i, i + chunk));
-        }
-        return "data:audio/wav;base64," + btoa(bin);
-    } catch {
-        return await new Promise((resolve) => {
-            const reader = new FileReader();
-            reader.onload = (e) => resolve(e.target.result);
-            reader.readAsDataURL(file);
-        });
-    }
-}
-
-async function processAndUploadCroppedAudio() {
-    if (!_acFile) return;
-    setBtnLoading("btn-save-audio-crop", true, "Memotong & Kompresi MP3...");
-    const clipLen = Math.min(_acTotalDur, _acDuration);
-    const songTitle = (document.getElementById("ac-song-title")?.value || "").trim() || _acFile.name.replace(/\.[^/.]+$/, "");
-    const songCat = _acTargetMode === "library"
-        ? ((document.getElementById("ac-song-cat")?.value || "").trim() || "Pernikahan")
-        : ((typeof wizardState !== "undefined" && wizardState.category) || "Pernikahan");
-
-    const audioDataUrl = await _sliceAudioFileDataUrl(_acFile, _acStartSec, clipLen);
-    setBtnLoading("btn-save-audio-crop", true, "Mengunggah Lagu...");
-    const up = await apiAction({ action: "upload_media", dataUrl: audioDataUrl, prefix: "audio_clip" });
-    setBtnLoading("btn-save-audio-crop", false);
-    if (up && up.ok && up.url) {
-        idbSet("audio_data_" + encodeURIComponent(up.url), audioDataUrl);
-        const localBlobUrl = dataUrlToBlobUrl(audioDataUrl) || audioDataUrl;
-        _audioBlobCache.set(up.url, localBlobUrl);
-
-        if (!Array.isArray(db.musicLibrary)) db.musicLibrary = [];
-        if (!db.musicLibrary.some(m => m.url === up.url)) {
-            db.musicLibrary.unshift({
-                id: Date.now(),
-                title: songTitle,
-                category: songCat,
-                url: up.url
-            });
-            await apiAction({ action: "update_section", section: "musicLibrary", value: db.musicLibrary });
-            if (typeof populateMusicDropdown === "function") populateMusicDropdown(up.url);
-        }
-
-        if (_acTargetMode === "wizard") {
-            if (typeof wizardState !== "undefined") {
-                wizardState.customAudioUrl = up.url;
-                wizardState.customAudioTitle = songTitle;
-            }
-            const st = document.getElementById("audio-upload-status");
-            if (st) {
-                st.innerText = `✓ Lagu "${songTitle}" (${_fmtSec(_acStartSec)}–${_fmtSec(_acStartSec + clipLen)}) siap & masuk stok lagu!`;
-                st.classList.remove("hide");
-            }
-        } else {
-            if (typeof renderMasterWorkspaceContent === "function") renderMasterWorkspaceContent();
-        }
-
-        closeAudioCropper();
-        showToast(`Lagu "${songTitle}" berhasil diunggah ke Stok Lagu!`);
-    } else {
-        showToast("Gagal mengunggah lagu. Pastikan koneksi stabil atau pilih durasi lebih singkat.", "error");
-    }
 }
