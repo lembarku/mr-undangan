@@ -1,6 +1,6 @@
 // =========================================================================
-// LEMBARKU — MAIN CONTROLLER (NOTIFIKASI, PRIVASI, BLOKIR, BERANDA & PROFIL)
-// File: js/app.js (V14.3)
+// LEMBARKU & TITIK GOWES — APP CONTROLLER & NOTIFICATIONS (js/app.js)
+// Versi: V14.3 (Modular Super-App Ekosistem)
 // =========================================================================
 const USER_CACHE_KEY = "MR_UNDANGAN_USER_OBJ";
 let deferredPwaPrompt = null;
@@ -32,8 +32,6 @@ const isAppInstalled = () =>
 window.addEventListener("beforeinstallprompt", (e) => {
     e.preventDefault();
     deferredPwaPrompt = e;
-    // Jika perangkat sebelumnya tercatat terpasang namun browser kembali menawarkan install,
-    // artinya aplikasi telah dicopot (uninstall) dari layar utama perangkat.
     const prevMarked = localStorage.getItem("MR_PWA_INSTALLED") === "true" ||
         (typeof APP_INSTALLED_REPORTED_KEY !== "undefined" && localStorage.getItem(APP_INSTALLED_REPORTED_KEY) === "installed");
     if (prevMarked && !isStandaloneRunning()) {
@@ -133,15 +131,16 @@ function finishAndLaunchApp() {
     document.getElementById("modal-install-welcome")?.classList.add("hide");
     _mrDropTopModalById("modal-install-welcome");
     try { if (typeof getCleanBaseUrl === "function") window.open(getCleanBaseUrl(), "_self"); } catch {}
-    showToast("Selamat menggunakan Lembarku!");
+    showToast("Selamat menggunakan Lembarku & Titik Gowes!");
 }
 
-// ================= 2. POPUP LOGIN TENGAH & PENGINGAT LOGIN =================
+// ================= 2. POPUP LOGIN & PENGINGAT MASUK AKUN =================
 function openAuthModal() {
     document.getElementById("modal-auth")?.classList.remove("hide");
     setTimeout(() => document.getElementById("auth-username")?.focus(), 120);
     mrNavPush({ type: "modal", id: "modal-auth" });
 }
+
 function closeAuthModal() {
     document.getElementById("modal-auth")?.classList.add("hide");
     _mrDropTopModalById("modal-auth");
@@ -157,6 +156,7 @@ function maybeShowLoginReminder() {
     localStorage.setItem(LOGIN_REMIND_KEY, String(Date.now()));
     document.getElementById("login-reminder-pill")?.classList.remove("hide");
 }
+
 function dismissLoginReminder() {
     if (typeof LOGIN_REMIND_KEY !== "undefined") {
         localStorage.setItem(LOGIN_REMIND_KEY, String(Date.now()));
@@ -181,8 +181,10 @@ async function handleAuthSubmit(e) {
     const u = _normAppUserKey(rawU);
     const p = document.getElementById("auth-password").value.trim();
     if (!u || !p) return;
+
     setBtnLoading("auth-submit-btn", true, "Masuk...");
     const res = await apiAction({ action: "login", username: u, password: p });
+
     if (res && res.ok && res.user) {
         currentSessionUser = _normAppUserKey(res.user.username);
         currentSessionToken = res.token || "";
@@ -200,6 +202,7 @@ async function handleAuthSubmit(e) {
         if (typeof scheduleAdaptivePoll === "function") scheduleAdaptivePoll();
         return;
     }
+
     if (res && res.code === "NOT_FOUND") {
         setBtnLoading("auth-submit-btn", true, "Mendaftarkan...");
         const reg = await apiAction({ action: "register", username: u, password: p });
@@ -207,12 +210,13 @@ async function handleAuthSubmit(e) {
         if (reg && reg.ok) {
             document.getElementById("auth-password").value = "";
             closeAuthModal();
-            showToast("Pendaftaran berhasil! Tinggal tunggu konfirmasi Admin.", "info");
+            showToast("Pendaftaran berhasil! Akun otomatis aktif setelah disetujui Admin.", "info");
         } else showToast((reg && reg.message) || "Gagal mendaftar.", "error");
         return;
     }
+
     setBtnLoading("auth-submit-btn", false);
-    showToast((res && res.message) || "Gagal masuk. Periksa koneksi Anda.", "error");
+    showToast((res && res.message) || "Gagal masuk. Periksa password Anda.", "error");
 }
 
 async function confirmLogout() {
@@ -220,6 +224,7 @@ async function confirmLogout() {
         logoutSession();
     }
 }
+
 function logoutSession() {
     currentSessionUser = null;
     currentSessionToken = "";
@@ -228,8 +233,9 @@ function logoutSession() {
     localStorage.removeItem(DISPLAY_NAME_KEY);
     localStorage.removeItem(USER_CACHE_KEY);
     if (typeof idbRemove === "function") idbRemove("db_snapshot");
-    db.users = []; db.invitations = []; db.portfolios = []; db.chats = [];
+    db.users = []; db.invitations = []; db.portfolios = []; db.chats = []; db.gowesRentals = [];
     toggleSlideMenu(false);
+    toggleEcosystemDrawer(false);
     closeNotificationsFullscreen(true);
     if (typeof closeMasterWorkspaceFullscreen === "function") closeMasterWorkspaceFullscreen(true);
     if (typeof closeFullChatOverlay === "function") closeFullChatOverlay(true);
@@ -239,7 +245,7 @@ function logoutSession() {
     showToast("Anda telah keluar.", "info");
 }
 
-// ================= 3. MESIN NAVIGASI BERTAHAP TERPUSAT =================
+// ================= 3. MESIN NAVIGASI BERTAHAP TERPUSAT (mrNav) =================
 let lastBackPressTs = 0;
 let historyGuardReady = false;
 let _mrHistoryDepth = 0;
@@ -351,10 +357,7 @@ function _mrHideStackableOverlaysOnly() {
     if (av) av.classList.add("hide");
 
     const profMod = document.getElementById("modal-view-user-profile");
-    if (profMod) {
-        profMod.style.cssText = "";
-        profMod.classList.add("hide");
-    }
+    if (profMod) { profMod.style.cssText = ""; profMod.classList.add("hide"); }
 
     const notifMod = document.getElementById("modal-notifications");
     if (notifMod) notifMod.classList.add("hide");
@@ -363,10 +366,14 @@ function _mrHideStackableOverlaysOnly() {
     if (wsMod) wsMod.classList.add("hide");
 
     const chatOv = document.getElementById("full-chat-overlay");
-    if (chatOv) {
-        chatOv.style.cssText = "";
-        chatOv.classList.add("hide");
-    }
+    if (chatOv) { chatOv.style.cssText = ""; chatOv.classList.add("hide"); }
+
+    // Modal Titik Gowes
+    ["modal-gowes-booking", "modal-gowes-bike", "modal-gowes-handover", "modal-gowes-rental-detail"].forEach(id => {
+        document.getElementById(id)?.classList.add("hide");
+    });
+    toggleEcosystemDrawer(false);
+
     document.body.style.overflow = "";
 }
 
@@ -380,6 +387,27 @@ function _mrCloseTransientOverlayIfAny() {
         document.getElementById("app-confirm-cancel")?.click();
         return "app-confirm-modal";
     }
+    if (_isElVis("modal-gowes-booking")) {
+        if (typeof closeGowesBookingModal === "function") closeGowesBookingModal();
+        else document.getElementById("modal-gowes-booking")?.classList.add("hide");
+        return "modal-gowes-booking";
+    }
+    if (_isElVis("modal-gowes-bike")) {
+        document.getElementById("modal-gowes-bike")?.classList.add("hide");
+        return "modal-gowes-bike";
+    }
+    if (_isElVis("modal-gowes-handover")) {
+        document.getElementById("modal-gowes-handover")?.classList.add("hide");
+        return "modal-gowes-handover";
+    }
+    if (_isElVis("modal-gowes-rental-detail")) {
+        document.getElementById("modal-gowes-rental-detail")?.classList.add("hide");
+        return "modal-gowes-rental-detail";
+    }
+    if (document.getElementById("drawer-ecosystem")?.classList.contains("open")) {
+        toggleEcosystemDrawer(false);
+        return "drawer-ecosystem";
+    }
     if (_isElVis("modal-image-cropper")) {
         if (typeof closeImageCropper === "function") closeImageCropper();
         return "modal-image-cropper";
@@ -391,10 +419,6 @@ function _mrCloseTransientOverlayIfAny() {
     if (_isElVis("modal-proof-viewer")) {
         document.getElementById("modal-proof-viewer")?.classList.add("hide");
         return "modal-proof-viewer";
-    }
-    if (_isElVis("ios-vault-lightbox")) {
-        if (typeof closeSecretPhotoLightbox === "function") closeSecretPhotoLightbox();
-        return "ios-vault-lightbox";
     }
     if (_isElVis("modal-portfolio-preview")) {
         document.getElementById("modal-portfolio-preview")?.classList.add("hide");
@@ -476,10 +500,6 @@ function _mrCloseTransientOverlayIfAny() {
     if (_isElVis("guest-invitation-overlay") && _isElVis("gv-close-btn")) {
         if (typeof closeGuestInvitation === "function") closeGuestInvitation();
         return "guest-invitation-overlay";
-    }
-    if (_isElVis("ig-profile-stats-modal")) {
-        closeIgProfileFullscreen();
-        return "ig-profile-stats-modal";
     }
     return "";
 }
@@ -582,12 +602,6 @@ function _mrHandleFallbackBackStep() {
     return false;
 }
 
-function closeIgProfileFullscreen() {
-    window._igProfileSheetState.open = false;
-    const el = document.getElementById("ig-profile-stats-modal");
-    if (el) el.classList.add("hide");
-}
-
 window.addEventListener("popstate", (e) => {
     const stateDepth = (e && e.state && typeof e.state.depth === "number")
         ? e.state.depth
@@ -652,14 +666,17 @@ window.addEventListener("popstate", (e) => {
 });
 
 function handleHeaderBrandClick() {
-    if (typeof clientPortalState !== "undefined" && clientPortalState.active) { window.scrollTo({ top: 0, behavior: "smooth" }); return; }
+    if (typeof clientPortalState !== "undefined" && clientPortalState.active) {
+        window.scrollTo({ top: 0, behavior: "smooth" });
+        return;
+    }
     _mrHideStackableOverlaysOnly();
     _mrResetNavToLanding();
     goToLanding(true);
 }
 
 function hideAllViews() {
-    ["view-landing", "view-profile", "view-cabang-admin", "view-master-admin", "view-staff-admin", "view-wizard", "view-portfolio-wizard", "view-payment", "view-guestlist"]
+    ["view-landing", "view-gowes", "view-profile", "view-cabang-admin", "view-master-admin", "view-staff-admin", "view-wizard", "view-portfolio-wizard", "view-payment", "view-guestlist"]
         .forEach(id => document.getElementById(id)?.classList.add("hide"));
 }
 
@@ -667,15 +684,25 @@ function goToLanding(fromBack = false) {
     currentViewName = "landing";
     document.body.classList.add("in-home");
     hideAllViews();
-    document.getElementById("view-landing")?.classList.remove("hide");
+
+    const isGowes = currentAppMode === "titik_gowes";
+    if (isGowes) {
+        document.getElementById("view-gowes")?.classList.remove("hide");
+        if (typeof renderGowesLandingPage === "function") renderGowesLandingPage();
+    } else {
+        document.getElementById("view-landing")?.classList.remove("hide");
+        renderLandingPage();
+    }
+
     renderHeaderActions();
-    renderLandingPage();
+    if (typeof updateAppModeUI === "function") updateAppModeUI();
     window.scrollTo({ top: 0, behavior: "smooth" });
 }
 
 function routeDashboard(fromBack = false) {
     if (typeof clientPortalState !== "undefined" && clientPortalState.active) return;
     if (!currentSessionUser) return goToLanding(fromBack);
+
     let u = typeof getCurrentUserObj === "function" ? getCurrentUserObj() : null;
     if (!u) {
         try {
@@ -717,22 +744,25 @@ function routeDashboard(fromBack = false) {
         document.getElementById("view-profile")?.classList.remove("hide");
         renderUserProfile();
     }
+
     renderHeaderActions();
+    if (typeof updateAppModeUI === "function") updateAppModeUI();
     if (!fromBack) mrNavPush({ type: "view", view: currentViewName });
     window.scrollTo({ top: 0, behavior: "smooth" });
 }
 
+// ================= 4. PENATAAN HEADER (LONCENG DI KIRI FOTO PROFIL) =================
 function renderHeaderActions() {
     const box = document.getElementById("header-actions");
     const dotsBtn = document.getElementById("header-dots-btn");
     const notifBtn = document.getElementById("header-notif-btn");
-    const mainEl = document.getElementById("header-brand-main");
-    const subEl = document.getElementById("header-brand-sub");
     const footLoginBtn = document.getElementById("footer-login-cta");
     const defAv = typeof DEFAULT_AVATAR !== "undefined" ? DEFAULT_AVATAR : "./lembarku-logo.png";
 
     if (typeof clientPortalState !== "undefined" && clientPortalState.active) {
         document.body.classList.add("in-home");
+        const mainEl = document.getElementById("header-brand-main");
+        const subEl = document.getElementById("header-brand-sub");
         if (mainEl) mainEl.innerText = clientPortalState.brandName || "Mitra Cabang";
         if (subEl) {
             subEl.innerText = "Powered by Lembarku";
@@ -751,11 +781,6 @@ function renderHeaderActions() {
     const isProfileMenu = ["profile", "master", "cabang", "staff"].includes(currentViewName);
     document.body.classList.toggle("in-home", !isProfileMenu);
 
-    if (mainEl) mainEl.innerText = "Lembarku";
-    if (subEl) {
-        subEl.innerText = "";
-        subEl.classList.add("hide");
-    }
     document.getElementById("floating-chat-wrap")?.classList.remove("hide");
     if (dotsBtn) {
         if (isProfileMenu) {
@@ -770,6 +795,7 @@ function renderHeaderActions() {
     const u = typeof getCurrentUserObj === "function" ? getCurrentUserObj() : null;
     if (footLoginBtn) footLoginBtn.classList.toggle("hide", !!u);
 
+    // Lonceng notifikasi diposisikan tepat di sebelah kiri avatar
     if (notifBtn) {
         notifBtn.classList.toggle("hide", !u);
     }
@@ -783,13 +809,16 @@ function renderHeaderActions() {
     if (box) {
         box.innerHTML = onDashboard
             ? ``
-            : `<button onclick="routeDashboard()" class="w-9 h-9 rounded-full overflow-hidden border-2 gold-border shadow-sm hover:scale-105 transition bg-zinc-800 shrink-0" title="Buka Profil"><img src="${u.avatar || defAv}" alt="Profil" class="w-full h-full object-cover"></button>`;
+            : `<button onclick="routeDashboard()" class="w-9 h-9 rounded-full overflow-hidden border-2 gold-border shadow-sm hover:scale-105 transition bg-zinc-800 shrink-0" title="Buka Profil">
+                <img src="${u.avatar || defAv}" alt="Profil" class="w-full h-full object-cover">
+               </button>`;
     }
+
     if (typeof updateChatBadges === "function") updateChatBadges();
     updateNotificationBellBadge();
 }
 
-// ================= 4. LONCENG NOTIFIKASI MINIMALIS BERDASARKAN PERAN =================
+// ================= 5. MESIN NOTIFIKASI LONCENG TERPADU (LEMBARKU & GOWES) =================
 function _getNotifReadTs(username) {
     const k = `${typeof NOTIF_READ_TS_KEY !== "undefined" ? NOTIF_READ_TS_KEY : "LBK_NOTIF_LAST_READ_TS"}_${_normAppUserKey(username)}`;
     return Number(localStorage.getItem(k) || 0);
@@ -825,9 +854,13 @@ function buildNotificationsForCurrentUser() {
     const allInvs = Array.isArray(db.invitations) ? db.invitations : [];
     const allPfs = Array.isArray(db.portfolios) ? db.portfolios : [];
     const allChats = Array.isArray(db.chats) ? db.chats : [];
+    const allRentals = Array.isArray(db.gowesRentals) ? db.gowesRentals : [];
 
+    // NOTIFIKASI FOUNDER & TIM ADMINISTRASI
     if (role === "master" || role === "administrasi") {
         const isAdminOnly = role === "administrasi";
+
+        // 1. Pesanan Berkas Lembarku
         const scopedDocs = [
             ...allInvs.map(i => Object.assign({}, i, { _kind: "inv" })),
             ...allPfs.map(p => Object.assign({}, p, { _kind: "pf" }))
@@ -843,9 +876,9 @@ function buildNotificationsForCurrentUser() {
                     priority: true,
                     icon: "fa-solid fa-pen-to-square",
                     accent: "text-amber-500",
-                    title: `Pengajuan Revisi — ${doc.title}`,
-                    desc: `@${doc.owner} mengajukan revisi berkas. Ketuk untuk cek & ACC di Project.`,
-                    actionJs: `closeNotificationsFullscreen(true);if(typeof openSoloProjectModal==='function')openSoloProjectModal('${esc(myKey)}');`
+                    title: `[Lembarku] Pengajuan Revisi — ${doc.title}`,
+                    desc: `@${doc.owner} mengajukan revisi berkas. Ketuk untuk ACC di Project.`,
+                    actionJs: `closeNotificationsFullscreen(true);if(typeof openSoloProjectModal==='function'){if(typeof setSoloProjectDomainFilter==='function')setSoloProjectDomainFilter('lembarku');openSoloProjectModal('${esc(myKey)}');}`
                 });
             } else if (doc.status === "Menunggu Verifikasi") {
                 items.push({
@@ -855,9 +888,9 @@ function buildNotificationsForCurrentUser() {
                     priority: true,
                     icon: "fa-solid fa-receipt",
                     accent: "text-emerald-500",
-                    title: `Transaksi Masuk — ${doc.title}`,
-                    desc: `@${doc.owner} mengirim bukti konfirmasi${doc.totalPay ? ` (${fmtRp(doc.totalPay)})` : ""}. Ketuk untuk verifikasi.`,
-                    actionJs: `closeNotificationsFullscreen(true);if(typeof openSoloProjectModal==='function')openSoloProjectModal('${esc(myKey)}');`
+                    title: `[Lembarku] Transaksi Masuk — ${doc.title}`,
+                    desc: `@${doc.owner} mengirim bukti pembayaran${doc.totalPay ? ` (${fmtRp(doc.totalPay)})` : ""}. Cek di Project.`,
+                    actionJs: `closeNotificationsFullscreen(true);if(typeof openSoloProjectModal==='function'){if(typeof setSoloProjectDomainFilter==='function')setSoloProjectDomainFilter('lembarku');openSoloProjectModal('${esc(myKey)}');}`
                 });
             } else if (doc.status === "Menunggu Pembayaran") {
                 items.push({
@@ -866,13 +899,54 @@ function buildNotificationsForCurrentUser() {
                     unread: ts > lastRead,
                     icon: "fa-solid fa-bag-shopping",
                     accent: "app-accent",
-                    title: `Pesanan Baru — ${doc.title}`,
+                    title: `[Lembarku] Pesanan Draf — ${doc.title}`,
                     desc: `@${doc.owner} membuat draf baru (menunggu pembayaran).`,
-                    actionJs: `closeNotificationsFullscreen(true);if(typeof openSoloProjectModal==='function')openSoloProjectModal('${esc(myKey)}');`
+                    actionJs: `closeNotificationsFullscreen(true);if(typeof openSoloProjectModal==='function'){if(typeof setSoloProjectDomainFilter==='function')setSoloProjectDomainFilter('lembarku');openSoloProjectModal('${esc(myKey)}');}`
                 });
             }
         });
 
+        // 2. Transaksi Sewa Sepeda Titik Gowes
+        allRentals.forEach(r => {
+            const ts = Number(r.createdAt || 0);
+            if (r.status === "Menunggu Verifikasi") {
+                items.push({
+                    id: `gw_ver_${r.id}`,
+                    ts,
+                    unread: true,
+                    priority: true,
+                    icon: "fa-solid fa-bicycle",
+                    accent: "text-emerald-500",
+                    title: `[Titik Gowes] Pembayaran Sewa Masuk — ${r.bikeName}`,
+                    desc: `@${r.customerUsername} mengirim bukti sewa ${r.durationLabel} (${fmtRp(r.totalPrice)}). Ketuk untuk ACC.`,
+                    actionJs: `closeNotificationsFullscreen(true);if(typeof openSoloProjectModal==='function'){if(typeof setSoloProjectDomainFilter==='function')setSoloProjectDomainFilter('gowes');openSoloProjectModal('${esc(myKey)}');}`
+                });
+            } else if (r.status === "Menunggu Pembayaran") {
+                items.push({
+                    id: `gw_pay_${r.id}`,
+                    ts,
+                    unread: ts > lastRead,
+                    icon: "fa-solid fa-clock",
+                    accent: "text-amber-500",
+                    title: `[Titik Gowes] Booking Baru — ${r.bikeName}`,
+                    desc: `@${r.customerUsername} memesan paket ${r.durationLabel} untuk ${r.startDate} ${r.startTime} WITA.`,
+                    actionJs: `closeNotificationsFullscreen(true);if(typeof openSoloProjectModal==='function'){if(typeof setSoloProjectDomainFilter==='function')setSoloProjectDomainFilter('gowes');openSoloProjectModal('${esc(myKey)}');}`
+                });
+            } else if (r.status === "Sedang Digunakan") {
+                items.push({
+                    id: `gw_use_${r.id}`,
+                    ts: Number(r.startedAt || ts),
+                    unread: false,
+                    icon: "fa-solid fa-person-biking",
+                    accent: "text-blue-500",
+                    title: `[Titik Gowes] Sepeda Digunakan — ${r.bikeName}`,
+                    desc: `Penyewa: @${r.customerUsername}. Pastikan unit kembali aman di shelter garasi.`,
+                    actionJs: `closeNotificationsFullscreen(true);if(typeof openSoloProjectModal==='function'){if(typeof setSoloProjectDomainFilter==='function')setSoloProjectDomainFilter('gowes');openSoloProjectModal('${esc(myKey)}');}`
+                });
+            }
+        });
+
+        // 3. Pendaftar Baru (Khusus Founder)
         if (role === "master") {
             (db.users || []).filter(x => x.role !== "master" && x.status !== "Aktif").forEach(pu => {
                 const ts = Number(pu.createdAt || Date.now());
@@ -890,6 +964,7 @@ function buildNotificationsForCurrentUser() {
             });
         }
 
+        // 4. Pesan Chat Pelanggan Masuk
         const unreadThreadMap = {};
         allChats.forEach(c => {
             if (c.readByMaster || c.role === "master" || c.role === "administrasi") return;
@@ -917,7 +992,9 @@ function buildNotificationsForCurrentUser() {
                 actionJs: `closeNotificationsFullscreen(true);if(typeof openFullChatOverlay==='function')openFullChatOverlay('${esc(tKey)}');`
             });
         });
+
     } else if (role === "cabang") {
+        // NOTIFIKASI MITRA CABANG
         const quota = Number(u.quota || 0);
         if (quota <= 2) {
             items.push({
@@ -961,8 +1038,10 @@ function buildNotificationsForCurrentUser() {
                 actionJs: `closeNotificationsFullscreen(true);if(typeof openFullChatOverlay==='function')openFullChatOverlay();`
             });
         }
+
     } else {
-        // USER BIASA
+        // NOTIFIKASI PENGGUNA BIASA (USER)
+        // 1. Dokumen Lembarku
         const myDocs = [
             ...allInvs.filter(i => _normAppUserKey(i.owner) === myKey).map(i => Object.assign({}, i, { _kind: "inv" })),
             ...allPfs.filter(p => _normAppUserKey(p.owner) === myKey).map(p => Object.assign({}, p, { _kind: "pf" }))
@@ -976,8 +1055,8 @@ function buildNotificationsForCurrentUser() {
                     unread: true,
                     icon: "fa-solid fa-qrcode",
                     accent: "text-amber-500",
-                    title: `Selesaikan Konfirmasi — ${doc.title}`,
-                    desc: "Pesanan Anda tersimpan. Ketuk untuk bayar QRIS atau lampirkan bukti.",
+                    title: `Selesaikan Pembayaran — ${doc.title}`,
+                    desc: "Pesanan tersimpan. Ketuk untuk bayar QRIS atau lampirkan bukti.",
                     actionJs: `closeNotificationsFullscreen(true);if(typeof openUnifiedPayment==='function')openUnifiedPayment('${doc._kind === "pf" ? "portfolio" : "inv"}',${doc.id});`
                 });
             } else if (doc.status === "Menunggu Verifikasi") {
@@ -1023,6 +1102,70 @@ function buildNotificationsForCurrentUser() {
             }
         });
 
+        // 2. Transaksi Sewa Titik Gowes Pelanggan
+        const myRentals = allRentals.filter(r => _normAppUserKey(r.customerUsername) === myKey);
+        myRentals.forEach(r => {
+            const ts = Number(r.createdAt || 0);
+            if (r.status === "Menunggu Pembayaran") {
+                items.push({
+                    id: `gupay_${r.id}`,
+                    ts,
+                    unread: true,
+                    icon: "fa-solid fa-qrcode",
+                    accent: "text-emerald-500",
+                    title: `Bayar Sewa Sepeda — ${r.bikeName}`,
+                    desc: `Paket ${r.durationLabel} (${fmtRp(r.totalPrice)}). Ketuk untuk bayar via QRIS DANA.`,
+                    actionJs: `closeNotificationsFullscreen(true);if(typeof openGowesRentalPayment==='function')openGowesRentalPayment('${esc(r.id)}');`
+                });
+            } else if (r.status === "Menunggu Verifikasi") {
+                items.push({
+                    id: `guver_${r.id}`,
+                    ts,
+                    unread: ts > lastRead,
+                    icon: "fa-solid fa-clock",
+                    accent: "text-amber-500",
+                    title: `Verifikasi Sewa — ${r.bikeName}`,
+                    desc: "Bukti pembayaran diterima. Admin sedang memverifikasi pesanan Anda.",
+                    actionJs: `closeNotificationsFullscreen(true);if(typeof openGowesRentalDetail==='function')openGowesRentalDetail('${esc(r.id)}');`
+                });
+            } else if (r.status === "Terkonfirmasi") {
+                items.push({
+                    id: `guconf_${r.id}`,
+                    ts: Number(r.confirmedAt || ts),
+                    unread: true,
+                    priority: true,
+                    icon: "fa-solid fa-circle-check",
+                    accent: "text-emerald-600",
+                    title: `Sewa Dikonfirmasi: Siap Ambil — ${r.bikeName}`,
+                    desc: `Jadwal: ${r.startDate} ${r.startTime} WITA di ${r.pickupLocation || "Shelter Utama"}. Tunjukkan KTP asli saat ambil unit.`,
+                    actionJs: `closeNotificationsFullscreen(true);if(typeof openGowesRentalDetail==='function')openGowesRentalDetail('${esc(r.id)}');`
+                });
+            } else if (r.status === "Sedang Digunakan") {
+                items.push({
+                    id: `guin_${r.id}`,
+                    ts: Number(r.startedAt || ts),
+                    unread: false,
+                    icon: "fa-solid fa-person-biking",
+                    accent: "text-blue-500",
+                    title: `Gowes Sedang Berlangsung — ${r.bikeName}`,
+                    desc: `Paket ${r.durationLabel}. Pastikan kembali tepat waktu di garasi shelter.`,
+                    actionJs: `closeNotificationsFullscreen(true);if(typeof openGowesRentalDetail==='function')openGowesRentalDetail('${esc(r.id)}');`
+                });
+            } else if (r.status === "Selesai") {
+                items.push({
+                    id: `gudone_${r.id}`,
+                    ts: Number(r.completedAt || ts),
+                    unread: ts > lastRead,
+                    icon: "fa-solid fa-flag-checkered",
+                    accent: "text-emerald-500",
+                    title: `Rental Selesai — ${r.bikeName}`,
+                    desc: "Terima kasih telah menyewa sepeda di Titik Gowes! Jaminan KTP telah dikembalikan.",
+                    actionJs: `closeNotificationsFullscreen(true);if(typeof openGowesRentalDetail==='function')openGowesRentalDetail('${esc(r.id)}');`
+                });
+            }
+        });
+
+        // 3. Pesan Chat Admin
         const unreadStaffChats = allChats.filter(c => _normAppUserKey(c.threadUser) === myKey && !c.readByUser && (c.role === "master" || c.role === "administrasi"));
         if (unreadStaffChats.length) {
             const last = unreadStaffChats[unreadStaffChats.length - 1];
@@ -1033,22 +1176,9 @@ function buildNotificationsForCurrentUser() {
                 priority: true,
                 icon: "fa-solid fa-headset",
                 accent: "text-blue-500",
-                title: "Balasan Baru dari Admin Lembarku",
+                title: "Balasan Baru dari Admin",
                 desc: last.text ? last.text.slice(0, 85) : "Mengirim lampiran foto.",
                 actionJs: `closeNotificationsFullscreen(true);if(typeof openFullChatOverlay==='function')openFullChatOverlay();`
-            });
-        }
-
-        if (u.isPro) {
-            items.push({
-                id: `upro_${myKey}`,
-                ts: Number(u.createdAt || 0),
-                unread: false,
-                icon: "fa-solid fa-circle-check",
-                accent: "text-blue-500",
-                title: "Status Akun PRO Aktif",
-                desc: "Centang biru & penyimpanan Album Rahasia tanpa batas aktif di akun Anda.",
-                actionJs: `closeNotificationsFullscreen(true);routeDashboard();`
             });
         }
     }
@@ -1056,274 +1186,99 @@ function buildNotificationsForCurrentUser() {
     return items.sort((a, b) => (Number(!!b.priority) - Number(!!a.priority)) || (Number(b.ts || 0) - Number(a.ts || 0)));
 }
 
+// ================= 6. INTERAKSI LONCENG NOTIFIKASI =================
 function updateNotificationBellBadge() {
     const badge = document.getElementById("header-notif-badge");
-    const btn = document.getElementById("header-notif-btn");
+    if (!badge) return;
     const u = typeof getCurrentUserObj === "function" ? getCurrentUserObj() : null;
-    if (!badge || !btn) return;
-    if (!u || (typeof clientPortalState !== "undefined" && clientPortalState.active)) {
+    if (!u) {
         badge.classList.add("hide");
         return;
     }
-    const items = buildNotificationsForCurrentUser();
-    const unreadCnt = items.filter(x => x.unread).length;
-    badge.innerText = unreadCnt > 99 ? "99+" : String(unreadCnt);
-    badge.classList.toggle("hide", unreadCnt === 0);
+    const notifs = buildNotificationsForCurrentUser();
+    const unreadCount = notifs.filter(n => n.unread).length;
+    if (unreadCount > 0) {
+        badge.innerText = unreadCount > 99 ? "99+" : String(unreadCount);
+        badge.classList.remove("hide");
+    } else {
+        badge.classList.add("hide");
+    }
 }
 
 function openNotificationsFullscreen() {
-    const u = typeof getCurrentUserObj === "function" ? getCurrentUserObj() : null;
-    if (!u) return openAuthModal();
-    const sub = document.getElementById("notif-subtitle");
-    if (sub) {
-        const subMap = {
-            master: "Transaksi masuk, revisi, pendaftar baru & Live Chat",
-            administrasi: "Antrean transaksi & pesan pelanggan terbaru",
-            cabang: "Status kuota, ucapan tamu klien & pesan Founder",
-            user: "Status pesanan berkas, ucapan tamu & balasan Admin"
-        };
-        sub.innerText = subMap[u.role] || "Aktivitas terbaru akun Anda";
-    }
+    const modal = document.getElementById("modal-notifications");
+    if (!modal) return;
     renderNotificationsList();
-    document.getElementById("modal-notifications")?.classList.remove("hide");
+    modal.classList.remove("hide");
     mrNavPush({ type: "modal", id: "modal-notifications" });
 }
 
 function closeNotificationsFullscreen(fromNav = false) {
-    document.getElementById("modal-notifications")?.classList.add("hide");
+    const modal = document.getElementById("modal-notifications");
+    if (modal) modal.classList.add("hide");
     if (!fromNav) _mrDropTopModalById("modal-notifications");
-    updateNotificationBellBadge();
+}
+
+function renderNotificationsList() {
+    const box = document.getElementById("notifications-list-body");
+    const subTitle = document.getElementById("notif-subtitle");
+    if (!box) return;
+    const notifs = buildNotificationsForCurrentUser();
+    const unreadCnt = notifs.filter(n => n.unread).length;
+
+    if (subTitle) {
+        subTitle.innerText = `${notifs.length} total • ${unreadCnt} belum dibaca`;
+    }
+
+    if (!notifs.length) {
+        box.innerHTML = `
+            <div class="app-card border border-dashed rounded-3xl p-8 text-center space-y-2.5">
+                <div class="w-12 h-12 rounded-full app-card-soft border gold-border flex items-center justify-center mx-auto text-xl app-muted">
+                    <i class="fa-regular fa-bell-slash"></i>
+                </div>
+                <h4 class="font-extrabold text-sm">Belum Ada Notifikasi</h4>
+                <p class="text-xs app-muted">Aktivitas pesanan undangan, berkas CV, maupun sewa sepeda akan muncul di sini.</p>
+            </div>
+        `;
+        return;
+    }
+
+    box.innerHTML = notifs.map(n => {
+        const unreadDot = n.unread ? `<span class="w-2 h-2 rounded-full bg-red-500 shrink-0"></span>` : "";
+        const bgCls = n.unread ? "app-card border-l-4 border-l-amber-500 shadow-sm" : "app-card-soft border opacity-80";
+        return `
+            <div onclick="${n.actionJs || ''}" class="${bgCls} rounded-2xl p-3.5 space-y-1.5 cursor-pointer hover:brightness-95 active:scale-[0.99] transition">
+                <div class="flex items-center justify-between gap-2">
+                    <div class="flex items-center gap-2 min-w-0">
+                        <span class="w-7 h-7 rounded-lg app-card-soft border gold-border flex items-center justify-center shrink-0 ${n.accent || 'app-accent'} text-xs">
+                            <i class="${n.icon || 'fa-solid fa-bell'}"></i>
+                        </span>
+                        <strong class="text-xs truncate font-extrabold">${escHtml(n.title)}</strong>
+                    </div>
+                    <div class="flex items-center gap-1.5 shrink-0">
+                        ${unreadDot}
+                        <span class="text-[10px] app-muted">${_fmtNotifTime(n.ts)}</span>
+                    </div>
+                </div>
+                <p class="text-[11px] app-muted leading-relaxed pl-9">${escHtml(n.desc)}</p>
+            </div>
+        `;
+    }).join("");
 }
 
 function markAllNotificationsRead() {
     const u = typeof getCurrentUserObj === "function" ? getCurrentUserObj() : null;
     if (!u) return;
     _setNotifReadTs(u.username, Date.now());
-    renderNotificationsList();
     updateNotificationBellBadge();
-    showToast("Notifikasi ditandai sudah dibaca.", "info");
+    renderNotificationsList();
+    showToast("Semua notifikasi ditandai telah dibaca.");
 }
 
-function renderNotificationsList() {
-    const box = document.getElementById("notifications-list-body");
-    if (!box) return;
-    const items = buildNotificationsForCurrentUser();
-    if (!items.length) {
-        box.innerHTML = `
-            <div class="app-card border border-dashed rounded-3xl p-10 text-center space-y-2 mt-4">
-                <i class="fa-regular fa-bell-slash text-2xl app-muted"></i>
-                <h4 class="font-bold text-sm">Belum Ada Notifikasi</h4>
-                <p class="text-xs app-muted">Semua aktivitas transaksi, revisi, dan pesan terbaru akan muncul rapi di sini.</p>
-            </div>
-        `;
-        return;
-    }
-
-    box.innerHTML = items.map(it => `
-        <button type="button" onclick="${it.actionJs}" class="w-full text-left app-card border rounded-2xl p-3.5 shadow-sm flex items-start gap-3 hover:brightness-95 active:scale-[0.99] transition ${it.unread ? "gold-border" : ""}">
-            <span class="w-10 h-10 rounded-2xl app-card-soft border flex items-center justify-center shrink-0 ${it.accent || "app-accent"}">
-                <i class="${it.icon}"></i>
-            </span>
-            <div class="flex-1 min-w-0 space-y-0.5">
-                <div class="flex items-center justify-between gap-2">
-                    <strong class="text-xs sm:text-sm font-extrabold truncate">${escHtml(it.title)}</strong>
-                    ${it.unread ? `<span class="w-2 h-2 rounded-full bg-red-500 shrink-0"></span>` : ""}
-                </div>
-                <p class="text-[11px] app-muted leading-snug line-clamp-2">${escHtml(it.desc)}</p>
-                <span class="block text-[9.5px] app-muted pt-0.5">${escHtml(_fmtNotifTime(it.ts))}</span>
-            </div>
-        </button>
-    `).join("");
-}
-
-// ================= 5. INSTAGRAM-STYLE STATS, FOLLOW & BLOKIR USER =================
-function _normKey(s) {
-    return _normAppUserKey(s);
-}
-
-function _fmtIgCount(num) {
-    const n = Math.max(0, Number(num) || 0);
-    if (n >= 1000) {
-        const kVal = (n / 1000).toFixed(1).replace(/\.0$/, "");
-        return `${kVal}K`;
-    }
-    return String(n);
-}
-
-function _getFollowersListForUser(uObj) {
-    if (!uObj || !uObj.username) return [];
-    const targetKey = _normKey(uObj.username);
-    const allUsers = Array.isArray(db.users) ? db.users : [];
-    const fromUsers = allUsers
-        .filter(other => {
-            if (!other || !other.username) return false;
-            if (_normKey(other.username) === targetKey) return false;
-            const fList = Array.isArray(other.following) ? other.following : [];
-            return fList.some(x => _normKey(x) === targetKey);
-        })
-        .map(x => _normKey(x.username));
-    const direct = Array.isArray(uObj.followers) ? uObj.followers.map(_normKey).filter(Boolean) : [];
-    return Array.from(new Set([...fromUsers, ...direct]));
-}
-
-function _getFollowingListForUser(uObj) {
-    if (!uObj || !uObj.following || !Array.isArray(uObj.following)) return [];
-    return Array.from(new Set(uObj.following.map(_normKey).filter(Boolean)));
-}
-
-function _getProjectsForUser(uObj) {
-    const invs = Array.isArray(db.invitations) ? db.invitations.map(i => Object.assign({}, i, { _kind: "inv" })) : [];
-    const pfs = Array.isArray(db.portfolios) ? db.portfolios.map(p => Object.assign({}, p, { _kind: "pf" })) : [];
-    const combined = [...invs, ...pfs];
-    if (!uObj) return [];
-    if (uObj.role === "master" || uObj.role === "administrasi") {
-        return combined;
-    }
-    const uKey = _normKey(uObj.username);
-    return combined.filter(d => _normKey(d.owner) === uKey);
-}
-
-function _formatMasterFollowersDisplay() {
-    const allUsers = Array.isArray(db.users) ? db.users : [];
-    const activeRealCount = allUsers.filter(u => u && u.role !== "master" && u.status === "Aktif").length;
-    return _fmtIgCount(18300 + activeRealCount);
-}
-
-function _buildIgStatsRowHtml(targetUserObj) {
-    if (!targetUserObj || !targetUserObj.username) return "";
-    const role = targetUserObj.role || "user";
-    const uname = _normKey(targetUserObj.username);
-    const curU = typeof getCurrentUserObj === "function" ? getCurrentUserObj() : null;
-    const isSelf = !!(curU && _normKey(curU.username) === uname);
-    const isMasterProfile = role === "master";
-    const isCabangProfile = role === "cabang";
-
-    const followingList = _getFollowingListForUser(targetUserObj);
-    const projectsList = _getProjectsForUser(targetUserObj);
-    const followersDisplay = isMasterProfile
-        ? _formatMasterFollowersDisplay()
-        : _fmtIgCount(_getFollowersListForUser(targetUserObj).length);
-
-    const canFollowThis = !isSelf && curU && (
-        isMasterProfile
-            ? (curU.role === "user" || curU.role === "administrasi")
-            : true
-    );
-    const isFollowingThis = canFollowThis && _getFollowingListForUser(curU).includes(uname);
-
-    const followersClick = `onclick="if(typeof openSoloFollowersModal==='function')openSoloFollowersModal('${esc(uname)}')"`;
-    const followersColHtml = isCabangProfile
-        ? ""
-        : `<button type="button" ${followersClick} class="flex-1 py-2 px-1 text-center rounded-xl hover:bg-black/5 active:scale-98 transition">
-            <span class="block text-sm sm:text-base font-extrabold tracking-tight">${escHtml(followersDisplay)}</span>
-            <span class="block text-[11px] app-muted font-medium">Followers</span>
-        </button>`;
-
-    const followingColHtml = isCabangProfile
-        ? ""
-        : `<button type="button" onclick="if(typeof openSoloFollowingModal==='function')openSoloFollowingModal('${esc(uname)}')" class="flex-1 py-2 px-1 text-center rounded-xl hover:bg-black/5 active:scale-98 transition">
-            <span class="block text-sm sm:text-base font-extrabold tracking-tight">${escHtml(_fmtIgCount(followingList.length))}</span>
-            <span class="block text-[11px] app-muted font-medium">Following</span>
-        </button>`;
-
-    const projectColHtml = `<button type="button" onclick="if(typeof openSoloProjectModal==='function')openSoloProjectModal('${esc(uname)}')" class="flex-1 py-2 px-1 text-center rounded-xl hover:bg-black/5 active:scale-98 transition">
-        <span class="block text-sm sm:text-base font-extrabold tracking-tight">${escHtml(_fmtIgCount(projectsList.length))}</span>
-        <span class="block text-[11px] app-muted font-medium">Project</span>
-    </button>`;
-
-    const followBtnHtml = canFollowThis
-        ? `<div class="px-1 pt-2">
-            <button type="button" onclick="toggleFollowTargetUser('${esc(uname)}')" class="w-full py-2 rounded-xl text-xs font-extrabold transition ${isFollowingThis ? "app-btn-sec border" : "gold-pill-btn shadow-sm"}">
-                <i class="fa-solid ${isFollowingThis ? "fa-user-check" : "fa-user-plus"} mr-1.5"></i>${isFollowingThis ? "Following" : "Follow"}
-            </button>
-        </div>`
-        : "";
-
-    return `
-        <div class="ig-stats-strip app-card border rounded-2xl px-2 py-2 shadow-sm">
-            <div class="flex items-center justify-around divide-x divide-black/10">
-                ${followersColHtml}
-                ${followingColHtml}
-                ${projectColHtml}
-            </div>
-            ${followBtnHtml}
-        </div>
-    `;
-}
-
-async function toggleFollowTargetUser(targetUname) {
-    const curU = typeof getCurrentUserObj === "function" ? getCurrentUserObj() : null;
-    if (!curU || !curU.username) {
-        showToast("Silakan masuk akun terlebih dahulu untuk mengikuti.", "info");
-        if (typeof openAuthModal === "function") openAuthModal();
-        return;
-    }
-    const tKey = _normKey(targetUname);
-    const targetObj = (db.users || []).find(u => _normKey(u.username) === tKey);
-    if (!targetObj) return;
-    if (targetObj.role === "master" && curU.role !== "user" && curU.role !== "administrasi") {
-        return showToast("Hanya User dan Admin yang dapat mengikuti akun Founder.", "info");
-    }
-    if (typeof isUserBlockedByMe === "function" && isUserBlockedByMe(tKey)) {
-        return showToast("Buka blokir akun ini terlebih dahulu untuk mengikutinya.", "error");
-    }
-    if (targetObj.blockedViewer) {
-        return showToast("Anda tidak dapat mengikuti akun ini.", "error");
-    }
-
-    showLoading("Memperbarui...");
-    const res = await apiAction({ action: "toggle_follow", targetUsername: tKey });
-    hideLoading();
-    if (!res || !res.ok) {
-        return showToast((res && res.message) || "Gagal memperbarui status mengikuti.", "error");
-    }
-
-    if (res.user) ensureUserInLocalDb(res.user);
-    refreshActiveViewSmart();
-    if (typeof viewUserProfileModal === "function" && _isElVis("modal-view-user-profile")) {
-        viewUserProfileModal(tKey, true);
-    }
-    showToast(res.following ? `Mengikuti @${tKey}` : `Berhenti mengikuti @${tKey}`, "info");
-}
-
-async function toggleBlockTargetUser(targetUname, fromPrivacyList = false) {
-    const curU = typeof getCurrentUserObj === "function" ? getCurrentUserObj() : null;
-    if (!curU || !curU.username) return showToast("Silakan masuk akun terlebih dahulu.", "info");
-    if (curU.role === "cabang") return showToast("Fitur blokir tidak tersedia untuk akun Cabang.", "info");
-
-    const tKey = _normKey(targetUname);
-    const alreadyBlocked = typeof isUserBlockedByMe === "function" && isUserBlockedByMe(tKey);
-    const ok = await showConfirm(
-        alreadyBlocked ? "Buka Blokir Akun" : "Blokir Pengguna",
-        alreadyBlocked
-            ? `Buka blokir @${tKey}? Setelah dibuka, akun ini dapat melihat profil Anda sesuai pengaturan privasi.`
-            : `Blokir @${tKey}? Pengguna ini tidak akan bisa melihat profil, project, atau mengikuti Anda lagi.`,
-        alreadyBlocked ? "fa-solid fa-unlock" : "fa-solid fa-ban",
-        alreadyBlocked ? "Ya, Buka Blokir" : "Ya, Blokir"
-    );
-    if (!ok) return;
-
-    showLoading(alreadyBlocked ? "Membuka blokir..." : "Memblokir akun...");
-    const res = await apiAction({ action: "toggle_block", targetUsername: tKey });
-    hideLoading();
-    if (!res || !res.ok) {
-        return showToast((res && res.message) || "Gagal mengubah status blokir.", "error");
-    }
-
-    if (res.user) ensureUserInLocalDb(res.user);
-    if (fromPrivacyList && typeof renderPrivacySubPanel === "function") {
-        renderPrivacySubPanel();
-    }
-    if (typeof viewUserProfileModal === "function" && _isElVis("modal-view-user-profile")) {
-        viewUserProfileModal(tKey, true);
-    }
-    refreshActiveViewSmart();
-    showToast(res.blocked ? `@${tKey} berhasil diblokir.` : `Blokir @${tKey} dibuka.`, "info");
-}
-
-// ================= 6. MENU PENGATURAN FULL-SCREEN (PRIVASI & GANTI PASSWORD) =================
+// ================= 7. MENU PENGATURAN FULL-SCREEN (TITIK 3) =================
 function toggleSlideMenu(show) {
-    const el = document.getElementById("drawer-main"); if (!el) return;
+    const el = document.getElementById("drawer-main");
+    if (!el) return;
     if (show) {
         backToMainSlideMenu(true);
         el.classList.add("open");
@@ -1373,14 +1328,16 @@ function menuRowItem(icon, title, sub, onclickJs) {
 }
 
 function renderMainSlideMenuList() {
-    const box = document.getElementById("drawer-main-list"); if (!box) return;
+    const box = document.getElementById("drawer-main-list");
+    if (!box) return;
     const u = typeof getCurrentUserObj === "function" ? getCurrentUserObj() : null;
     let html = "";
 
     if (!u) {
-        html += menuRowItem("fa-right-to-bracket", "Masuk / Daftar Akun", "Buat undangan, CV & simpan favorit", "toggleSlideMenu(false);openAuthModal();");
+        html += menuRowItem("fa-right-to-bracket", "Masuk / Daftar Akun", "Buat undangan, CV & rental sepeda", "toggleSlideMenu(false);openAuthModal();");
     } else if (u.role === "master") {
-        html += menuRowItem("fa-chart-line", "Grafik & Analitik Bisnis", "Omzet, tren pesanan & data install/uninstall PWA", "toggleSlideMenu(false);if(typeof openMasterWorkspace==='function')openMasterWorkspace('overview');");
+        html += menuRowItem("fa-chart-line", "Grafik & Analitik Bisnis", "Omzet Lembarku, rental sepeda & data PWA", "toggleSlideMenu(false);if(typeof openMasterWorkspace==='function')openMasterWorkspace('overview');");
+        html += menuRowItem("fa-bicycle", "Kelola Armada Titik Gowes", "Input unit sepeda, atur tarif sewa & servis", "toggleSlideMenu(false);if(typeof openMasterWorkspace==='function')openMasterWorkspace('gowes_fleet');");
         html += menuRowItem("fa-palette", "Kelola Tema & Harga", "Foto template, nama contoh & harga CV/Lamaran", "toggleSlideMenu(false);if(typeof openMasterWorkspace==='function')openMasterWorkspace('themes');");
         html += menuRowItem("fa-rectangle-ad", "Edit Banner Promosi (12:4.4)", "Atur banner promosi utama beranda", "toggleSlideMenu(false);if(typeof openMasterWorkspace==='function')openMasterWorkspace('home_editor');");
         html += menuRowItem("fa-music", "Stok Musik & Testimoni", "Upload lagu dari perangkat & ulasan beranda", "toggleSlideMenu(false);if(typeof openMasterWorkspace==='function')openMasterWorkspace('media');");
@@ -1409,7 +1366,7 @@ function renderMainSlideMenuList() {
     if (!isAppInstalled()) {
         html += menuRowItem("fa-mobile-screen-button", "Pasang Aplikasi (< 2 MB)", "Akses super cepat dari layar utama HP", "toggleSlideMenu(false);openWelcomeInstallModal(true);");
     }
-    html += menuRowItem("fa-circle-info", "Tentang Aplikasi", "Penjelasan singkat, fitur & versi aplikasi", "openSlideSub('about')");
+    html += menuRowItem("fa-circle-info", "Tentang Aplikasi", "Penjelasan fitur Lembarku & Titik Gowes", "openSlideSub('about')");
 
     box.innerHTML = html;
 }
@@ -1442,7 +1399,7 @@ function openSlideSub(sec, skipNavPush = false) {
         renderPrivacySubPanel();
         document.getElementById("drawer-sub-privacy")?.classList.remove("hide");
     } else if (sec === "about") {
-        if (tEl) tEl.innerText = "Tentang Lembarku";
+        if (tEl) tEl.innerText = "Tentang Aplikasi";
         document.getElementById("drawer-sub-about")?.classList.remove("hide");
     } else if (sec === "profil" && u) {
         if (tEl) tEl.innerText = u.role === "cabang" ? "Profil & Label Brand" : "Pengaturan Profil";
@@ -1487,7 +1444,7 @@ function openSlideSub(sec, skipNavPush = false) {
         const dInp = document.getElementById("ms-qris-dyn-str"); if (dInp) dInp.value = ms.qrisDynamicString || "";
         const uChk = document.getElementById("ms-qris-unique"); if (uChk) uChk.checked = ms.qrisUniqueCode !== false;
         const qPrev = document.getElementById("ms-qris-prev"); if (qPrev) qPrev.src = ms.qrisImage || "";
-        const pInp = document.getElementById("ms-p"); if (pInp) pInp.value = ms.priceText || "Rp 150.000";
+        const pInp = document.getElementById("ms-p"); if (pInp) pInp.value = ms.priceText || "Rp 99.000";
         if (typeof toggleQrisModeFields === "function") toggleQrisModeFields();
         const box = document.getElementById("ms-banks-container");
         if (box && typeof getMasterBanksList === "function" && typeof addMasterBankRow === "function") {
@@ -1520,7 +1477,7 @@ function renderPrivacySubPanel() {
     if (!listEl) return;
 
     if (!blocked.length) {
-        listEl.innerHTML = `<p class="text-xs app-muted text-center py-4 app-card-soft rounded-2xl border border-dashed">Tidak ada akun yang diblokir. Anda bisa memblokir pengguna pengganggu langsung dari halaman profilnya.</p>`;
+        listEl.innerHTML = `<p class="text-xs app-muted text-center py-4 app-card-soft rounded-2xl border border-dashed">Tidak ada akun yang diblokir.</p>`;
         return;
     }
 
@@ -1638,13 +1595,13 @@ async function submitSecurePasswordChange(e) {
 
     const confirmed = await showConfirm(
         "Peringatan Ganti Password",
-        "Anda akan mengganti kata sandi akun ini. Pastikan Anda sudah mencatat kata sandi baru dengan aman sebelum melanjutkan. Konfirmasi penggantian sekarang?",
+        "Pastikan Anda sudah mencatat kata sandi baru dengan aman sebelum melanjutkan. Konfirmasi penggantian sekarang?",
         "fa-solid fa-triangle-exclamation",
         "Konfirmasi & Ganti"
     );
     if (!confirmed) return;
 
-    setBtnLoading("btn-submit-change-pw", true, "Memverifikasi & Mengganti...");
+    setBtnLoading("btn-submit-change-pw", true, "Memverifikasi...");
     const res = await apiAction({ action: "change_password", oldPassword, newPassword });
     setBtnLoading("btn-submit-change-pw", false);
 
@@ -1668,7 +1625,8 @@ async function submitSecurePasswordChange(e) {
 }
 
 async function changeUsernameOnly() {
-    const u = typeof getCurrentUserObj === "function" ? getCurrentUserObj() : null; if (!u) return;
+    const u = typeof getCurrentUserObj === "function" ? getCurrentUserObj() : null;
+    if (!u) return;
     if (u.role === "master") return showToast("Username Founder (@kausar.af) bersifat permanen.", "info");
     const oldU = _normAppUserKey(u.username);
     const newU = _normAppUserKey(document.getElementById("set-acc-user").value.trim().toLowerCase());
@@ -1698,47 +1656,70 @@ async function changeUsernameOnly() {
     }
     ensureUserInLocalDb(finalUser);
     if (typeof idbSet === "function") idbSet("db_snapshot", db);
-    refreshActiveViewSmart(); renderHeaderActions();
+    refreshActiveViewSmart();
+    renderHeaderActions();
     showToast("Username berhasil diperbarui!");
 }
 
 function pickCroppedProfileMedia(inp, type) {
-    const file = inp.files[0]; if (!file) return; inp.value = "";
+    const file = inp.files[0];
+    if (!file) return;
+    inp.value = "";
     const isBanner = type === "banner";
     if (typeof openImageCropper !== "function") return;
     openImageCropper(file, isBanner ? 16 / 6 : 1, isBanner ? "Atur Sampul Profil (16:6)" : "Atur Foto Profil (1:1)", isBanner ? 1000 : 380, isBanner ? 375 : 380, async (dataUrl) => {
-        const u = typeof getCurrentUserObj === "function" ? getCurrentUserObj() : null; if (!u) return;
+        const u = typeof getCurrentUserObj === "function" ? getCurrentUserObj() : null;
+        if (!u) return;
         showLoading("Menyimpan foto...");
         const up = await apiAction({ action: "upload_media", dataUrl, prefix: `${type}_${u.username}` });
-        if (!up || !up.ok || !up.url) { hideLoading(); return showToast("Gagal mengunggah foto.", "error"); }
-        const upd = Object.assign({}, u); upd[type] = up.url;
+        if (!up || !up.ok || !up.url) {
+            hideLoading();
+            return showToast("Gagal mengunggah foto.", "error");
+        }
+        const upd = Object.assign({}, u);
+        upd[type] = up.url;
         const res = await apiAction({ action: "upsert_user", oldUsername: u.username, user: upd });
         hideLoading();
         if (res && res.ok) {
             ensureUserInLocalDb(upd);
-            if (!isBanner) { const prev = document.getElementById("set-prof-avatar-prev"); if (prev) prev.src = up.url; }
-            refreshActiveViewSmart(); renderHeaderActions();
+            if (!isBanner) {
+                const prev = document.getElementById("set-prof-avatar-prev");
+                if (prev) prev.src = up.url;
+            }
+            refreshActiveViewSmart();
+            renderHeaderActions();
             showToast(isBanner ? "Sampul profil diperbarui!" : "Foto profil diperbarui!");
         }
     });
 }
+
 async function removeProfileMedia(type) {
-    const u = typeof getCurrentUserObj === "function" ? getCurrentUserObj() : null; if (!u) return;
+    const u = typeof getCurrentUserObj === "function" ? getCurrentUserObj() : null;
+    if (!u) return;
     const defAv = typeof DEFAULT_AVATAR !== "undefined" ? DEFAULT_AVATAR : "./lembarku-logo.png";
     if (!u[type]) return showToast("Foto sudah kosong.", "info");
     if (!(await showConfirm("Hapus Foto", `Hapus ${type === "avatar" ? "foto profil" : "sampul profil"} ini?`, "fa-solid fa-trash", "Ya, Hapus"))) return;
+
     showLoading("Menghapus...");
-    const upd = Object.assign({}, u); upd[type] = "";
+    const upd = Object.assign({}, u);
+    upd[type] = "";
     const res = await apiAction({ action: "upsert_user", oldUsername: u.username, user: upd });
     hideLoading();
     if (res && res.ok) {
         ensureUserInLocalDb(upd);
-        if (type === "avatar") { const prev = document.getElementById("set-prof-avatar-prev"); if (prev) prev.src = defAv; }
-        refreshActiveViewSmart(); renderHeaderActions(); showToast("Foto dihapus.", "info");
+        if (type === "avatar") {
+            const prev = document.getElementById("set-prof-avatar-prev");
+            if (prev) prev.src = defAv;
+        }
+        refreshActiveViewSmart();
+        renderHeaderActions();
+        showToast("Foto dihapus.", "info");
     }
 }
+
 async function saveProfileInfo() {
-    const u = typeof getCurrentUserObj === "function" ? getCurrentUserObj() : null; if (!u) return;
+    const u = typeof getCurrentUserObj === "function" ? getCurrentUserObj() : null;
+    if (!u) return;
     setBtnLoading("btn-save-prof", true, "Menyimpan...");
     const updatedUser = Object.assign({}, u, {
         name: document.getElementById("set-prof-name").value.trim() || u.name,
@@ -1752,12 +1733,14 @@ async function saveProfileInfo() {
     if (res && res.ok) {
         ensureUserInLocalDb(updatedUser);
         if (typeof DISPLAY_NAME_KEY !== "undefined") localStorage.setItem(DISPLAY_NAME_KEY, updatedUser.name.split(" ")[0]);
-        toggleSlideMenu(false); refreshActiveViewSmart(); renderHeaderActions();
+        toggleSlideMenu(false);
+        refreshActiveViewSmart();
+        renderHeaderActions();
         showToast("Profil berhasil disimpan!");
     } else showToast("Gagal menyimpan profil.", "error");
 }
 
-// ================= 7. BERANDA (BANNER + ETALASE SAMPUL JADI + CV + 6 SERTIFIKAT) =================
+// ================= 8. BERANDA LEMBARKU (BANNER + ETALASE SAMBUNG) =================
 function renderLandingPage() {
     renderPromoBannerSlider();
     renderInfiniteInvShelf();
@@ -1774,7 +1757,7 @@ function _getSafeBanners() {
     }
     return [{
         badge: "PROMO",
-        title: "Buat Undangan Digital, CV & Lamaran Praktis",
+        title: "Undangan Digital, CV & Lamaran Siap PDF",
         subtitle: "Pilih desain, isi data, dan bagikan tautan undangan atau unduh PDF langsung dari HP.",
         ctaText: "Mulai Buat",
         img: "./lembarku-logo.png",
@@ -1807,6 +1790,7 @@ function renderPromoBannerSlider() {
     }
     updatePromoBannerPos();
 }
+
 function updatePromoBannerPos() {
     const tr = document.getElementById("promo-banner-track");
     if (tr) tr.style.transform = `translateX(-${promoBannerIdx * 100}%)`;
@@ -1815,25 +1799,34 @@ function updatePromoBannerPos() {
         btn.className = `h-1.5 rounded-full transition-all ${active ? "w-6 bg-amber-400" : "w-2 bg-white/45"}`;
     });
 }
+
 function handlePromoBannerClick(idx) {
     const s = _getSafeBanners()[idx];
     if (!s) return;
-    if (s.targetType === "login") { if (currentSessionUser) routeDashboard(); else openAuthModal(); }
-    else if (s.targetType === "chat" && typeof openFullChatOverlay === "function") openFullChatOverlay();
-    else document.getElementById(s.targetSection || "sec-undangan")?.scrollIntoView({ behavior: "smooth" });
+    if (s.targetType === "gowes") {
+        if (typeof switchAppMode === "function") switchAppMode("titik_gowes");
+    } else if (s.targetType === "login") {
+        if (currentSessionUser) routeDashboard(); else openAuthModal();
+    } else if (s.targetType === "chat" && typeof openFullChatOverlay === "function") {
+        openFullChatOverlay();
+    } else {
+        document.getElementById(s.targetSection || "sec-undangan")?.scrollIntoView({ behavior: "smooth" });
+    }
 }
 
 function renderInvCategoryPills() {
     if (typeof THEME_CATALOG === "undefined") return;
     const cats = Object.keys(THEME_CATALOG);
-    const box = document.getElementById("landing-inv-cat-tabs"); if (!box) return;
+    const box = document.getElementById("landing-inv-cat-tabs");
+    if (!box) return;
     box.innerHTML = cats.map(c =>
         `<button type="button" onclick="scrollInvShelfToCat('${esc(c)}')" class="px-3 py-1.5 rounded-full text-[11px] font-bold whitespace-nowrap transition ${activeInvShelfCat === c ? "gold-pill-btn shadow" : "app-card border app-muted"}">${escHtml(c)}</button>`
     ).join("");
 }
 
 function renderInfiniteInvShelf() {
-    const shelf = document.getElementById("landing-inv-shelf"); if (!shelf) return;
+    const shelf = document.getElementById("landing-inv-shelf");
+    if (!shelf) return;
     if (typeof THEME_CATALOG === "undefined" || typeof getMergedThemes !== "function") return;
     const cats = Object.keys(THEME_CATALOG);
     const flat = [];
@@ -1879,7 +1872,8 @@ function renderInfiniteInvShelf() {
 function scrollInvShelfToCat(cat) {
     activeInvShelfCat = cat;
     renderInvCategoryPills();
-    const shelf = document.getElementById("landing-inv-shelf"); if (!shelf) return;
+    const shelf = document.getElementById("landing-inv-shelf");
+    if (!shelf) return;
     const target = shelf.querySelector(`[data-inv-cat="${CSS.escape(cat)}"]`);
     if (target) {
         invShelfLock = true;
@@ -1896,7 +1890,8 @@ function openBannerOrCardTarget(cat, themeName, targetInvId) {
 }
 
 function renderPfCategoryPills() {
-    const box = document.getElementById("landing-pf-cat-tabs"); if (!box) return;
+    const box = document.getElementById("landing-pf-cat-tabs");
+    if (!box) return;
     box.innerHTML = [
         { key: "cv", lbl: "Curriculum Vitae (9)" },
         { key: "lamaran", lbl: "Lamaran Kerja (3)" }
@@ -1904,7 +1899,8 @@ function renderPfCategoryPills() {
 }
 
 function renderPortfolioShelf() {
-    const shelf = document.getElementById("landing-pf-shelf"); if (!shelf) return;
+    const shelf = document.getElementById("landing-pf-shelf");
+    if (!shelf) return;
     if (typeof PORTFOLIO_CATALOG === "undefined" || typeof getPortfolioThemeObj !== "function") return;
     const items = [
         ...PORTFOLIO_CATALOG.cv.map(x => ({ docType: "cv", obj: getPortfolioThemeObj("cv", x.id) })),
@@ -1930,7 +1926,10 @@ function renderPortfolioShelf() {
             for (const card of shelf.children) {
                 if (card.getBoundingClientRect().right > shelfLeft) {
                     const c = card.dataset.pfCat;
-                    if (c && c !== activePfShelfCat) { activePfShelfCat = c; renderPfCategoryPills(); }
+                    if (c && c !== activePfShelfCat) {
+                        activePfShelfCat = c;
+                        renderPfCategoryPills();
+                    }
                     break;
                 }
             }
@@ -1939,8 +1938,10 @@ function renderPortfolioShelf() {
 }
 
 function scrollPfShelfToCat(cat) {
-    activePfShelfCat = cat; renderPfCategoryPills();
-    const shelf = document.getElementById("landing-pf-shelf"); if (!shelf) return;
+    activePfShelfCat = cat;
+    renderPfCategoryPills();
+    const shelf = document.getElementById("landing-pf-shelf");
+    if (!shelf) return;
     const target = shelf.querySelector(`[data-pf-cat="${cat}"]`);
     if (target) {
         pfShelfLock = true;
@@ -1950,7 +1951,8 @@ function scrollPfShelfToCat(cat) {
 }
 
 function renderCertificateShowcaseShelf() {
-    const shelf = document.getElementById("landing-cert-shelf"); if (!shelf) return;
+    const shelf = document.getElementById("landing-cert-shelf");
+    if (!shelf) return;
     if (typeof CERT_SHOWCASE === "undefined" || !Array.isArray(CERT_SHOWCASE)) return;
     shelf.innerHTML = CERT_SHOWCASE.map(c => {
         const isPortrait = c.orientation === "portrait";
@@ -1995,7 +1997,7 @@ function renderCertificateShowcaseShelf() {
         }
 
         return `
-            <div onclick="showToast('Fitur Sertifikat & Piagam Otomatis segera hadir! Bebas isi nama asli, perusahaan & institusi apa pun.','info')" class="${sizeCls} rounded-2xl overflow-hidden border border-black/15 shadow-md cursor-pointer select-none relative flex flex-col justify-between p-4 text-zinc-900 shrink-0" style="background:${c.bg};">
+            <div onclick="showToast('Fitur Sertifikat & Piagam Otomatis segera hadir!','info')" class="${sizeCls} rounded-2xl overflow-hidden border border-black/15 shadow-md cursor-pointer select-none relative flex flex-col justify-between p-4 text-zinc-900 shrink-0" style="background:${c.bg};">
                 ${decorLayer}
                 <div class="relative z-10 flex items-center justify-between gap-1">
                     <span class="text-[8px] uppercase font-extrabold px-2 py-0.5 rounded-full text-white" style="background:${c.accent};">${escHtml(c.cat)}</span>
@@ -2020,15 +2022,40 @@ function renderCertificateShowcaseShelf() {
 }
 
 function renderTestimonials() {
-    const list = db.testimonials || [], tr = document.getElementById("testimonial-track"), dt = document.getElementById("testimonial-dots");
+    const list = db.testimonials || [];
+    const tr = document.getElementById("testimonial-track");
+    const dt = document.getElementById("testimonial-dots");
     if (!tr) return;
-    if (!list.length) { tr.innerHTML = `<div class="min-w-full text-center text-xs app-muted py-5">Belum ada testimoni.</div>`; if (dt) dt.innerHTML = ""; return; }
+    if (!list.length) {
+        tr.innerHTML = `<div class="min-w-full text-center text-xs app-muted py-5">Belum ada ulasan pelanggan.</div>`;
+        if (dt) dt.innerHTML = "";
+        return;
+    }
     if (testiIdx >= list.length) testiIdx = 0;
-    tr.innerHTML = list.map(t => `<div class="min-w-full px-1"><div class="app-card-soft border rounded-2xl p-4 space-y-2 text-center max-w-2xl mx-auto"><div class="text-amber-500 text-xs">${'<i class="fa-solid fa-star mx-0.5"></i>'.repeat(t.rating || 5)}</div><p class="text-xs italic">"${escHtml(t.text)}"</p><div><h4 class="font-bold text-xs">${escHtml(t.name)}</h4><span class="text-[10px] app-accent uppercase font-semibold">${escHtml(t.category)}</span></div></div></div>`).join("");
-    if (dt) dt.innerHTML = list.map((_, i) => `<button onclick="testiIdx=${i};renderTestimonials()" class="h-1.5 rounded-full transition-all ${i===testiIdx?"w-6 bg-blue-600":"w-2 bg-zinc-500/40"}"></button>`).join("");
+    tr.innerHTML = list.map(t => `
+        <div class="min-w-full px-1">
+            <div class="app-card-soft border rounded-2xl p-4 space-y-2 text-center max-w-2xl mx-auto">
+                <div class="text-amber-500 text-xs">${'<i class="fa-solid fa-star mx-0.5"></i>'.repeat(t.rating || 5)}</div>
+                <p class="text-xs italic">"${escHtml(t.text)}"</p>
+                <div>
+                    <h4 class="font-bold text-xs">${escHtml(t.name)}</h4>
+                    <span class="text-[10px] app-accent uppercase font-semibold">${escHtml(t.category)}</span>
+                </div>
+            </div>
+        </div>
+    `).join("");
+    if (dt) {
+        dt.innerHTML = list.map((_, i) => `<button onclick="testiIdx=${i};renderTestimonials()" class="h-1.5 rounded-full transition-all ${i===testiIdx?"w-6 bg-blue-600":"w-2 bg-zinc-500/40"}"></button>`).join("");
+    }
     tr.style.transform = `translateX(-${testiIdx * 100}%)`;
 }
-function slideTestimonial(d) { const n = (db.testimonials || []).length; if (!n) return; testiIdx = (testiIdx + d + n) % n; renderTestimonials(); }
+
+function slideTestimonial(d) {
+    const n = (db.testimonials || []).length;
+    if (!n) return;
+    testiIdx = (testiIdx + d + n) % n;
+    renderTestimonials();
+}
 
 setInterval(() => {
     if (document.hidden || currentViewName !== "landing") return;
@@ -2044,7 +2071,7 @@ setInterval(() => {
     if ((db.testimonials || []).length > 1) slideTestimonial(1);
 }, 4500);
 
-// ================= 8. BUAT BERKASMU & PROFIL USER / CABANG =================
+// ================= 9. BUAT BERKASMU & PROFIL USER / CABANG =================
 function openCreateChoiceModal(isCabang = false) {
     const u = typeof getCurrentUserObj === "function" ? getCurrentUserObj() : null;
     if (!u) {
@@ -2055,6 +2082,7 @@ function openCreateChoiceModal(isCabang = false) {
     document.getElementById("modal-create-choice")?.classList.remove("hide");
     mrNavPush({ type: "modal", id: "modal-create-choice" });
 }
+
 function chooseCreateDoc(kind) {
     document.getElementById("modal-create-choice")?.classList.add("hide");
     _mrDropTopModalById("modal-create-choice");
@@ -2154,7 +2182,8 @@ function getUserCombinedDocs(username) {
 }
 
 function renderProfileFavoritesShelf() {
-    const u = typeof getCurrentUserObj === "function" ? getCurrentUserObj() : null; if (!u) return;
+    const u = typeof getCurrentUserObj === "function" ? getCurrentUserObj() : null;
+    if (!u) return;
     const favs = u.favorites || [];
     const html = !favs.length
         ? `<div class="w-full app-card border border-dashed rounded-2xl p-7 text-center text-xs app-muted">Belum ada produk favorit. Ketuk ikon <i class="fa-solid fa-heart text-red-500"></i> pada kartu di Beranda untuk menyimpannya di sini.</div>`
@@ -2167,8 +2196,14 @@ function renderProfileFavoritesShelf() {
             return `<div onclick="openThemeLivePreview('${esc(f.cat)}','${esc(tObj.name)}')" class="h-shelf-card group rounded-2xl overflow-hidden border gold-border bg-black shadow cursor-pointer flex flex-col">${buildMiniCoverCardHtml(f.cat, tObj, true)}${buildPriceStripHtml(tObj, true)}</div>`;
         }).join("");
 
-    ["user-favs-shelf", "cabang-favs-shelf"].forEach(id => { const el = document.getElementById(id); if (el) el.innerHTML = html; });
-    ["prof-fav-count", "cabang-fav-count"].forEach(id => { const el = document.getElementById(id); if (el) el.innerText = favs.length; });
+    ["user-favs-shelf", "cabang-favs-shelf"].forEach(id => {
+        const el = document.getElementById(id);
+        if (el) el.innerHTML = html;
+    });
+    ["prof-fav-count", "cabang-fav-count"].forEach(id => {
+        const el = document.getElementById(id);
+        if (el) el.innerText = favs.length;
+    });
 }
 
 function switchProfileDocsTab(tab) {
@@ -2178,6 +2213,7 @@ function switchProfileDocsTab(tab) {
     const td = document.getElementById("tab-prof-docs"); if (td) td.className = `px-4 py-1.5 rounded-full text-xs font-extrabold ${isDocs ? "gold-pill-btn" : "app-btn-sec"}`;
     const tf = document.getElementById("tab-prof-favs"); if (tf) tf.className = `px-4 py-1.5 rounded-full text-xs font-bold ${!isDocs ? "gold-pill-btn" : "app-btn-sec"}`;
 }
+
 function switchCabangDocsTab(tab) {
     const isDocs = tab === "docs";
     document.getElementById("cab-docs-panel")?.classList.toggle("hide", !isDocs);
@@ -2200,8 +2236,67 @@ function _mountProfileIgStats(sectionId, mountId, userObj) {
     mount.innerHTML = _buildIgStatsRowHtml(userObj);
 }
 
+function _buildIgStatsRowHtml(userObj) {
+    if (!userObj) return "";
+    const isMaster = userObj.role === "master";
+    const isCabang = userObj.role === "cabang";
+
+    let fCount = 0;
+    if (isMaster) {
+        fCount = typeof _formatMasterFollowersNum === "function" ? _formatMasterFollowersNum() : 18300;
+    } else if (typeof _getFollowersListForUser === "function") {
+        fCount = typeof _formatInstagramMetric === "function" ? _formatInstagramMetric(_getFollowersListForUser(userObj).length) : 0;
+    } else {
+        fCount = Array.isArray(userObj.followers) ? userObj.followers.length : 0;
+    }
+
+    const gCount = (typeof _getFollowingListForUser === "function")
+        ? (typeof _formatInstagramMetric === "function" ? _formatInstagramMetric(_getFollowingListForUser(userObj).length) : 0)
+        : (Array.isArray(userObj.following) ? userObj.following.length : 0);
+
+    const allInvs = (db.invitations || []).filter(i => _normAppUserKey(i.owner) === _normAppUserKey(userObj.username));
+    const allPfs = (db.portfolios || []).filter(p => _normAppUserKey(p.owner) === _normAppUserKey(userObj.username));
+    const allRentals = (db.gowesRentals || []).filter(r => _normAppUserKey(r.customerUsername) === _normAppUserKey(userObj.username));
+    const pCount = typeof _formatInstagramMetric === "function"
+        ? _formatInstagramMetric(allInvs.length + allPfs.length + allRentals.length)
+        : (allInvs.length + allPfs.length + allRentals.length);
+
+    if (isCabang) {
+        return `
+            <div class="app-card border rounded-3xl p-3 shadow-sm my-2">
+                <div class="grid grid-cols-1 text-center">
+                    <button type="button" onclick="openSoloProjectModal('${esc(userObj.username)}')" class="py-1.5 px-2 rounded-2xl hover:bg-black/5 active:scale-98 transition">
+                        <span class="block text-base font-extrabold tracking-tight">${escHtml(String(pCount))}</span>
+                        <span class="block text-[11px] app-muted font-medium">Project Klien</span>
+                    </button>
+                </div>
+            </div>
+        `;
+    }
+
+    return `
+        <div class="app-card border rounded-3xl p-3 shadow-sm my-2">
+            <div class="grid grid-cols-3 divide-x divide-black/10 text-center">
+                <button type="button" onclick="openSoloFollowersModal('${esc(userObj.username)}')" class="py-1.5 px-1 rounded-2xl hover:bg-black/5 active:scale-98 transition">
+                    <span class="block text-base font-extrabold tracking-tight">${escHtml(String(fCount))}</span>
+                    <span class="block text-[11px] app-muted font-medium">Followers</span>
+                </button>
+                <button type="button" onclick="openSoloFollowingModal('${esc(userObj.username)}')" class="py-1.5 px-1 rounded-2xl hover:bg-black/5 active:scale-98 transition">
+                    <span class="block text-base font-extrabold tracking-tight">${escHtml(String(gCount))}</span>
+                    <span class="block text-[11px] app-muted font-medium">Following</span>
+                </button>
+                <button type="button" onclick="openSoloProjectModal('${esc(userObj.username)}')" class="py-1.5 px-1 rounded-2xl hover:bg-black/5 active:scale-98 transition">
+                    <span class="block text-base font-extrabold tracking-tight">${escHtml(String(pCount))}</span>
+                    <span class="block text-[11px] app-muted font-medium">Project</span>
+                </button>
+            </div>
+        </div>
+    `;
+}
+
 function renderUserProfile() {
-    const u = typeof getCurrentUserObj === "function" ? getCurrentUserObj() : null; if (!u) return;
+    const u = typeof getCurrentUserObj === "function" ? getCurrentUserObj() : null;
+    if (!u) return;
     const defAv = typeof DEFAULT_AVATAR !== "undefined" ? DEFAULT_AVATAR : "./lembarku-logo.png";
     const bEl = document.getElementById("prof-banner"); if (bEl) bEl.style.backgroundImage = u.banner ? `url('${u.banner}')` : "";
     const aEl = document.getElementById("prof-avatar");
@@ -2234,7 +2329,8 @@ function renderUserProfile() {
 }
 
 function renderCabangAdmin() {
-    const cab = typeof getCurrentUserObj === "function" ? getCurrentUserObj() : null; if (!cab) return;
+    const cab = typeof getCurrentUserObj === "function" ? getCurrentUserObj() : null;
+    if (!cab) return;
     const defAv = typeof DEFAULT_AVATAR !== "undefined" ? DEFAULT_AVATAR : "./lembarku-logo.png";
     const bEl = document.getElementById("cprof-banner"); if (bEl) bEl.style.backgroundImage = cab.banner ? `url('${cab.banner}')` : "";
     const aEl = document.getElementById("cprof-avatar");
@@ -2267,7 +2363,7 @@ function renderCabangAdmin() {
     renderProfileFavoritesShelf();
 }
 
-// ================= 9. SMART REFRESH & INITIALIZATION =================
+// ================= 10. SMART REFRESH & BOOT INITIALIZATION =================
 function isUserTypingIn(id) {
     const el = document.activeElement;
     if (!el || !["INPUT", "TEXTAREA", "SELECT"].includes(el.tagName)) return false;
@@ -2282,12 +2378,22 @@ function refreshActiveViewSmart() {
 
     const chatOv = document.getElementById("full-chat-overlay");
     if (chatOv && !chatOv.classList.contains("hide") && typeof renderFullChatContentSmart === "function") renderFullChatContentSmart();
-    if (currentViewName === "landing" && !isUserTypingIn("view-landing")) renderLandingPage();
-    else if (currentViewName === "profile") renderUserProfile();
-    else if (currentViewName === "cabang") renderCabangAdmin();
-    else if (currentViewName === "staff" && typeof renderStaffAdmin === "function") renderStaffAdmin();
-    else if (currentViewName === "guestlist" && !isUserTypingIn("view-guestlist") && typeof renderGuestListStatsAndRows === "function") renderGuestListStatsAndRows();
-    else if (currentViewName === "master" && typeof renderMasterHeaderStats === "function") {
+
+    if (currentViewName === "landing") {
+        if (currentAppMode === "titik_gowes") {
+            if (typeof renderGowesLandingPage === "function" && !isUserTypingIn("view-gowes")) renderGowesLandingPage();
+        } else {
+            if (!isUserTypingIn("view-landing")) renderLandingPage();
+        }
+    } else if (currentViewName === "profile") {
+        renderUserProfile();
+    } else if (currentViewName === "cabang") {
+        renderCabangAdmin();
+    } else if (currentViewName === "staff" && typeof renderStaffAdmin === "function") {
+        renderStaffAdmin();
+    } else if (currentViewName === "guestlist" && !isUserTypingIn("view-guestlist") && typeof renderGuestListStatsAndRows === "function") {
+        renderGuestListStatsAndRows();
+    } else if (currentViewName === "master" && typeof renderMasterHeaderStats === "function") {
         renderMasterHeaderStats();
     }
 
@@ -2297,6 +2403,7 @@ function refreshActiveViewSmart() {
     if (window._soloStatsViewState && window._soloStatsViewState.open && typeof renderSoloStatsModal === "function") {
         renderSoloStatsModal();
     }
+
     const gOv = document.getElementById("guest-invitation-overlay");
     if (gOv && !gOv.classList.contains("hide") && typeof activeGuestInv !== "undefined" && activeGuestInv && activeGuestInv.id !== "demo") {
         const fresh = (db.invitations || []).find(i => String(i.id) === String(activeGuestInv.id));
@@ -2327,7 +2434,10 @@ async function bootMrUndanganApp() {
 
         const tKey = typeof APP_THEME_KEY !== "undefined" ? APP_THEME_KEY : "MR_UNDANGAN_APP_THEME";
         if (typeof applyAppTheme === "function") applyAppTheme(localStorage.getItem(tKey) || "light", false);
+
         initBackNavigationGuard();
+        if (typeof updateAppModeUI === "function") updateAppModeUI();
+
         const p = new URLSearchParams(window.location.search);
 
         if (p.has("client") && typeof fetchClientPortalData === "function") {
