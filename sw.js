@@ -1,12 +1,13 @@
 // =========================================================================
-// LEMBARKU — SERVICE WORKER PWA ENGINE (sw.js — V14.3)
+// LEMBARKU & TITIK GOWES — SERVICE WORKER PWA ENGINE (sw.js — V14.3)
 // =========================================================================
-const CACHE_NAME = "lembarku-cache-v2";
+const CACHE_NAME = "lembarku-cache-v3";
 const ASSETS_TO_CACHE = [
     "./",
     "./index.html",
     "./manifest.json",
     "./lembarku-logo.png",
+    "./titik-gowes-logo.png",
     "./css/styles.css",
     "./js/config.js",
     "./js/qris.js",
@@ -14,11 +15,13 @@ const ASSETS_TO_CACHE = [
     "./js/chat.js",
     "./js/portfolio.js",
     "./js/invitation.js",
+    "./js/gowes.js",
+    "./js/gowes-admin.js",
     "./js/admin.js",
     "./js/app.js"
 ];
 
-// 1. INSTALL: Simpan aset inti ke penyimpanan lokal
+// 1. INSTALL: Simpan seluruh aset inti (Lembarku & Titik Gowes) ke cache lokal
 self.addEventListener("install", (e) => {
     self.skipWaiting();
     e.waitUntil(
@@ -28,7 +31,7 @@ self.addEventListener("install", (e) => {
     );
 });
 
-// 2. ACTIVATE: Hapus cache versi lama (v1) secara otomatis
+// 2. ACTIVATE: Bersihkan cache versi lama (v1 & v2) secara otomatis
 self.addEventListener("activate", (e) => {
     e.waitUntil(
         caches.keys().then((keys) => {
@@ -43,17 +46,17 @@ self.addEventListener("activate", (e) => {
     );
 });
 
-// 3. FETCH: Network-First untuk berkas HTML/API & Cache-First untuk aset statis
+// 3. FETCH: Network-First untuk file HTML/API & Cache-First untuk aset statis
 self.addEventListener("fetch", (e) => {
     const req = e.request;
     const url = new URL(req.url);
 
-    // Jangan cegat permintaan POST atau panggilan API Google Apps Script
+    // Abaikan permintaan POST atau panggilan API Google Apps Script
     if (req.method !== "GET" || url.href.includes("script.google.com") || url.href.includes("script.googleusercontent.com")) {
         return;
     }
 
-    // Untuk file HTML utama: ambil dari jaringan agar selalu mutakhir, fallback ke cache jika offline
+    // Navigasi & HTML: Ambil dari jaringan agar selalu terupdate, fallback ke cache jika offline
     if (req.mode === "navigate" || req.headers.get("accept")?.includes("text/html")) {
         e.respondWith(
             fetch(req)
@@ -69,7 +72,7 @@ self.addEventListener("fetch", (e) => {
         return;
     }
 
-    // Untuk aset statis (JS, CSS, Gambar): Ambil cache terlebih dahulu, perbarui di latar belakang
+    // Aset Statis (JS, CSS, Gambar): Cache-First dengan background revalidation
     e.respondWith(
         caches.match(req).then((cached) => {
             const fetchPromise = fetch(req)
