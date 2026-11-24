@@ -1,5 +1,5 @@
 // =========================================================================
-// MR UNDANGAN — ENGINE QRIS DINAMIS DANA & KONFIRMASI PEMBAYARAN (js/qris.js)
+// LEMBARKU — ENGINE QRIS DINAMIS DANA & KONFIRMASI PEMBAYARAN (js/qris.js)
 // =========================================================================
 let activePaymentState = {
     kind: "inv",
@@ -67,7 +67,7 @@ function buildDynamicQrisString(staticStr, nominalRupiah) {
     return body + computeCrc16Ccitt(body);
 }
 
-// ================= 2. PENGATURAN MASTER: BACA GAMBAR QRIS DANA =================
+// ================= 2. PENGATURAN FOUNDER: BACA GAMBAR QRIS DANA =================
 function toggleQrisModeFields() {
     const mode = document.getElementById("ms-qris-mode")?.value || "static";
     document.getElementById("ms-qris-dynamic-wrap")?.classList.toggle("hide", mode !== "dynamic");
@@ -198,7 +198,7 @@ async function renderPaymentQrisCode(ms, totalPay) {
     }
 
     badge.innerText = "QRIS Resmi (Masukkan Nominal Sesuai Total)";
-    const fallbackQris = ms.qrisImage || `https://api.qrserver.com/v1/create-qr-code/?size=320x320&data=MR-UNDANGAN-${totalPay}`;
+    const fallbackQris = ms.qrisImage || `https://api.qrserver.com/v1/create-qr-code/?size=320x320&data=LEMBARKU-${totalPay}`;
     activePaymentState.qrisDataUrl = fallbackQris;
     wrap.innerHTML = `<img id="pay-qris-img" src="${fallbackQris}" class="w-48 h-48 object-contain" alt="QRIS">`;
 }
@@ -213,7 +213,7 @@ function downloadCurrentQrisPng() {
     if (!src) return;
     const a = document.createElement("a");
     a.href = src;
-    a.download = `QRIS_MrUndangan_${activePaymentState.totalPay || "bayar"}.png`;
+    a.download = `QRIS_Lembarku_${activePaymentState.totalPay || "bayar"}.png`;
     a.target = "_blank";
     a.click();
     showToast("Menyimpan gambar QRIS...");
@@ -253,7 +253,7 @@ async function submitPaymentProofUnified() {
         if (inv) {
             const allowShowcase = await showConfirm(
                 "Tampilkan Sebagai Contoh Promosi?",
-                "Apakah Anda bersedia jika undangan Anda ditampilkan sebagai contoh tema promosi di Beranda Mr Undangan? (Data tetap aman dan menarik untuk inspirasi tamu)",
+                "Apakah Anda bersedia jika undangan Anda ditampilkan sebagai contoh tema promosi di Beranda Lembarku? (Data tetap aman dan menarik untuk inspirasi tamu)",
                 "fa-solid fa-wand-magic-sparkles",
                 "Ya, Bersedia"
             );
