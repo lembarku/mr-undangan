@@ -1,5 +1,6 @@
 // =========================================================================
-// LEMBARKU — LIVE CHAT, KONTAK BARU (+), NOTIFIKASI & HAPUS HISTORY (js/chat.js)
+// LEMBARKU — LIVE CHAT, KONTAK BARU (+), PRIVASI, BLOKIR & NOTIFIKASI
+// File: js/chat.js (V14.3)
 // =========================================================================
 const QUICK_REPLIES_STAFF = [
     "Halo Kak, ada yang bisa kami bantu?",
@@ -99,6 +100,7 @@ function getAccessibleChatContacts() {
     const curU = getCurrentUserObj();
     if (!curU || !curU.username) return [];
     const myKey = _normChatKey(curU.username);
+    const myBlocked = typeof getBlockedUsersList === "function" ? getBlockedUsersList(curU) : [];
     const all = (db.users || []).filter(u => u && u.username && _normChatKey(u.username) !== myKey);
 
     if (curU.role === "master" || curU.role === "administrasi") {
@@ -107,7 +109,16 @@ function getAccessibleChatContacts() {
     if (curU.role === "cabang") {
         return all.filter(u => u.role === "master" || u.role === "administrasi");
     }
-    return all.filter(u => u.role !== "cabang");
+    return all.filter(u => {
+        if (u.role === "cabang") return false;
+        const uKey = _normChatKey(u.username);
+        if (myBlocked.includes(uKey) || u.blockedViewer) return false;
+        if (u.role !== "master" && u.role !== "administrasi") {
+            const priv = typeof getUserPrivacy === "function" ? getUserPrivacy(u) : { showInChatContacts: true };
+            if (!priv.showInChatContacts) return false;
+        }
+        return true;
+    });
 }
 
 function openChatContactsModal() {
@@ -184,9 +195,29 @@ function renderChatContactsModalList() {
 }
 
 function startDirectChatWithContact(username) {
+    const cleanTarget = _normChatKey(username);
+    const curU = getCurrentUserObj();
+    const targetObj = (db.users || []).find(x => _normChatKey(x.username) === cleanTarget);
+
+    if (curU && !isStaffUserObj(curU)) {
+        const myBlocked = typeof getBlockedUsersList === "function" ? getBlockedUsersList(curU) : [];
+        if (myBlocked.includes(cleanTarget)) {
+            return showToast("Anda telah memblokir akun ini. Buka blokir di Pengaturan Privasi terlebih dahulu.", "error");
+        }
+        if (targetObj && targetObj.blockedViewer) {
+            return showToast("Anda tidak dapat mengirim pesan ke akun ini.", "error");
+        }
+        if (targetObj && targetObj.role !== "master" && targetObj.role !== "administrasi") {
+            const priv = typeof getUserPrivacy === "function" ? getUserPrivacy(targetObj) : { allowDirectChat: true };
+            if (!priv.allowDirectChat) {
+                return showToast("Pengguna ini membatasi pesan langsung dari pengguna lain.", "info");
+            }
+        }
+    }
+
     document.getElementById("modal-chat-contacts")?.classList.add("hide");
     if (typeof _mrDropTopModalById === "function") _mrDropTopModalById("modal-chat-contacts");
-    openFullChatOverlay(_normChatKey(username));
+    openFullChatOverlay(cleanTarget);
 }
 
 async function deleteChatThreadHistory(targetUser) {
@@ -214,6 +245,7 @@ function _renderUserProfileModalFallback(uObj) {
     const mod = document.getElementById("modal-view-user-profile");
     if (!mod || !uObj) return false;
     const roleLabel = uObj.role === "master" ? "Founder" : (uObj.role || "user");
+    const priv = typeof getUserPrivacy === "function" ? getUserPrivacy(uObj) : { showContact: false };
     const body = mod.querySelector("#mvp-body");
     if (body) {
         body.innerHTML = `
@@ -227,11 +259,10 @@ function _renderUserProfileModalFallback(uObj) {
                     </div>
                 </div>
                 ${uObj.bio ? `<p class="app-card-soft border rounded-2xl p-3">${escHtml(uObj.bio)}</p>` : ""}
-                <div class="app-card-soft border rounded-2xl p-3 space-y-1">
+                ${(priv.showContact && (uObj.phone || uObj.address)) ? `<div class="app-card-soft border rounded-2xl p-3 space-y-1">
                     ${uObj.phone ? `<div><strong>No. HP/WA:</strong> ${escHtml(uObj.phone)}</div>` : ""}
                     ${uObj.address ? `<div><strong>Alamat:</strong> ${escHtml(uObj.address)}</div>` : ""}
-                    ${typeof uObj.quota === "number" && uObj.role === "cabang" ? `<div><strong>Kuota:</strong> ${uObj.quota}</div>` : ""}
-                </div>
+                </div>` : ""}
             </div>
         `;
     }
@@ -250,7 +281,6 @@ function _openUserProfileFromChat(threadUser) {
 
     window.openedFromChatThread = activeMasterChatThread || cleanUser;
 
-    // viewUserProfileModal di js/admin.js sudah otomatis mendorong 1 langkah navigasi
     if (typeof viewUserProfileModal === "function") {
         viewUserProfileModal(cleanUser);
         return;
@@ -566,6 +596,7 @@ async function sendMasterThreadReply(e) {
         delete localMsg._pending;
         if (res.savedMsg && res.savedMsg.id) localMsg.id = res.savedMsg.id;
         renderFullChatMessagesOnly();
+        updateChatBadges();
     } else {
         showToast("Pesan tertunda, periksa koneksi internet.", "error");
     }
@@ -602,6 +633,7 @@ async function sendUserChatMessage(e) {
         delete localMsg._pending;
         if (res.savedMsg && res.savedMsg.id) localMsg.id = res.savedMsg.id;
         renderFullChatMessagesOnly();
+        updateChatBadges();
     } else {
         showToast("Pesan tertunda, periksa koneksi internet.", "error");
     }
@@ -640,5 +672,8 @@ function updateChatBadges() {
     if (staffPill) {
         staffPill.innerText = count;
         staffPill.classList.toggle("hide", count === 0);
+    }
+    if (typeof updateNotificationBellBadge === "function") {
+        updateNotificationBellBadge();
     }
 }
