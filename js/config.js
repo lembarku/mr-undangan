@@ -1,6 +1,6 @@
 // =========================================================================
 // LEMBARKU & TITIK GOWES — CORE CONFIG, CATALOGS & SHARED ENGINE (js/config.js)
-// Versi: V14.3 (Steril & Modular)
+// Versi: V14.3 (Update: 5 Banner 16:5, Toko Tutup, Showcase 3:4 & Stepper)
 // =========================================================================
 const CLOUD_API_URL = "https://script.google.com/macros/s/AKfycbyHsITJ02tiA59p0QIXkOQaO3VnBFQmDBp-7iUHcUkmrYjlOtRVwxhlGZCzL4RLKKNW/exec";
 const FOUNDER_USERNAME = "kausar.af";
@@ -255,8 +255,68 @@ const DEFAULT_GOWES_SHELTER = {
     address: "Jl. Mulawarman No. 88, Samarinda (Dekat Taman Kota)",
     mapsUrl: "https://maps.google.com/?q=-0.502,117.153",
     operationalHours: "Setiap Hari: 05.30 - 20.00 WITA",
-    csPhone: "085117488828"
+    csPhone: "085117488828",
+    isClosed: false, // Sakelar toko tutup
+    closedReason: "Garasi Titik Gowes sedang istirahat / tutup sementara. Kami siap melayani kembali besok pukul 05.30 WITA."
 };
+
+// 5 SLIDE BANNER PROMOSI RAMPING 16:5
+const DEFAULT_GOWES_BANNERS = [
+    {
+        id: "gb_1",
+        badge: "GRATIS AKSESORIS LENGKAP",
+        title: "Gowes Nyaman & Aman Tanpa Khawatir",
+        subtitle: "Setiap sewa unit sudah termasuk Helm SNI, Kunci Pengaman Spiral & Lampu Malam gratis.",
+        ctaText: "Booking Sekarang",
+        targetSection: "sec-gowes-booking-cta",
+        img: "https://images.unsplash.com/photo-1544717305-2782549b5136?auto=format&fit=crop&w=1200&q=75"
+    },
+    {
+        id: "gb_2",
+        badge: "KEBUGARAN & IMUN",
+        title: "Investasi Sehat di Setiap Kayuhan",
+        subtitle: "Tingkatkan stamina kardio & bakar kalori sambil menikmati segarnya udara pagi Samarinda.",
+        ctaText: "Lihat Armada",
+        targetSection: "sec-gowes-showcase",
+        img: "https://images.unsplash.com/photo-1517649763962-0c623266ddc0?auto=format&fit=crop&w=1200&q=75"
+    },
+    {
+        id: "gb_3",
+        badge: "PEMBAYARAN INSTAN",
+        title: "Sewa Cepat Bebas Ribet dengan QRIS",
+        subtitle: "Pilih durasi 2 jam, 6 jam, atau seharian penuh. Konfirmasi instan via QRIS DANA Bisnis.",
+        ctaText: "Cek Tarif Paket",
+        targetSection: "sec-gowes-showcase",
+        img: "https://images.unsplash.com/photo-1532298229144-0ec0c57515c7?auto=format&fit=crop&w=1200&q=75"
+    },
+    {
+        id: "gb_4",
+        badge: "ARMADA PRIMA",
+        title: "Performa Maksimal di Setiap Tanjakan",
+        subtitle: "Groupset Shimano presisi, suspensi air fork empuk & rem hidrolik pakem rutin diservis mekanik.",
+        ctaText: "Pilih Sepeda",
+        targetSection: "sec-gowes-showcase",
+        img: "https://images.unsplash.com/photo-1485965120184-e220f721d03e?auto=format&fit=crop&w=1200&q=75"
+    },
+    {
+        id: "gb_5",
+        badge: "SUNSET RIDE",
+        title: "Eksplorasi Sudut Kota & Rute Sore",
+        subtitle: "Nikmati pemandangan tepi sungai dan momen santai bersama teman dan keluarga.",
+        ctaText: "Rute Garasi Shelter",
+        targetSection: "sec-gowes-shelter",
+        img: "https://images.unsplash.com/photo-1507035895480-2b3156c31fc8?auto=format&fit=crop&w=1200&q=75"
+    }
+];
+
+const DEFAULT_GOWES_CATEGORIES = [
+    { id: "all", name: "Semua Unit", active: true },
+    { id: "MTB (Gunung)", name: "MTB (Gunung)", active: true },
+    { id: "Roadbike (Balap)", name: "Roadbike (Balap)", active: true },
+    { id: "Sepeda Lipat (Folding)", name: "Sepeda Lipat", active: true },
+    { id: "Fixie", name: "Fixie", active: true },
+    { id: "Touring", name: "Touring / Gravel", active: true }
+];
 
 const DEFAULT_GOWES_BIKES = [
     {
@@ -265,14 +325,15 @@ const DEFAULT_GOWES_BIKES = [
         type: "MTB (Gunung)",
         frameSize: "M (165-175 cm)",
         gears: "1x11 Speed Shimano Deore",
+        brakes: "Hydraulic Disc Brake Shimano",
         price2Hours: 40000,
         price6Hours: 75000,
         priceFullDay: 120000,
         status: "Tersedia",
-        description: "Suspensi empuk air fork, rem hidrolik pakem, cocok untuk rute aspal maupun off-road ringan.",
-        freeAccessories: ["Helm Sepeda", "Kunci Gembok Spiral", "Lampu Depan/Belakang"],
+        description: "Suspensi empuk air fork, rem hidrolik pakem, sangat tangguh untuk rute aspal maupun tanah berkerikil.",
+        freeAccessories: ["Helm Sepeda", "Kunci Gembok Spiral", "Lampu Malam Depan/Belakang"],
         image: "https://images.unsplash.com/photo-1485965120184-e220f721d03e?auto=format&fit=crop&w=800&q=75",
-        totalRentedCount: 24,
+        totalRentedCount: 28,
         createdAt: 1700000000000
     },
     {
@@ -281,14 +342,15 @@ const DEFAULT_GOWES_BIKES = [
         type: "Roadbike (Balap)",
         frameSize: "S/M (160-172 cm)",
         gears: "2x9 Speed Shimano Sora",
+        brakes: "Caliper Dual-Pivot Rim Brake",
         price2Hours: 50000,
         price6Hours: 95000,
         priceFullDay: 150000,
         status: "Tersedia",
-        description: "Super ringan & kencang, geometri nyaman untuk gowes pagi keliling kota atau latihan endurance.",
+        description: "Bobot alloy super ringan, posisi aerodinamis mantap untuk latihan kecepatan dan endurance keliling kota.",
         freeAccessories: ["Helm Aero", "Pompa Mini Portabel", "Bottle Cage"],
         image: "https://images.unsplash.com/photo-1532298229144-0ec0c57515c7?auto=format&fit=crop&w=800&q=75",
-        totalRentedCount: 38,
+        totalRentedCount: 42,
         createdAt: 1700000000001
     },
     {
@@ -297,15 +359,33 @@ const DEFAULT_GOWES_BIKES = [
         type: "Sepeda Lipat (Folding)",
         frameSize: "All Size (Adjustable)",
         gears: "8 Speed Shimano Tourney",
+        brakes: "Mechanical Disc Brake",
         price2Hours: 35000,
         price6Hours: 60000,
         priceFullDay: 90000,
         status: "Tersedia",
-        description: "Sangat ringkas & praktis, mudah dilipat ke dalam bagasi mobil, cocok untuk Car Free Day santai.",
+        description: "Sangat ringkas dan elegan, mudah dilipat ke bagasi mobil, cocok untuk Car Free Day santai keluarga.",
         freeAccessories: ["Helm Casual", "Tas Stang Depan", "Kunci Gembok"],
         image: "https://images.unsplash.com/photo-1507035895480-2b3156c31fc8?auto=format&fit=crop&w=800&q=75",
-        totalRentedCount: 42,
+        totalRentedCount: 56,
         createdAt: 1700000000002
+    },
+    {
+        id: "bike_4",
+        name: "Thrill Fervent T120",
+        type: "MTB (Gunung)",
+        frameSize: "L (175-185 cm)",
+        gears: "1x12 Speed SRAM SX Eagle",
+        brakes: "Hydraulic Disc Brake",
+        price2Hours: 45000,
+        price6Hours: 85000,
+        priceFullDay: 135000,
+        status: "Tersedia",
+        description: "Full suspension (dual suspension) empuk, sangat stabil meredam getaran jalan berlubang atau tanjakan curam.",
+        freeAccessories: ["Helm Trail", "Kunci Spiral", "Lampu Malam"],
+        image: "https://images.unsplash.com/photo-1576435728678-68d0fbf94e91?auto=format&fit=crop&w=800&q=75",
+        totalRentedCount: 19,
+        createdAt: 1700000000003
     }
 ];
 
@@ -325,6 +405,8 @@ function getLocalFallbackDB() {
         gowesBikes: [...DEFAULT_GOWES_BIKES],
         gowesRentals: [],
         gowesShelter: Object.assign({}, DEFAULT_GOWES_SHELTER),
+        gowesBanners: [...DEFAULT_GOWES_BANNERS],
+        gowesCategories: [...DEFAULT_GOWES_CATEGORIES],
         gowesAnalytics: null,
         appStats: {
             activeInstalled: 0,
@@ -585,7 +667,6 @@ function updateAppModeUI() {
         document.body.classList.remove("mode-gowes");
     }
 
-    // Toggle tampilan beranda utama jika sedang berada di layar beranda
     if (currentViewName === "landing") {
         const vLbk = document.getElementById("view-landing");
         const vGws = document.getElementById("view-gowes");
@@ -932,6 +1013,8 @@ function applyPublicDb(data) {
     if (data.gowesPublic && typeof data.gowesPublic === "object") {
         if (Array.isArray(data.gowesPublic.bikes)) db.gowesBikes = data.gowesPublic.bikes;
         if (data.gowesPublic.shelterLocation) db.gowesShelter = data.gowesPublic.shelterLocation;
+        if (Array.isArray(data.gowesPublic.banners)) db.gowesBanners = data.gowesPublic.banners;
+        if (Array.isArray(data.gowesPublic.categories)) db.gowesCategories = data.gowesPublic.categories;
     }
 }
 
@@ -953,6 +1036,8 @@ function applyServerDb(data) {
         else if (Array.isArray(data.gowesData.myRentals)) db.gowesRentals = data.gowesData.myRentals;
 
         if (data.gowesData.shelterLocation) db.gowesShelter = data.gowesData.shelterLocation;
+        if (Array.isArray(data.gowesData.banners)) db.gowesBanners = data.gowesData.banners;
+        if (Array.isArray(data.gowesData.categories)) db.gowesCategories = data.gowesData.categories;
         if (data.gowesData.analytics) db.gowesAnalytics = data.gowesData.analytics;
     }
 
