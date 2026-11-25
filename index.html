@@ -4,8 +4,8 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Lembarku &amp; Titik Gowes</title>
-    <meta property="og:title" content="Lembarku &amp; Titik Gowes — Undangan, Berkas &amp; Rental Sepeda">
-    <meta property="og:description" content="Buat undangan digital, CV profesional, dan sewa sepeda berkualitas langsung dari satu aplikasi praktis.">
+    <meta property="og:title" content="Lembarku &amp; Titik Gowes — Undangan Digital &amp; Rental Sepeda">
+    <meta property="og:description" content="Buat undangan digital elegan, CV, surat lamaran kerja siap PDF, dan sewa sepeda berkualitas langsung dari HP.">
     <meta property="og:image" content="./lembarku-logo.png">
     <meta name="theme-color" content="#f2f2f7">
     <link rel="icon" type="image/png" href="./lembarku-logo.png">
@@ -13,9 +13,9 @@
     <link rel="manifest" href="./manifest.json">
 
     <link rel="preconnect" href="https://fonts.googleapis.com">
-    <link rel="preconnect" href="https://fonts.gstatic.com">
-    <link rel="preconnect" href="https://cdnjs.cloudflare.com">
-    <link rel="preconnect" href="https://cdn.jsdelivr.net">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link rel="preconnect" href="https://cdnjs.cloudflare.com" crossorigin>
+    <link rel="preconnect" href="https://cdn.jsdelivr.net" crossorigin>
 
     <script src="https://cdn.tailwindcss.com"></script>
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
@@ -25,7 +25,7 @@
     <link href="https://fonts.googleapis.com/css2?family=Alex+Brush&family=Amiri:wght@700&family=Cormorant+Garamond:ital,wght@0,600;0,700;1,500&family=Fredoka:wght@500;700&family=Great+Vibes&family=Montserrat:wght@400;600;700;800&family=Playfair+Display:ital,wght@0,600;0,700;1,500&family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="./css/styles.css">
     <style>
-        /* Kunci layar loading Halo sebelum styles.css eksternal siap */
+        /* Kunci layar loading "Halo" seketika sebelum styles.css eksternal selesai dimuat */
         #ios-hello-splash {
             position: fixed;
             inset: 0;
@@ -45,6 +45,7 @@
         }
         #ios-hello-splash.hide { display: none !important; }
 
+        /* Banner promo full lebar layar HP */
         .promo-banner-fullbleed {
             position: relative;
             width: 100vw;
@@ -64,8 +65,12 @@
             }
         }
 
-        #promo-banner-dots { display: none !important; }
+        /* Sembunyikan titik indikator banner */
+        #promo-banner-dots {
+            display: none !important;
+        }
 
+        /* Tombol titik 3 disembunyikan saat di beranda utama */
         body.in-home #header-dots-btn {
             display: none !important;
         }
@@ -99,6 +104,7 @@
             overscroll-behavior: contain;
         }
 
+        /* Toggle Switch Privasi Gaya iOS */
         .lbk-switch {
             position: relative;
             display: inline-flex;
@@ -140,6 +146,7 @@
             transform: translateX(20px);
         }
 
+        /* Kartu Mini Sampul Jadi Undangan di Beranda */
         .mini-inv-cover-stage {
             position: relative;
             aspect-ratio: 3 / 4.25;
@@ -250,7 +257,7 @@
                 </div>
                 <div class="app-card-soft border rounded-2xl p-3 text-left text-[11px] space-y-1.5">
                     <p><i class="fa-solid fa-bolt app-accent w-4 mr-1"></i>Buka 3x lebih cepat langsung dari layar utama HP</p>
-                    <p><i class="fa-solid fa-file-pdf app-accent w-4 mr-1"></i>Undangan Digital, CV, &amp; Lamaran PDF praktis</p>
+                    <p><i class="fa-solid fa-file-pdf app-accent w-4 mr-1"></i>Buat Undangan Digital, CV, &amp; Lamaran PDF praktis</p>
                     <p><i class="fa-solid fa-bicycle text-emerald-600 w-4 mr-1"></i>Sewa sepeda &amp; cek rute gowes instan</p>
                 </div>
                 <div class="flex gap-2.5 pt-1">
@@ -278,7 +285,7 @@
                 </div>
                 <div class="space-y-1">
                     <h4 class="font-extrabold text-base">Aplikasi Berhasil Dipasang!</h4>
-                    <p class="text-xs app-muted leading-relaxed">Ikon aplikasi sudah tersedia di layar utama HP Anda.</p>
+                    <p class="text-xs app-muted leading-relaxed">Ikon sudah tersedia di layar utama HP Anda.</p>
                 </div>
                 <button type="button" onclick="finishAndLaunchApp()" class="w-full gold-pill-btn py-3 rounded-xl text-xs uppercase shadow-lg">Buka Aplikasi Sekarang</button>
             </div>
@@ -325,7 +332,7 @@
         <button type="button" onclick="dismissLoginReminder()" class="app-muted text-xs"><i class="fa-solid fa-xmark"></i></button>
     </div>
 
-    <!-- HEADER DINAMIS DENGAN TOMBOL GARIS 2 THREADS & LONCENG DI KIRI FOTO PROFIL -->
+    <!-- HEADER DINAMIS DENGAN TOMBOL THREADS & LONCENG DI KIRI FOTO PROFIL -->
     <header class="app-header w-full px-3 sm:px-6 md:px-8 py-2.5 sm:py-3 backdrop-blur-md border-b flex justify-between items-center sticky top-0 z-40 shadow-sm">
         <!-- Kiri: Tombol Garis 2 Threads + Logo & Brand Dinamis -->
         <div class="flex items-center space-x-2.5">
@@ -333,7 +340,7 @@
                 <span class="t-bar"></span>
                 <span class="t-bar"></span>
             </button>
-            <div class="flex items-center space-x-2 cursor-pointer" onclick="handleHeaderBrandClick()" title="Ke Beranda">
+            <div class="flex items-center space-x-2 cursor-pointer" onclick="handleHeaderBrandClick()" title="Ke Beranda Utama">
                 <img id="header-app-logo" src="./lembarku-logo.png" alt="Logo" class="w-8 h-8 sm:w-9 sm:h-9 rounded-lg bg-white p-1 object-contain shadow-sm border border-black/10" onerror="this.src='./lembarku-logo.png'">
                 <div class="leading-none">
                     <span id="header-brand-main" class="font-extrabold text-base sm:text-lg md:text-xl tracking-tight block">Lembarku</span>
@@ -342,16 +349,16 @@
             </div>
         </div>
 
-        <!-- Kanan: [ Lonceng Notifikasi ] -> [ Foto Profil Avatar ] -> [ Titik 3 Pengaturan ] -->
+        <!-- Kanan: [ 🔔 Lonceng Notifikasi ] -> [ 👤 Foto Profil ] -> [ ⋮ Titik 3 Pengaturan ] -->
         <div class="flex items-center gap-2">
-            <!-- 1. Lonceng Notifikasi di sebelah kiri foto profil -->
+            <!-- 1. Lonceng Notifikasi tepat di sebelah kiri foto profil -->
             <button id="header-notif-btn" type="button" onclick="openNotificationsFullscreen()" class="hide relative w-9 h-9 rounded-full app-card-soft border gold-border app-accent flex items-center justify-center hover:brightness-95 active:scale-95 transition" title="Notifikasi">
                 <i class="fa-regular fa-bell text-sm"></i>
                 <span id="header-notif-badge" class="hide absolute -top-1 -right-1 min-w-[18px] h-[18px] px-1 rounded-full bg-red-500 text-white text-[9px] font-extrabold flex items-center justify-center border-2 border-[var(--app-card)]">0</span>
             </button>
 
-            <!-- 2. Foto Profil / Tombol Masuk Akun -->
-            <div id="header-actions" class="flex items-center"></div>
+            <!-- 2. Foto Profil Avatar / Tombol Masuk Akun -->
+            <div id="header-actions" class="flex items-center gap-2"></div>
 
             <!-- 3. Titik 3 Pengaturan -->
             <button id="header-dots-btn" type="button" onclick="toggleSlideMenu(true)" class="w-9 h-9 rounded-full app-card-soft border gold-border app-accent flex items-center justify-center hover:brightness-95 active:scale-95 transition" title="Opsi &amp; Pengaturan">
@@ -400,7 +407,7 @@
                             <h2 class="text-lg md:text-xl font-extrabold" style="font-family:'Cormorant Garamond',serif;">Sertifikat &amp; Piagam Penghargaan</h2>
                             <span class="text-[9px] px-2 py-0.5 rounded-full app-accent-bg app-accent border gold-border font-extrabold uppercase">Segera Hadir</span>
                         </div>
-                        <p class="text-[11px] app-muted">Sekali buat desain sertifikat, nama pemegang sertifikat diinput otomatis seperti daftar tamu</p>
+                        <p class="text-[11px] app-muted">Sekali buat desain sertifikat, nama-nama pemegang sertifikat tinggal diinput seperti daftar tamu undangan</p>
                     </div>
                 </div>
                 <div id="landing-cert-shelf" class="h-shelf-track no-scrollbar items-stretch"></div>
@@ -435,25 +442,25 @@
                     <div class="app-card-soft border rounded-2xl p-3 space-y-1">
                         <i class="fa-solid fa-envelope-open-text app-accent text-base"></i>
                         <h5 class="font-bold">Tema Undangan Eksklusif</h5>
-                        <p class="text-[11px] app-muted leading-snug">Adat Nusantara, Premium Black, Aqiqah, &amp; Syukuran.</p>
+                        <p class="text-[11px] app-muted leading-snug">Adat Nusantara, Premium Black, Aqiqah, Ultah, Syukuran &amp; Khitanan dengan animasi 3D.</p>
                     </div>
                     <div class="app-card-soft border rounded-2xl p-3 space-y-1">
                         <i class="fa-solid fa-file-pdf app-accent text-base"></i>
-                        <h5 class="font-bold">CV &amp; Scan PDF</h5>
-                        <p class="text-[11px] app-muted leading-snug">9 desain CV modern &amp; Auto-Scan dokumen ke 1 file PDF.</p>
+                        <h5 class="font-bold">CV, Lamaran &amp; Scan PDF</h5>
+                        <p class="text-[11px] app-muted leading-snug">9 desain CV &amp; Surat Lamaran, otomatis scan foto lampiran jadi 1 PDF rapi siap HRD.</p>
                     </div>
                     <div class="app-card-soft border rounded-2xl p-3 space-y-1">
                         <i class="fa-solid fa-bicycle text-emerald-600 text-base"></i>
                         <h5 class="font-bold">Titik Gowes Rental</h5>
-                        <p class="text-[11px] app-muted leading-snug">Sewa sepeda harian/jam dengan QRIS DANA &amp; helm gratis.</p>
+                        <p class="text-[11px] app-muted leading-snug">Sewa sepeda harian/jam dengan QRIS DANA, jaminan aman &amp; helm gratis.</p>
                     </div>
                     <div class="app-card-soft border rounded-2xl p-3 space-y-1">
                         <i class="fa-solid fa-qrcode app-accent text-base"></i>
                         <h5 class="font-bold">QRIS Dinamis Terpadu</h5>
-                        <p class="text-[11px] app-muted leading-snug">Kode unik otomatis untuk pembayaran berkas &amp; rental sepeda.</p>
+                        <p class="text-[11px] app-muted leading-snug">Nominal otomatis dengan 3 digit kode unik untuk verifikasi instan.</p>
                     </div>
                 </div>
-                <p class="text-[10px] app-muted text-center pt-1">&copy; 2026 Lembarku &amp; Titik Gowes. Hak cipta dilindungi.</p>
+                <p class="text-[10px] app-muted text-center pt-1">&copy; 2026 Lembarku &amp; Titik Gowes. Semua hak cipta dilindungi.</p>
             </footer>
         </section>
 
@@ -651,7 +658,7 @@
             <div onclick="openCreateChoiceModal(true)" class="app-card border rounded-2xl p-3 shadow-sm flex items-center gap-2.5 cursor-pointer hover:brightness-95 transition">
                 <img id="cabang-composer-avatar" src="" class="w-9 h-9 rounded-full object-cover border gold-border shrink-0 bg-zinc-800">
                 <div class="flex-1 app-card-soft border rounded-full px-3.5 py-2 text-xs app-muted font-medium truncate">
-                    Buat berkas klien instan (-1 Kuota)...
+                    Buat berkas klien instan (-1 Kuota)... (Undangan, CV, Lamaran)
                 </div>
                 <span class="gold-pill-btn px-3.5 py-1.5 rounded-full text-xs shrink-0"><i class="fa-solid fa-bolt mr-1"></i>Buat</span>
             </div>
@@ -700,7 +707,7 @@
             <div class="app-card border rounded-3xl p-4 shadow-sm flex flex-wrap items-center justify-between gap-2.5">
                 <div class="min-w-0">
                     <p class="text-xs font-extrabold">Pusat Kendali Founder</p>
-                    <p class="text-[11px] app-muted">Kelola akun di <strong>Followers</strong>, transaksi berkas &amp; rental sepeda di <strong>Project</strong>.</p>
+                    <p class="text-[11px] app-muted">Kelola akun di <strong>Followers</strong>, verifikasi order di <strong>Project</strong>, atau buka <strong>Pengaturan (⋮)</strong>.</p>
                 </div>
                 <div class="flex flex-wrap gap-2">
                     <button type="button" onclick="openMasterWorkspace('overview')" class="px-3.5 py-2 rounded-xl app-card-soft border gold-border app-accent text-xs font-bold"><i class="fa-solid fa-chart-line mr-1.5"></i>Analitik</button>
@@ -729,15 +736,15 @@
 
             <div class="app-card border rounded-3xl p-4 shadow-sm flex flex-wrap items-center justify-between gap-2.5">
                 <div class="min-w-0">
-                    <p class="text-xs font-extrabold">Verifikasi Order &amp; Sewa Sepeda</p>
-                    <p class="text-[11px] app-muted">Buka menu <strong>Project</strong> di atas untuk memverifikasi pesanan Lembarku &amp; Titik Gowes.</p>
+                    <p class="text-xs font-extrabold">Verifikasi &amp; Revisi Order User</p>
+                    <p class="text-[11px] app-muted">Buka menu <strong>Project</strong> di atas untuk verifikasi pembayaran, revisi, &amp; edit berkas user.</p>
                 </div>
                 <span id="staff-pending-badge" class="text-xs px-3 py-1 rounded-full app-accent-bg app-accent font-bold">0 Menunggu</span>
             </div>
         </section>
 
         <!-- ========================================================= -->
-        <!-- 7. WIZARD UNDANGAN DIGITAL                                -->
+        <!-- 7. WIZARD BUAT / EDIT UNDANGAN DIGITAL                    -->
         <!-- ========================================================= -->
         <section id="view-wizard" class="hide app-card border rounded-3xl p-5 md:p-8 shadow-xl space-y-6">
             <div class="flex items-center justify-between border-b gold-border pb-4">
@@ -922,6 +929,7 @@
                 </form>
             </div>
         </section>
+
         <!-- ========================================================= -->
         <!-- 8. WIZARD PORTOFOLIO (CV & SURAT LAMARAN KERJA)           -->
         <!-- ========================================================= -->
@@ -1090,7 +1098,6 @@
     <!-- ========================================================= -->
     <div id="drawer-ecosystem" class="drawer-left-backdrop" onclick="if(event.target===this)toggleEcosystemDrawer(false)">
         <div class="drawer-left-panel">
-            <!-- Header Drawer Kiri -->
             <div class="p-4 border-b gold-border flex items-center justify-between">
                 <div>
                     <h3 class="font-extrabold text-base tracking-tight">Pilih Layanan</h3>
@@ -1101,9 +1108,7 @@
                 </button>
             </div>
 
-            <!-- Body Drawer: Profil Ringkas & Pilihan Layanan -->
             <div class="p-4 flex-1 overflow-y-auto space-y-3.5">
-                <!-- Info Akun Pengguna Ringkas -->
                 <div id="drawer-eco-user-box" class="app-card-soft border rounded-2xl p-3 flex items-center gap-3">
                     <img id="drawer-eco-avatar" src="./lembarku-logo.png" class="w-10 h-10 rounded-full object-cover border gold-border bg-zinc-800 shrink-0">
                     <div class="min-w-0 flex-1">
@@ -1112,7 +1117,6 @@
                     </div>
                 </div>
 
-                <!-- Kartu Pilihan Layanan: 1. LEMBARKU -->
                 <div onclick="switchAppMode('lembarku')" id="eco-opt-lembarku" class="ecosystem-item-card is-active">
                     <div class="w-12 h-12 rounded-2xl bg-blue-500/15 border border-blue-500/35 flex items-center justify-center text-xl text-blue-600 shrink-0">
                         <img src="./lembarku-logo.png" class="w-7 h-7 object-contain" onerror="this.style.display='none'">
@@ -1126,7 +1130,6 @@
                     </div>
                 </div>
 
-                <!-- Kartu Pilihan Layanan: 2. TITIK GOWES -->
                 <div onclick="switchAppMode('titik_gowes')" id="eco-opt-gowes" class="ecosystem-item-card">
                     <div class="w-12 h-12 rounded-2xl bg-emerald-500/15 border border-emerald-500/35 flex items-center justify-center text-xl text-emerald-600 shrink-0">
                         <img src="./titik-gowes-logo.png" class="w-7 h-7 object-contain" onerror="this.src='./lembarku-logo.png'">
@@ -1166,7 +1169,6 @@
             <div class="p-5 overflow-y-auto space-y-4 flex-1">
                 <input type="hidden" id="gw-book-bike-id">
 
-                <!-- Ringkasan Unit Terpilih -->
                 <div class="app-card-soft border rounded-2xl p-3.5 flex items-center gap-3">
                     <img id="gw-book-bike-img" src="" class="w-16 h-16 rounded-xl object-cover bg-black border gold-border shrink-0">
                     <div class="min-w-0 flex-1 space-y-0.5">
@@ -1176,7 +1178,6 @@
                     </div>
                 </div>
 
-                <!-- 1. Pilihan Paket Durasi Sewa -->
                 <div class="space-y-1.5">
                     <label class="app-label">1. Pilih Paket Durasi Sewa:</label>
                     <div class="grid grid-cols-3 gap-2">
@@ -1204,7 +1205,6 @@
                     </div>
                 </div>
 
-                <!-- 2. Waktu Ambil & Lokasi Shelter -->
                 <div class="grid grid-cols-2 gap-2.5">
                     <div>
                         <label class="app-label">Tanggal Sewa</label>
@@ -1216,14 +1216,12 @@
                     </div>
                 </div>
 
-                <!-- 3. Data Penyewa -->
                 <div class="space-y-2.5">
                     <label class="app-label !mb-0">2. Data Diri &amp; Kontak WhatsApp:</label>
                     <input type="tel" id="gw-book-phone" placeholder="No. WhatsApp Aktif (0812...)" class="app-input" required>
                     <input type="text" id="gw-book-address" placeholder="Alamat Domisili Sekarang" class="app-input" required>
                 </div>
 
-                <!-- 4. Upload Foto KTP Penjamin -->
                 <div class="app-card-soft border rounded-2xl p-3.5 space-y-2">
                     <div class="flex items-center justify-between">
                         <label class="app-label !mb-0 text-emerald-600 font-extrabold"><i class="fa-solid fa-id-card mr-1"></i>3. Upload Foto KTP / SIM Penjamin</label>
@@ -1237,13 +1235,11 @@
                     <img id="gw-ktp-preview" class="hide w-full max-h-36 object-contain rounded-xl border border-emerald-500/40 bg-black/10 mx-auto">
                 </div>
 
-                <!-- 5. Catatan Tambahan -->
                 <div>
                     <label class="app-label">Catatan Tambahan (Opsional)</label>
-                    <input type="text" id="gw-book-note" placeholder="Misal: Perlu helm ukuran besar / tambahan tas..." class="app-input">
+                    <input type="text" id="gw-book-note" placeholder="Misal: Perlu helm ukuran besar / tas depan..." class="app-input">
                 </div>
 
-                <!-- Rincian Biaya -->
                 <div class="app-card-soft border-2 border-emerald-500/40 rounded-2xl p-3 flex items-center justify-between text-xs">
                     <div>
                         <span class="app-muted block text-[10px]">Total Estimasi Sewa:</span>
@@ -1427,7 +1423,7 @@
     </div>
 
     <!-- ========================================================= -->
-    <!-- OVERLAY 2: MENU PENGATURAN FULL-SCREEN PREMIUM            -->
+    <!-- OVERLAY 2: MENU PENGATURAN FULL-SCREEN PREMIUM (FIXED HDR)-->
     <!-- ========================================================= -->
     <div id="drawer-main" class="slide-drawer-backdrop" onclick="if(event.target===this)toggleSlideMenu(false)">
         <div class="slide-drawer-panel">
@@ -1461,7 +1457,7 @@
                         <div class="app-card border rounded-3xl p-4 space-y-3.5 shadow-sm">
                             <div class="border-b gold-border pb-2.5">
                                 <h4 class="font-extrabold text-sm">Visibilitas Profil &amp; Dokumen</h4>
-                                <p class="text-[11px] app-muted mt-0.5">Dokumen privat (Album Rahasia ber-PIN, draf &amp; bukti transfer) <strong>selalu tersembunyi</strong> dari publik.</p>
+                                <p class="text-[11px] app-muted mt-0.5">Dokumen privat (Album Rahasia ber-PIN, draf belum aktif &amp; bukti transfer) <strong>selalu tersembunyi</strong> dan tidak pernah ditampilkan ke orang lain.</p>
                             </div>
 
                             <div class="flex items-center justify-between gap-3">
@@ -1535,10 +1531,10 @@
                             </div>
                             <p class="app-muted">Aplikasi serba bisa yang memadukan pembuatan berkas digital profesional dan penyewaan sepeda premium dalam satu pintu:</p>
                             <ul class="space-y-1.5 list-disc pl-4">
-                                <li><strong>Undangan Digital Interaktif:</strong> Desain adat &amp; modern dengan amplop digital, musik, dan RSVP.</li>
-                                <li><strong>Portofolio CV &amp; Lamaran:</strong> 9 desain modern + Auto-Scan dokumen ke 1 file PDF siap HRD.</li>
-                                <li><strong>Titik Gowes Rental:</strong> Sewa sepeda MTB, Roadbike &amp; Lipat dengan booking cepat, QRIS DANA &amp; garasi terverifikasi.</li>
-                                <li><strong>Brankas Album Rahasia:</strong> Simpan foto pribadi ber-PIN 4 digit langsung di profil akun.</li>
+                                <li><strong>Undangan Digital Interaktif:</strong> Berbagai desain pernikahan adat &amp; modern, Aqiqah, Ulang Tahun, Syukuran, &amp; Khitanan lengkap peta, amplop digital, musik potong sendiri, RSVP &amp; daftar tamu personal.</li>
+                                <li><strong>Portofolio CV &amp; Surat Lamaran:</strong> 9 desain CV modern + surat lamaran resmi, fitur <em>Sempurnakan</em> untuk Auto-Scan foto dokumen HP dan menggabungkannya menjadi 1 file PDF utuh.</li>
+                                <li><strong>Titik Gowes Rental:</strong> Sewa sepeda MTB, Roadbike &amp; Sepeda Lipat dengan booking cepat, QRIS DANA &amp; garasi terverifikasi.</li>
+                                <li><strong>Sorotan Album &amp; Brankas Rahasia:</strong> Tautkan folder Google Drive atau simpan foto &amp; catatan pribadi di Album Rahasia ber-PIN 4-digit.</li>
                             </ul>
                             <div class="pt-3 border-t gold-border flex items-center justify-between text-[11px]">
                                 <span class="app-muted">Versi Aplikasi</span>
@@ -1604,7 +1600,7 @@
                         <form onsubmit="submitSecurePasswordChange(event)" class="app-card border rounded-3xl p-5 space-y-4 shadow-sm" autocomplete="off">
                             <div class="app-accent-bg border gold-border rounded-2xl p-3 text-[11px] leading-relaxed">
                                 <i class="fa-solid fa-shield-halved app-accent mr-1.5"></i>
-                                Masukkan <strong>Password Lama</strong>, lalu ketik <strong>Password Baru</strong> dua kali (minimal 6 karakter).
+                                Demi keamanan akun Anda, masukkan <strong>Password Lama</strong> terlebih dahulu, lalu ketik <strong>Password Baru</strong> dua kali (minimal 6 karakter).
                             </div>
 
                             <div>
@@ -1715,8 +1711,9 @@
     </div>
 
     <!-- ========================================================= -->
-    <!-- MODAL PILIHAN DOKUMEN & ALBUM                             -->
+    <!-- MODALS                                                    -->
     <!-- ========================================================= -->
+
     <div id="modal-create-choice" class="hide fixed inset-0 z-[80] bg-black/75 backdrop-blur-sm flex items-center justify-center p-4">
         <div class="app-card border rounded-3xl max-w-sm w-full p-6 space-y-4 shadow-2xl">
             <div class="flex justify-between items-center border-b gold-border pb-2.5">
@@ -1728,6 +1725,7 @@
                 <button onclick="chooseCreateDoc('cv')" class="menu-row-card"><span class="menu-row-ic"><i class="fa-solid fa-id-card"></i></span><div class="flex-1"><strong class="text-xs block">Curriculum Vitae (CV)</strong><span class="text-[10px] app-muted">9 desain profesional + Auto-Scan gabung PDF</span></div><i class="fa-solid fa-chevron-right text-xs app-muted"></i></button>
                 <button onclick="chooseCreateDoc('lamaran')" class="menu-row-card"><span class="menu-row-ic"><i class="fa-solid fa-file-signature"></i></span><div class="flex-1"><strong class="text-xs block">Surat Lamaran Kerja</strong><span class="text-[10px] app-muted">Format resmi siap HRD + gabung lampiran PDF</span></div><i class="fa-solid fa-chevron-right text-xs app-muted"></i></button>
                 <button onclick="document.getElementById('modal-create-choice').classList.add('hide');switchAppMode('titik_gowes');" class="menu-row-card"><span class="menu-row-ic !bg-emerald-500/15 !text-emerald-600"><i class="fa-solid fa-bicycle"></i></span><div class="flex-1"><strong class="text-xs block">Sewa Sepeda (Titik Gowes)</strong><span class="text-[10px] app-muted">Booking unit MTB, Roadbike &amp; Sepeda Lipat</span></div><i class="fa-solid fa-chevron-right text-xs app-muted"></i></button>
+                <button disabled class="menu-row-card opacity-50 cursor-not-allowed"><span class="menu-row-ic"><i class="fa-solid fa-award"></i></span><div class="flex-1"><strong class="text-xs block">Sertifikat &amp; Piagam</strong><span class="text-[10px] app-muted">Segera Hadir (Proyek Berikutnya)</span></div><span class="text-[9px] px-2 py-0.5 rounded-full app-btn-sec font-bold">SOON</span></button>
             </div>
         </div>
     </div>
@@ -1874,7 +1872,7 @@
         <div id="sa-pane-notes" class="hide p-4 overflow-y-auto flex-1 space-y-3 max-w-2xl w-full mx-auto">
             <div id="sa-note-composer" class="app-card border rounded-2xl p-3.5 space-y-2 shadow-sm">
                 <div class="flex items-center justify-between">
-                    <span class="text-[11px] font-bold app-accent uppercase"><i class="fa-solid fa-lock mr-1"></i>Catatan Pribadi Aman</span>
+                    <span class="text-[11px] font-bold app-accent uppercase"><i class="fa-solid fa-lock mr-1"></i>Catatan Pribadi Aman (Tersimpan di Cloud Akun)</span>
                     <span class="text-[10px] app-muted">Aman meski HP hilang</span>
                 </div>
                 <input type="text" id="sa-note-title" placeholder="Judul catatan kecil (misal: PIN ATM, Catatan Penting...)" class="app-input !py-2 text-xs font-bold">
@@ -1910,11 +1908,11 @@
             <div class="p-5 overflow-y-auto space-y-4 flex-1">
                 <div class="app-card-soft border rounded-2xl p-3.5 space-y-2.5">
                     <div class="flex flex-wrap items-center justify-between gap-2">
-                        <label class="text-xs font-bold app-accent">1. Tambah Lampiran Dokumen (KTP, Ijazah, Sertifikat)</label>
-                        <label class="flex items-center gap-1.5 text-[11px] font-bold cursor-pointer"><input type="checkbox" id="smp-autoscan-chk" checked class="w-4 h-4 accent-blue-600"> Auto-Scan Bersih</label>
+                        <label class="text-xs font-bold app-accent">1. Tambah Lampiran Dokumen Pelengkap (KTP, Ijazah, Transkrip, Sertifikat)</label>
+                        <label class="flex items-center gap-1.5 text-[11px] font-bold cursor-pointer"><input type="checkbox" id="smp-autoscan-chk" checked class="w-4 h-4 accent-blue-600"> Auto-Scan Bersih (Seperti Mesin Scanner)</label>
                     </div>
                     <label class="block gold-pill-btn py-2.5 rounded-xl text-center text-xs cursor-pointer shadow">
-                        <i class="fa-solid fa-camera mr-1.5"></i>Foto Kamera / Pilih Dokumen Galeri HP
+                        <i class="fa-solid fa-camera mr-1.5"></i>Foto Kamera / Pilih Dokumen dari Galeri HP
                         <input type="file" accept="image/*" multiple class="hide" onchange="addAttachmentsToSempurnakan(this)">
                     </label>
                     <div id="smp-attachments-list" class="grid grid-cols-2 sm:grid-cols-3 gap-2.5 pt-1"></div>
@@ -1933,7 +1931,7 @@
 
                 <div class="app-card-soft border rounded-2xl p-3.5 space-y-2.5">
                     <div class="flex items-center justify-between">
-                        <label class="text-xs font-bold app-accent">3. Kata Pengantar Melamar Kerja (Siap Salin)</label>
+                        <label class="text-xs font-bold app-accent">3. Kata Pengantar Email / WhatsApp Melamar Kerja (Siap Salin)</label>
                         <button type="button" onclick="copyCoverLetterMsg()" class="px-3 py-1 rounded-lg gold-pill-btn text-[10px]"><i class="fa-regular fa-copy mr-1"></i>Salin Teks</button>
                     </div>
                     <textarea id="smp-email-text" class="app-input h-28 text-[11px]"></textarea>
@@ -1952,7 +1950,7 @@
                 <button onclick="document.getElementById('modal-client-portal').classList.add('hide')" class="app-muted"><i class="fa-solid fa-xmark"></i></button>
             </div>
             <div class="app-accent-bg border gold-border rounded-2xl p-3 text-[11px] leading-relaxed">
-                Klien tidak perlu login — mereka langsung bisa melihat pratinjau undangan, menginput daftar tamu, dan membagikan undangan ke WhatsApp.
+                Klien tidak perlu login — mereka langsung bisa melihat pratinjau undangan, menambah nama tamu satu per satu atau massal, dan membagikan langsung ke kontak WhatsApp masing-masing.
             </div>
             <div class="flex gap-2">
                 <input type="text" id="cp-link-input" class="app-input flex-1 font-mono text-[11px]" readonly>
@@ -2016,7 +2014,7 @@
                         <div><label class="app-label">Harga Jual / Bayar (Rp)</label><input type="number" id="tb-price" oninput="updateThemeBuilderPreview()" min="0" step="1000" class="app-input" required></div>
                     </div>
                     <div class="grid sm:grid-cols-2 gap-3">
-                        <div><label class="app-label">Gaya Tata Letak</label><select id="tb-layout" onchange="updateThemeBuilderPreview()" class="app-input"><option value="kalimantan_story">Story Editorial Polaroid</option><option value="premium_black">Premium Black</option><option value="split">Split Mempelai</option><option value="combined">Foto Berdua Digabung</option><option value="sulawesi">Adat 3-Kolom</option><option value="classic_card">Klasik Kartu</option></select></div>
+                        <div><label class="app-label">Gaya Tata Letak</label><select id="tb-layout" onchange="updateThemeBuilderPreview()" class="app-input"><option value="kalimantan_story">Story Editorial Polaroid (Mempelai Terpisah)</option><option value="premium_black">Premium Black (Kartu Putih Kontras)</option><option value="split">Split Mempelai (1 Layar Penuh)</option><option value="combined">Foto Berdua Digabung (Full di Atas Nama)</option><option value="sulawesi">Adat 3-Kolom</option><option value="classic_card">Klasik Kartu</option></select></div>
                         <div><label class="app-label">Gaya Frame</label><select id="tb-frame" onchange="updateThemeBuilderPreview()" class="app-input"><option value="arch">Lengkungan Tinggi</option><option value="polaroid">Bingkai Polaroid</option><option value="rounded">Elegan Melengkung</option><option value="glass">Kaca Transparan</option><option value="sharp">Kotak Tajam</option></select></div>
                         <div><label class="app-label">Efek Transisi</label><select id="tb-transition" class="app-input"><option value="random">Acak Premium</option><option value="pageturn">Membalik Kertas 3D</option><option value="curtain">Tirai Belah</option><option value="lift">Angkat Halus</option><option value="zoomblur">Kabut Sinematik</option></select></div>
                         <div><label class="app-label">Ornamen &amp; Bayangan Latar</label><select id="tb-ornament" class="app-input"><option value="leaf">Bayangan Daun Elegan</option><option value="batik">Bayangan Batik Halus</option><option value="floral_mono">Mawar Monokrom</option><option value="jawa">Gunungan Wayang Jawa</option><option value="sulawesi">Ornamen Sulawesi</option><option value="islami">Kaligrafi Islami</option><option value="none">Polos Bersih</option></select></div>
@@ -2052,7 +2050,7 @@
         </form>
     </div>
 
-    <!-- MODAL LIVE CHAT LAYAR PENUH -->
+    <!-- MODAL LIVE CHAT LAYAR PENUH + TOMBOL + KONTAK BARU & HAPUS HISTORY -->
     <div id="full-chat-overlay" class="hide fixed inset-0 z-[75] bg-black/80 backdrop-blur-md flex items-center justify-center p-0 sm:p-4">
         <div class="app-card w-full max-w-3xl h-full sm:h-[88vh] sm:rounded-3xl border flex flex-col overflow-hidden shadow-2xl relative">
             <div class="gold-gradient px-5 py-3.5 flex items-center justify-between shrink-0">
@@ -2060,7 +2058,7 @@
                     <i class="fa-solid fa-headset text-lg"></i>
                     <div>
                         <h3 id="fchat-title" class="font-extrabold text-sm leading-tight">Live Chat Admin</h3>
-                        <p id="fchat-subtitle" class="text-[10px] opacity-85 font-semibold">Lembarku &amp; Titik Gowes</p>
+                        <p id="fchat-subtitle" class="text-[10px] opacity-85 font-semibold">Sinkronisasi real-time</p>
                     </div>
                 </div>
                 <button onclick="closeFullChatOverlay()" class="w-9 h-9 rounded-full bg-black/15 hover:bg-black/25 flex items-center justify-center text-base font-bold"><i class="fa-solid fa-xmark"></i></button>
@@ -2069,7 +2067,7 @@
             <div class="px-4 py-2 app-card border-t gold-border flex items-center justify-between text-[10px] app-muted shrink-0">
                 <div class="flex items-center gap-2">
                     <img src="./lembarku-logo.png" class="w-5 h-5 rounded bg-white p-0.5 object-contain border border-black/10" onerror="this.style.display='none'">
-                    <span class="font-extrabold app-accent tracking-wide">Lembarku • Titik Gowes</span>
+                    <span class="font-extrabold app-accent tracking-wide">Lembarku</span>
                     <span class="hidden sm:inline">• Layanan Resmi</span>
                 </div>
                 <span class="opacity-0 pointer-events-none select-none">Hosted</span>
@@ -2077,7 +2075,7 @@
         </div>
     </div>
 
-    <!-- MODAL KONTAK CHAT -->
+    <!-- MODAL KONTAK BARU ALA WHATSAPP -->
     <div id="modal-chat-contacts" class="hide fixed inset-0 z-[135] bg-black/80 backdrop-blur-sm flex items-center justify-center p-4">
         <div class="app-card border rounded-3xl max-w-md w-full max-h-[82vh] flex flex-col overflow-hidden shadow-2xl">
             <div class="px-5 py-3.5 border-b gold-border flex items-center justify-between shrink-0">
@@ -2148,7 +2146,7 @@
         </div>
     </div>
 
-    <!-- MODAL PENAMPIL BUKTI TRANSFER -->
+    <!-- MODAL PENAMPIL BUKTI TRANSFER / SCREENSHOT AMAN -->
     <div id="modal-proof-viewer" class="hide fixed inset-0 z-[149] bg-black/90 backdrop-blur-md flex items-center justify-center p-4" onclick="if(event.target===this)this.classList.add('hide')">
         <div class="app-card border rounded-3xl max-w-lg w-full overflow-hidden shadow-2xl flex flex-col max-h-[90vh]">
             <div class="px-5 py-3.5 border-b gold-border flex items-center justify-between gap-2 shrink-0">
@@ -2176,7 +2174,7 @@
         </div>
     </div>
 
-    <!-- MODAL FOUNDER CRUD USER -->
+    <!-- MODAL FOUNDER CRUD USER / CABANG / ADMINISTRASI -->
     <div id="modal-master-user" class="hide fixed inset-0 z-[148] bg-black/80 flex items-center justify-center p-4">
         <form onsubmit="submitMasterUserModal(event)" class="app-card border rounded-3xl max-w-md w-full p-6 space-y-3">
             <div class="flex justify-between items-center border-b gold-border pb-2.5">
@@ -2197,7 +2195,7 @@
             </div>
             <div><label class="app-label">Nama Lengkap / Mitra</label><input type="text" id="mmu-name" class="app-input" required></div>
             <div><label class="app-label">Username</label><input type="text" id="mmu-username" class="app-input" required></div>
-            <div><label class="app-label">Password</label><div class="relative"><input type="password" id="mmu-password" class="app-input pr-10" placeholder="Kosongkan jika tidak diubah"><button type="button" onclick="togglePassVis('mmu-password',this)" class="absolute right-3 top-1/2 -translate-y-1/2 app-muted text-xs"><i class="fa-regular fa-eye"></i></button></div></div>
+            <div><label class="app-label">Password</label><div class="relative"><input type="password" id="mmu-password" class="app-input pr-10" placeholder="Kosongkan saat edit jika tidak diubah"><button type="button" onclick="togglePassVis('mmu-password',this)" class="absolute right-3 top-1/2 -translate-y-1/2 app-muted text-xs"><i class="fa-regular fa-eye"></i></button></div></div>
             <div class="grid grid-cols-2 gap-2.5"><input type="tel" id="mmu-phone" placeholder="No. HP" class="app-input"><input type="text" id="mmu-address" placeholder="Alamat" class="app-input"></div>
             <label class="flex items-center justify-between app-card-soft border rounded-2xl p-3 text-xs font-bold cursor-pointer">
                 <span><i class="fa-solid fa-circle-check text-blue-500 mr-1.5"></i>Status Akun PRO (Centang Biru + Unlimited)</span>
@@ -2227,7 +2225,7 @@
                 </div>
             </div>
             <textarea id="share-preview-text" class="app-input h-28" readonly></textarea>
-            <button id="btn-share-native" onclick="launchNativeShareWithPhoto()" class="w-full gold-pill-btn py-2.5 rounded-xl text-xs"><i class="fa-solid fa-share-from-square mr-1.5"></i>Bagikan + Foto Sampul Langsung</button>
+            <button id="btn-share-native" onclick="launchNativeShareWithPhoto()" class="w-full gold-pill-btn py-2.5 rounded-xl text-xs"><i class="fa-solid fa-share-from-square mr-1.5"></i>Bagikan + Foto Sampul Langsung (HP)</button>
             <div class="grid grid-cols-2 gap-2">
                 <button onclick="launchSocialShare('wa')" class="bg-emerald-600 text-white py-2.5 rounded-xl text-xs font-bold"><i class="fa-brands fa-whatsapp mr-1"></i>WhatsApp</button>
                 <button onclick="launchSocialShare('tg')" class="bg-sky-600 text-white py-2.5 rounded-xl text-xs font-bold"><i class="fa-brands fa-telegram mr-1"></i>Telegram</button>
