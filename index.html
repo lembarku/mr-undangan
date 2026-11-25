@@ -65,12 +65,10 @@
             }
         }
 
-        /* Sembunyikan titik indikator banner */
         #promo-banner-dots {
             display: none !important;
         }
 
-        /* Tombol titik 3 disembunyikan saat di beranda utama */
         body.in-home #header-dots-btn {
             display: none !important;
         }
@@ -104,7 +102,6 @@
             overscroll-behavior: contain;
         }
 
-        /* Toggle Switch Privasi Gaya iOS */
         .lbk-switch {
             position: relative;
             display: inline-flex;
@@ -146,7 +143,6 @@
             transform: translateX(20px);
         }
 
-        /* Kartu Mini Sampul Jadi Undangan di Beranda */
         .mini-inv-cover-stage {
             position: relative;
             aspect-ratio: 3 / 4.25;
@@ -252,7 +248,7 @@
                 <div class="space-y-1.5">
                     <h3 class="font-extrabold text-base">Pasang Aplikasi Lembarku</h3>
                     <p class="text-xs app-muted leading-relaxed">
-                        Ukuran aplikasi <strong>sangat kecil &amp; super ringan</strong>, terintegrasi penuh dengan <strong>Titik Gowes</strong>.
+                        Ukuran aplikasi <strong>sangat kecil &amp; super ringan</strong>, terintegrasi penuh dengan rental sepeda <strong>Titik Gowes</strong>.
                     </p>
                 </div>
                 <div class="app-card-soft border rounded-2xl p-3 text-left text-[11px] space-y-1.5">
@@ -334,7 +330,7 @@
 
     <!-- HEADER DINAMIS DENGAN TOMBOL THREADS & LONCENG DI KIRI FOTO PROFIL -->
     <header class="app-header w-full px-3 sm:px-6 md:px-8 py-2.5 sm:py-3 backdrop-blur-md border-b flex justify-between items-center sticky top-0 z-40 shadow-sm">
-        <!-- Kiri: Tombol Garis 2 Threads + Logo & Brand Dinamis -->
+        <!-- Kiri: Tombol Garis 2 Threads (Hanya Beranda) + Logo & Brand Dinamis -->
         <div class="flex items-center space-x-2.5">
             <button id="header-threads-btn" type="button" onclick="toggleEcosystemDrawer(true)" class="threads-bars-btn" title="Pilih Layanan (Lembarku / Titik Gowes)">
                 <span class="t-bar"></span>
@@ -349,18 +345,16 @@
             </div>
         </div>
 
-        <!-- Kanan: [ 🔔 Lonceng Notifikasi ] -> [ 👤 Foto Profil ] -> [ ⋮ Titik 3 Pengaturan ] -->
+        <!-- Kanan: [ 🔔 Lonceng ] -> [ 👤 Profil / Tombol Masuk ] -> [ ⋮ Titik 3 ] -->
         <div class="flex items-center gap-2">
-            <!-- 1. Lonceng Notifikasi tepat di sebelah kiri foto profil -->
             <button id="header-notif-btn" type="button" onclick="openNotificationsFullscreen()" class="hide relative w-9 h-9 rounded-full app-card-soft border gold-border app-accent flex items-center justify-center hover:brightness-95 active:scale-95 transition" title="Notifikasi">
                 <i class="fa-regular fa-bell text-sm"></i>
                 <span id="header-notif-badge" class="hide absolute -top-1 -right-1 min-w-[18px] h-[18px] px-1 rounded-full bg-red-500 text-white text-[9px] font-extrabold flex items-center justify-center border-2 border-[var(--app-card)]">0</span>
             </button>
 
-            <!-- 2. Foto Profil Avatar / Tombol Masuk Akun -->
+            <!-- Foto Profil Avatar atau Tombol Masuk di Kanan Atas -->
             <div id="header-actions" class="flex items-center gap-2"></div>
 
-            <!-- 3. Titik 3 Pengaturan -->
             <button id="header-dots-btn" type="button" onclick="toggleSlideMenu(true)" class="w-9 h-9 rounded-full app-card-soft border gold-border app-accent flex items-center justify-center hover:brightness-95 active:scale-95 transition" title="Opsi &amp; Pengaturan">
                 <i class="fa-solid fa-ellipsis-vertical text-sm"></i>
             </button>
@@ -465,100 +459,109 @@
         </section>
 
         <!-- ========================================================= -->
-        <!-- 2. BERANDA / LANDING PAGE TITIK GOWES (RENTAL SEPEDA)     -->
+        <!-- 2. BERANDA TITIK GOWES (SHOWCASE 3:4 & BANNER 16:5 BARU)  -->
         <!-- ========================================================= -->
         <section id="view-gowes" class="hide space-y-5">
-            <!-- Hero Banner Titik Gowes -->
-            <div class="promo-banner-fullbleed shadow-sm">
-                <div class="w-full h-full relative flex items-end sm:items-center px-4 py-3.5 md:px-14 select-none">
-                    <img src="https://images.unsplash.com/photo-1517649763962-0c623266ddc0?auto=format&fit=crop&w=1200&q=75" class="absolute inset-0 w-full h-full object-cover opacity-70">
-                    <div class="absolute inset-0 bg-gradient-to-r from-emerald-950/90 via-black/60 to-black/30"></div>
-                    <div class="relative z-10 max-w-xl space-y-1 sm:space-y-2 text-white">
-                        <span class="inline-block px-2.5 py-0.5 rounded-full bg-emerald-500 text-white font-extrabold text-[9px] uppercase tracking-wider shadow">RENTAL SEPEDA TERBAIK</span>
-                        <h2 class="text-base sm:text-2xl md:text-3xl font-extrabold leading-tight drop-shadow">Gowes Sehat, Nyaman &amp; Bebas Ribet</h2>
-                        <p class="text-[10px] sm:text-xs text-zinc-200 line-clamp-2 max-w-md">Unit terawat, siap pakai, gratis helm &amp; kunci pengaman. Booking instan via QRIS DANA.</p>
-                        <button type="button" onclick="document.getElementById('sec-gowes-catalog').scrollIntoView({behavior:'smooth'})" class="inline-block mt-1 gowes-pill-btn px-4 py-2 rounded-xl text-[10px] sm:text-xs shadow-lg">
-                            <i class="fa-solid fa-bicycle mr-1.5"></i>Pilih Sepeda Sekarang
+            <!-- LAYAR TOKO TUTUP / GARASI ISTIRAHAT (DINAMIS SAKELAR) -->
+            <div id="gowes-closed-notice" class="hide gowes-closed-screen space-y-4">
+                <div class="w-16 h-16 rounded-3xl bg-amber-500/20 text-amber-400 border border-amber-400/40 flex items-center justify-center text-3xl mx-auto shadow-lg">
+                    <i class="fa-solid fa-store-slash"></i>
+                </div>
+                <div class="space-y-1.5 max-w-md mx-auto">
+                    <span class="text-[10px] uppercase font-extrabold px-3 py-1 rounded-full bg-amber-400/20 text-amber-300 tracking-widest border border-amber-400/30">PEMBERITAHUAN OPERASIONAL</span>
+                    <h3 class="text-xl font-extrabold text-white pt-1">Garasi Titik Gowes Sedang Tutup</h3>
+                    <p id="gowes-closed-desc" class="text-xs text-zinc-300 leading-relaxed"></p>
+                </div>
+                <div class="flex flex-col sm:flex-row items-center justify-center gap-2.5 pt-2 max-w-sm mx-auto">
+                    <a id="gowes-closed-wa-btn" href="#" target="_blank" class="w-full py-2.5 rounded-2xl bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-bold shadow flex items-center justify-center gap-2">
+                        <i class="fa-brands fa-whatsapp text-sm"></i> Chat Petugas Shelter
+                    </a>
+                    <button type="button" onclick="switchAppMode('lembarku')" class="w-full py-2.5 rounded-2xl bg-white/10 hover:bg-white/20 text-white text-xs font-bold border border-white/25">
+                        Beralih ke Lembarku
+                    </button>
+                </div>
+            </div>
+
+            <!-- KONTEN BERANDA NORMAL SAAT GARASI BUKA -->
+            <div id="gowes-open-content" class="space-y-5">
+                <!-- 1. BANNER MEMANJANG 16:5 (5 SLIDE SHOW AUTO-SLIDE) -->
+                <div class="gowes-banner-16-5 shadow-sm rounded-2xl">
+                    <div id="gowes-banner-track" class="w-full h-full flex transition-transform duration-700 ease-out"></div>
+                </div>
+
+                <!-- 2. SHOWCASE PILIHAN SEPEDA FULL-BLEED (3:4 SINEMATIK) -->
+                <div class="space-y-2">
+                    <div class="flex items-center justify-between px-1">
+                        <div>
+                            <span class="gowes-brand-tag !text-[8.5px]">SHOWCASE EKSKLUSIF</span>
+                            <h3 class="text-base sm:text-lg font-extrabold tracking-tight mt-0.5">Armada Pilihan Gowes</h3>
+                        </div>
+                        <span class="text-[10px] app-muted font-bold">Geser untuk melihat unit</span>
+                    </div>
+
+                    <div class="gowes-showcase-fullbleed shadow-md">
+                        <div id="gowes-showcase-track" class="gowes-showcase-track"></div>
+                    </div>
+                </div>
+
+                <!-- 3. TOMBOL TIPE SEPEDA (FILTER CEPAT) -->
+                <div class="space-y-2 pt-1">
+                    <div class="flex items-center justify-between px-1">
+                        <h4 class="text-xs font-extrabold uppercase app-muted tracking-wider">Kategori Unit Armada</h4>
+                        <span id="gowes-bike-count-badge" class="text-[10px] font-bold text-emerald-600"></span>
+                    </div>
+                    <div id="gowes-category-filters" class="flex gap-1.5 overflow-x-auto no-scrollbar pb-1 px-0.5"></div>
+                </div>
+
+                <!-- 4. TOMBOL BESAR BOOKING SEPEDA SEKARANG (CTA) -->
+                <div id="sec-gowes-booking-cta" class="pt-1">
+                    <div class="app-card border-2 border-emerald-500/50 rounded-3xl p-4 sm:p-5 shadow-md flex flex-col sm:flex-row sm:items-center justify-between gap-3.5 bg-gradient-to-r from-emerald-500/10 via-transparent to-transparent">
+                        <div class="space-y-1">
+                            <span class="text-[9px] uppercase tracking-widest font-extrabold px-2 py-0.5 rounded-full bg-emerald-500 text-white">PESAN MUDAH &amp; CEPAT</span>
+                            <h3 class="font-extrabold text-base leading-tight">Siap Menjelajah Rute Favoritmu?</h3>
+                            <p class="text-[11px] app-muted leading-relaxed">Pesan unit sekarang, tentukan durasi sewa, dan dapatkan jaminan unit terawat siap gowes.</p>
+                        </div>
+                        <button type="button" onclick="openGowesBookingModal()" class="gowes-pill-btn px-6 py-3.5 rounded-2xl text-xs uppercase tracking-wider font-extrabold shadow-lg shrink-0 flex items-center justify-center gap-2">
+                            <i class="fa-solid fa-bicycle text-sm"></i> Booking Sepeda Sekarang
                         </button>
                     </div>
                 </div>
-            </div>
 
-            <!-- Pos Shelter & Informasi Operasional Garasi -->
-            <div class="app-card border rounded-3xl p-4 sm:p-5 shadow-sm space-y-3">
-                <div class="flex flex-wrap items-center justify-between gap-3">
-                    <div class="flex items-center gap-3">
-                        <div class="w-11 h-11 rounded-2xl bg-emerald-500/15 border border-emerald-500/35 text-emerald-600 flex items-center justify-center text-lg shrink-0">
-                            <i class="fa-solid fa-location-dot"></i>
+                <!-- 5. INFORMASI POS SHELTER & PETA GARASI -->
+                <div id="sec-gowes-shelter" class="app-card border rounded-3xl p-4 sm:p-5 shadow-sm space-y-3">
+                    <div class="flex flex-wrap items-center justify-between gap-3">
+                        <div class="flex items-center gap-3">
+                            <div class="w-11 h-11 rounded-2xl bg-emerald-500/15 border border-emerald-500/35 text-emerald-600 flex items-center justify-center text-lg shrink-0">
+                                <i class="fa-solid fa-location-dot"></i>
+                            </div>
+                            <div class="min-w-0">
+                                <span class="gowes-brand-tag">POS UTAMA GARASI</span>
+                                <h3 id="gowes-shelter-name" class="font-extrabold text-sm sm:text-base mt-0.5 truncate">Titik Gowes Shelter Utama</h3>
+                                <p id="gowes-shelter-address" class="text-[11px] app-muted truncate">Jl. Mulawarman No. 88, Samarinda (Dekat Taman Kota)</p>
+                            </div>
                         </div>
-                        <div class="min-w-0">
-                            <span class="gowes-brand-tag">POS UTAMA GARASI</span>
-                            <h3 id="gowes-shelter-name" class="font-extrabold text-sm sm:text-base mt-0.5 truncate">Titik Gowes Shelter Utama</h3>
-                            <p id="gowes-shelter-address" class="text-[11px] app-muted truncate">Jl. Mulawarman No. 88, Samarinda (Dekat Taman Kota)</p>
+                        <div class="flex gap-2">
+                            <a id="gowes-shelter-map-btn" href="https://maps.google.com/?q=-0.502,117.153" target="_blank" rel="noopener noreferrer" class="gowes-pill-btn px-3.5 py-2 rounded-xl text-xs flex items-center gap-1.5 shadow">
+                                <i class="fa-solid fa-diamond-turn-right"></i> Rute Maps
+                            </a>
                         </div>
                     </div>
-                    <div class="flex gap-2">
-                        <a id="gowes-shelter-map-btn" href="https://maps.google.com/?q=-0.502,117.153" target="_blank" rel="noopener noreferrer" class="gowes-pill-btn px-3.5 py-2 rounded-xl text-xs flex items-center gap-1.5 shadow">
-                            <i class="fa-solid fa-diamond-turn-right"></i> Rute Maps
-                        </a>
+                    <div class="grid grid-cols-2 sm:grid-cols-3 gap-2 pt-2 border-t gold-border text-[11px]">
+                        <div class="flex items-center gap-1.5"><i class="fa-regular fa-clock text-emerald-600"></i><span id="gowes-hours-lbl" class="app-muted font-medium">Buka: 05.30 - 20.00 WITA</span></div>
+                        <div class="flex items-center gap-1.5"><i class="fa-solid fa-shield-halved text-emerald-600"></i><span class="app-muted font-medium">Jaminan: KTP / SIM Asli</span></div>
+                        <div class="flex items-center gap-1.5"><i class="fa-solid fa-helmet-safety text-emerald-600"></i><span class="app-muted font-medium">Gratis Helm &amp; Kunci</span></div>
                     </div>
                 </div>
-                <div class="grid grid-cols-2 sm:grid-cols-3 gap-2 pt-2 border-t gold-border text-[11px]">
-                    <div class="flex items-center gap-1.5"><i class="fa-regular fa-clock text-emerald-600"></i><span id="gowes-hours-lbl" class="app-muted font-medium">Buka: 05.30 - 20.00 WITA</span></div>
-                    <div class="flex items-center gap-1.5"><i class="fa-solid fa-shield-halved text-emerald-600"></i><span class="app-muted font-medium">Jaminan: KTP / SIM Asli</span></div>
-                    <div class="flex items-center gap-1.5"><i class="fa-solid fa-helmet-safety text-emerald-600"></i><span class="app-muted font-medium">Gratis Helm &amp; Kunci</span></div>
-                </div>
+
+                <footer class="app-card border rounded-3xl p-6 space-y-4 shadow-sm text-center">
+                    <div class="flex items-center justify-center gap-2.5">
+                        <img src="./titik-gowes-logo.png" class="w-8 h-8 rounded-xl bg-white p-1 object-contain border border-black/10" onerror="this.src='./lembarku-logo.png'">
+                        <span class="font-extrabold text-sm">Titik Gowes Indonesia</span>
+                    </div>
+                    <p class="text-[11px] app-muted max-w-md mx-auto">Solusi penyewaan sepeda premium untuk rekreasi santai, latihan olahraga, maupun keliling kota bebas polusi.</p>
+                    <p class="text-[10px] app-muted">&copy; 2026 Titik Gowes. Bagian dari ekosistem Lembarku.</p>
+                </footer>
             </div>
-
-            <!-- Etalase Armada Sepeda -->
-            <div id="sec-gowes-catalog" class="space-y-3.5 pt-1">
-                <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-2.5">
-                    <div>
-                        <h2 class="text-lg md:text-xl font-extrabold">Armada Sepeda Siap Gowes</h2>
-                        <p class="text-[11px] app-muted">Pilih durasi sewa fleksibel: 2 Jam, 6 Jam, atau Seharian Penuh</p>
-                    </div>
-                    <!-- Filter Kategori Tipe Sepeda -->
-                    <div id="gowes-type-filter-tabs" class="flex gap-1.5 overflow-x-auto no-scrollbar pb-0.5">
-                        <button type="button" onclick="filterGowesBikes('all')" data-gt="all" class="gowes-filter-btn active">Semua Unit</button>
-                        <button type="button" onclick="filterGowesBikes('MTB (Gunung)')" data-gt="MTB (Gunung)" class="gowes-filter-btn">MTB (Gunung)</button>
-                        <button type="button" onclick="filterGowesBikes('Roadbike (Balap)')" data-gt="Roadbike (Balap)" class="gowes-filter-btn">Roadbike (Balap)</button>
-                        <button type="button" onclick="filterGowesBikes('Sepeda Lipat (Folding)')" data-gt="Sepeda Lipat (Folding)" class="gowes-filter-btn">Sepeda Lipat</button>
-                    </div>
-                </div>
-
-                <!-- Grid Kartu Sepeda -->
-                <div id="gowes-bikes-container" class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4"></div>
-            </div>
-
-            <!-- Syarat & Ketentuan Sewa Praktis -->
-            <div class="app-card border rounded-3xl p-5 space-y-3 shadow-sm">
-                <h3 class="font-extrabold text-sm flex items-center gap-2">
-                    <i class="fa-solid fa-circle-check text-emerald-600"></i> Cara Mudah Sewa Sepeda di Titik Gowes
-                </h3>
-                <div class="grid grid-cols-1 sm:grid-cols-3 gap-3 text-xs">
-                    <div class="app-card-soft border rounded-2xl p-3.5 space-y-1">
-                        <strong class="text-emerald-600 block">1. Pilih Unit &amp; Waktu</strong>
-                        <p class="text-[11px] app-muted">Tentukan sepeda pilihanmu, paket durasi, serta jam mulai ambil di shelter.</p>
-                    </div>
-                    <div class="app-card-soft border rounded-2xl p-3.5 space-y-1">
-                        <strong class="text-emerald-600 block">2. Bayar QRIS &amp; Upload KTP</strong>
-                        <p class="text-[11px] app-muted">Scan QRIS DANA Bisnis resmi dan lampirkan foto KTP penjamin dengan aman.</p>
-                    </div>
-                    <div class="app-card-soft border rounded-2xl p-3.5 space-y-1">
-                        <strong class="text-emerald-600 block">3. Ambil Unit &amp; Gowes!</strong>
-                        <p class="text-[11px] app-muted">Kunjungi shelter, cek fisik sepeda bersama tim kami, lalu nikmati perjalananmu.</p>
-                    </div>
-                </div>
-            </div>
-
-            <footer class="app-card border rounded-3xl p-6 space-y-4 shadow-sm text-center">
-                <div class="flex items-center justify-center gap-2.5">
-                    <img src="./titik-gowes-logo.png" class="w-8 h-8 rounded-xl bg-white p-1 object-contain border border-black/10" onerror="this.src='./lembarku-logo.png'">
-                    <span class="font-extrabold text-sm">Titik Gowes Indonesia</span>
-                </div>
-                <p class="text-[11px] app-muted max-w-md mx-auto">Solusi penyewaan sepeda premium untuk rekreasi santai, latihan olahraga, maupun keliling kota bebas polusi.</p>
-                <p class="text-[10px] app-muted">&copy; 2026 Titik Gowes. Bagian dari ekosistem Lembarku.</p>
-            </footer>
         </section>
 
         <!-- ========================================================= -->
@@ -1150,8 +1153,45 @@
         </div>
     </div>
 
+    <span id="drawer-eco-role" class="text-[10px] app-muted block truncate">Masuk akun untuk akses penuh</span>
+                    </div>
+                </div>
+
+                <div onclick="switchAppMode('lembarku')" id="eco-opt-lembarku" class="ecosystem-item-card is-active">
+                    <div class="w-12 h-12 rounded-2xl bg-blue-500/15 border border-blue-500/35 flex items-center justify-center text-xl text-blue-600 shrink-0">
+                        <img src="./lembarku-logo.png" class="w-7 h-7 object-contain" onerror="this.style.display='none'">
+                    </div>
+                    <div class="flex-1 min-w-0">
+                        <div class="flex items-center justify-between">
+                            <strong class="text-sm font-extrabold">Lembarku</strong>
+                            <i id="eco-chk-lembarku" class="fa-solid fa-circle-check text-blue-600 text-sm"></i>
+                        </div>
+                        <p class="text-[11px] app-muted leading-tight mt-0.5">Undangan Digital, CV &amp; Surat Lamaran Siap PDF</p>
+                    </div>
+                </div>
+
+                <div onclick="switchAppMode('titik_gowes')" id="eco-opt-gowes" class="ecosystem-item-card">
+                    <div class="w-12 h-12 rounded-2xl bg-emerald-500/15 border border-emerald-500/35 flex items-center justify-center text-xl text-emerald-600 shrink-0">
+                        <img src="./titik-gowes-logo.png" class="w-7 h-7 object-contain" onerror="this.src='./lembarku-logo.png'">
+                    </div>
+                    <div class="flex-1 min-w-0">
+                        <div class="flex items-center justify-between">
+                            <strong class="text-sm font-extrabold">Titik Gowes</strong>
+                            <i id="eco-chk-gowes" class="hide fa-solid fa-circle-check text-emerald-600 text-sm"></i>
+                        </div>
+                        <p class="text-[11px] app-muted leading-tight mt-0.5">Rental Sepeda Premium, Aksesoris &amp; Rute Gowes</p>
+                    </div>
+                </div>
+            </div>
+
+            <div class="p-4 border-t gold-border text-center text-[10px] app-muted">
+                Versi V14.3 • Terintegrasi Penuh
+            </div>
+        </div>
+    </div>
+
     <!-- ========================================================= -->
-    <!-- MODAL BOOKING SEWA SEPEDA TITIK GOWES                     -->
+    <!-- MODAL FORMULIR SEWA SEPEDA TITIK GOWES (STEPPER [-] 1 [+]) -->
     <!-- ========================================================= -->
     <div id="modal-gowes-booking" class="hide fixed inset-0 z-[140] bg-black/85 backdrop-blur-sm flex items-center justify-center p-3 sm:p-4">
         <form onsubmit="submitGowesRentalBooking(event)" class="app-card border rounded-3xl max-w-lg w-full max-h-[92vh] flex flex-col overflow-hidden shadow-2xl">
@@ -1160,98 +1200,189 @@
                     <span class="w-8 h-8 rounded-xl bg-emerald-500/15 text-emerald-600 flex items-center justify-center text-sm"><i class="fa-solid fa-bicycle"></i></span>
                     <div>
                         <h3 class="font-extrabold text-sm sm:text-base leading-tight">Formulir Sewa Sepeda</h3>
-                        <p id="gw-modal-bike-title" class="text-[10px] app-muted truncate">Pilih durasi &amp; verifikasi data sewa</p>
+                        <p class="text-[10px] app-muted">Isi identitas, pilih unit &amp; durasi sewa</p>
                     </div>
                 </div>
                 <button type="button" onclick="closeGowesBookingModal()" class="w-8 h-8 rounded-full app-btn-sec flex items-center justify-center text-xs"><i class="fa-solid fa-xmark"></i></button>
             </div>
 
             <div class="p-5 overflow-y-auto space-y-4 flex-1">
-                <input type="hidden" id="gw-book-bike-id">
-
-                <div class="app-card-soft border rounded-2xl p-3.5 flex items-center gap-3">
-                    <img id="gw-book-bike-img" src="" class="w-16 h-16 rounded-xl object-cover bg-black border gold-border shrink-0">
-                    <div class="min-w-0 flex-1 space-y-0.5">
-                        <span id="gw-book-bike-type" class="gowes-brand-tag !text-[9px]">MTB</span>
-                        <h4 id="gw-book-bike-name" class="font-extrabold text-sm truncate">Polygon Xtrada 6</h4>
-                        <p id="gw-book-bike-specs" class="text-[10px] app-muted truncate">Ukuran M • 11 Speed</p>
-                    </div>
-                </div>
-
-                <div class="space-y-1.5">
-                    <label class="app-label">1. Pilih Paket Durasi Sewa:</label>
-                    <div class="grid grid-cols-3 gap-2">
-                        <label class="cursor-pointer">
-                            <input type="radio" name="gw_duration" value="2_hours" checked onchange="updateGowesBookingPriceCalc()" class="hide peer">
-                            <div class="app-card border rounded-2xl p-2.5 text-center peer-checked:border-emerald-500 peer-checked:bg-emerald-500/10 transition">
-                                <span class="text-[10px] font-bold block app-muted">Paket 2 Jam</span>
-                                <strong id="gw-rate-2h" class="text-xs font-extrabold text-emerald-600 block mt-0.5">Rp 40.000</strong>
-                            </div>
-                        </label>
-                        <label class="cursor-pointer">
-                            <input type="radio" name="gw_duration" value="6_hours" onchange="updateGowesBookingPriceCalc()" class="hide peer">
-                            <div class="app-card border rounded-2xl p-2.5 text-center peer-checked:border-emerald-500 peer-checked:bg-emerald-500/10 transition">
-                                <span class="text-[10px] font-bold block app-muted">Paket 6 Jam</span>
-                                <strong id="gw-rate-6h" class="text-xs font-extrabold text-emerald-600 block mt-0.5">Rp 75.000</strong>
-                            </div>
-                        </label>
-                        <label class="cursor-pointer">
-                            <input type="radio" name="gw_duration" value="full_day" onchange="updateGowesBookingPriceCalc()" class="hide peer">
-                            <div class="app-card border rounded-2xl p-2.5 text-center peer-checked:border-emerald-500 peer-checked:bg-emerald-500/10 transition">
-                                <span class="text-[10px] font-bold block app-muted">Full Day</span>
-                                <strong id="gw-rate-fullday" class="text-xs font-extrabold text-emerald-600 block mt-0.5">Rp 120.000</strong>
-                            </div>
-                        </label>
-                    </div>
-                </div>
-
-                <div class="grid grid-cols-2 gap-2.5">
-                    <div>
-                        <label class="app-label">Tanggal Sewa</label>
-                        <input type="date" id="gw-book-date" class="app-input" required>
-                    </div>
-                    <div>
-                        <label class="app-label">Jam Ambil Sepeda</label>
-                        <input type="time" id="gw-book-time" class="app-input" required>
-                    </div>
-                </div>
-
+                <!-- 1. Identitas Pemesan -->
                 <div class="space-y-2.5">
-                    <label class="app-label !mb-0">2. Data Diri &amp; Kontak WhatsApp:</label>
-                    <input type="tel" id="gw-book-phone" placeholder="No. WhatsApp Aktif (0812...)" class="app-input" required>
-                    <input type="text" id="gw-book-address" placeholder="Alamat Domisili Sekarang" class="app-input" required>
+                    <label class="app-label !mb-0 text-emerald-600 font-extrabold">1. Identitas Pemesan</label>
+                    <div>
+                        <label class="app-label">Nama Lengkap</label>
+                        <input type="text" id="gw-book-name" placeholder="Nama lengkap Anda" class="app-input" required>
+                    </div>
+                    <div class="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
+                        <div>
+                            <label class="app-label">No. WhatsApp Aktif</label>
+                            <input type="tel" id="gw-book-phone" placeholder="08xxxxxxxxxx" class="app-input" required>
+                        </div>
+                        <div>
+                            <label class="app-label">Alamat Domisili</label>
+                            <input type="text" id="gw-book-address" placeholder="Kota / Alamat sekarang" class="app-input" required>
+                        </div>
+                    </div>
                 </div>
 
-                <div class="app-card-soft border rounded-2xl p-3.5 space-y-2">
+                <!-- 2. Jadwal & Stepper Jumlah Sepeda -->
+                <div class="space-y-2.5 border-t gold-border pt-3">
+                    <label class="app-label !mb-0 text-emerald-600 font-extrabold">2. Jadwal &amp; Jumlah Sepeda</label>
+                    <div class="grid grid-cols-2 gap-2.5">
+                        <div>
+                            <label class="app-label">Tanggal Sewa</label>
+                            <input type="date" id="gw-book-date" onchange="updateGowesReturnEstimate()" class="app-input" required>
+                        </div>
+                        <div>
+                            <label class="app-label">Jam Ambil</label>
+                            <input type="time" id="gw-book-time" onchange="updateGowesReturnEstimate()" class="app-input" required>
+                        </div>
+                    </div>
+
+                    <!-- Stepper Jumlah Sepeda [-] 1 [+] -->
+                    <div class="flex items-center justify-between app-card-soft border rounded-2xl p-3">
+                        <div>
+                            <span class="text-xs font-bold block">Jumlah Sepeda Dipesan</span>
+                            <span class="text-[10px] app-muted">Pesan lebih dari 1 unit sekaligus</span>
+                        </div>
+                        <div class="flex items-center gap-3">
+                            <button type="button" onclick="changeBookingBikeQty(-1)" class="gowes-stepper-btn" title="Kurangi">–</button>
+                            <span id="gw-book-qty-lbl" class="font-extrabold text-base min-w-[24px] text-center text-emerald-600">1</span>
+                            <input type="hidden" id="gw-book-qty" value="1">
+                            <button type="button" onclick="changeBookingBikeQty(1)" class="gowes-stepper-btn" title="Tambah">+</button>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- 3. Pilihan Unit Sepeda & Paket Durasi -->
+                <div class="space-y-2.5 border-t gold-border pt-3">
+                    <label class="app-label !mb-0 text-emerald-600 font-extrabold">3. Pilih Unit &amp; Durasi</label>
+                    <div>
+                        <label class="app-label">Pilih Unit Sepeda</label>
+                        <select id="gw-book-bike-select" onchange="onBookingBikeSelectChange(this.value)" class="app-input font-bold" required></select>
+                    </div>
+
+                    <div class="space-y-1.5">
+                        <label class="app-label">Paket Durasi Sewa:</label>
+                        <div class="grid grid-cols-3 gap-2">
+                            <label class="cursor-pointer">
+                                <input type="radio" name="gw_duration" value="2_hours" checked onchange="updateGowesBookingPriceCalc()" class="hide peer">
+                                <div class="app-card border rounded-2xl p-2.5 text-center peer-checked:border-emerald-500 peer-checked:bg-emerald-500/10 transition">
+                                    <span class="text-[10px] font-bold block app-muted">Paket 2 Jam</span>
+                                    <strong id="gw-rate-2h" class="text-xs font-extrabold text-emerald-600 block mt-0.5">Rp 40.000</strong>
+                                </div>
+                            </label>
+                            <label class="cursor-pointer">
+                                <input type="radio" name="gw_duration" value="6_hours" onchange="updateGowesBookingPriceCalc()" class="hide peer">
+                                <div class="app-card border rounded-2xl p-2.5 text-center peer-checked:border-emerald-500 peer-checked:bg-emerald-500/10 transition">
+                                    <span class="text-[10px] font-bold block app-muted">Paket 6 Jam</span>
+                                    <strong id="gw-rate-6h" class="text-xs font-extrabold text-emerald-600 block mt-0.5">Rp 75.000</strong>
+                                </div>
+                            </label>
+                            <label class="cursor-pointer">
+                                <input type="radio" name="gw_duration" value="full_day" onchange="updateGowesBookingPriceCalc()" class="hide peer">
+                                <div class="app-card border rounded-2xl p-2.5 text-center peer-checked:border-emerald-500 peer-checked:bg-emerald-500/10 transition">
+                                    <span class="text-[10px] font-bold block app-muted">Full Day</span>
+                                    <strong id="gw-rate-fullday" class="text-xs font-extrabold text-emerald-600 block mt-0.5">Rp 120.000</strong>
+                                </div>
+                            </label>
+                        </div>
+                    </div>
+
+                    <!-- Estimasi Jam Pengembalian Otomatis -->
+                    <div id="gw-return-estimate" class="text-[11px] text-emerald-700 bg-emerald-500/10 border border-emerald-500/30 rounded-xl p-2.5 font-semibold flex items-center gap-2">
+                        <i class="fa-regular fa-clock text-emerald-600"></i>
+                        <span id="gw-return-estimate-text">Pilih jam ambil untuk melihat perkiraan batas kembali</span>
+                    </div>
+                </div>
+
+                <!-- 4. Upload KTP Penjamin & Catatan -->
+                <div class="space-y-2.5 border-t gold-border pt-3">
                     <div class="flex items-center justify-between">
-                        <label class="app-label !mb-0 text-emerald-600 font-extrabold"><i class="fa-solid fa-id-card mr-1"></i>3. Upload Foto KTP / SIM Penjamin</label>
+                        <label class="app-label !mb-0 text-emerald-600 font-extrabold"><i class="fa-solid fa-id-card mr-1"></i>4. Foto KTP / SIM Penjamin</label>
                         <span class="text-[9px] px-2 py-0.5 rounded bg-emerald-500/15 text-emerald-600 font-bold">Wajib</span>
                     </div>
-                    <p class="text-[10px] app-muted">Foto fisik KTP asli wajib ditunjukkan kembali ke petugas saat serah terima unit di shelter.</p>
                     <label class="block gowes-pill-btn py-2.5 rounded-xl text-center text-xs cursor-pointer shadow">
-                        <i class="fa-solid fa-camera mr-1.5"></i>Pilih / Foto KTP Anda
+                        <i class="fa-solid fa-camera mr-1.5"></i>Pilih / Foto KTP Penjamin
                         <input type="file" id="gw-ktp-input" accept="image/*" class="hide" onchange="handleGowesKtpPick(this)">
                     </label>
                     <img id="gw-ktp-preview" class="hide w-full max-h-36 object-contain rounded-xl border border-emerald-500/40 bg-black/10 mx-auto">
-                </div>
-
-                <div>
-                    <label class="app-label">Catatan Tambahan (Opsional)</label>
-                    <input type="text" id="gw-book-note" placeholder="Misal: Perlu helm ukuran besar / tas depan..." class="app-input">
-                </div>
-
-                <div class="app-card-soft border-2 border-emerald-500/40 rounded-2xl p-3 flex items-center justify-between text-xs">
+                    
                     <div>
-                        <span class="app-muted block text-[10px]">Total Estimasi Sewa:</span>
-                        <strong id="gw-book-total-calc" class="text-base text-emerald-600 font-extrabold">Rp 40.000</strong>
+                        <label class="app-label">Catatan Tambahan (Opsional)</label>
+                        <input type="text" id="gw-book-note" placeholder="Misal: Helm ukuran L, pasang tas depan..." class="app-input">
                     </div>
-                    <span class="text-[10px] app-muted">+ Termasuk helm &amp; kunci</span>
+                </div>
+
+                <!-- Total Kalkulasi -->
+                <div class="app-card-soft border-2 border-emerald-500/40 rounded-2xl p-3.5 flex items-center justify-between text-xs">
+                    <div>
+                        <span class="app-muted block text-[10px]">Total Pembayaran Sewa:</span>
+                        <strong id="gw-book-total-calc" class="text-lg text-emerald-600 font-extrabold">Rp 40.000</strong>
+                    </div>
+                    <span class="text-[10px] app-muted text-right">Gratis helm &amp; kunci<br>per sepeda</span>
                 </div>
             </div>
 
             <div class="px-5 py-3 border-t gold-border flex justify-end gap-2.5 shrink-0">
                 <button type="button" onclick="closeGowesBookingModal()" class="px-5 py-2.5 rounded-xl app-btn-sec text-xs font-bold">Batal</button>
                 <button type="submit" id="btn-submit-gw-booking" class="gowes-pill-btn px-7 py-2.5 rounded-xl text-xs uppercase shadow-lg">Lanjut Bayar QRIS</button>
+            </div>
+        </form>
+    </div>
+
+    <!-- ========================================================= -->
+    <!-- MODAL PENGATURAN STATUS OPERASIONAL GARASI (TOKO TUTUP)   -->
+    <!-- ========================================================= -->
+    <div id="modal-gowes-shelter-ops" class="hide fixed inset-0 z-[142] bg-black/85 backdrop-blur-sm flex items-center justify-center p-3 sm:p-4">
+        <form onsubmit="submitGowesShelterOps(event)" class="app-card border rounded-3xl max-w-md w-full p-6 space-y-4 shadow-2xl">
+            <div class="flex items-center justify-between border-b gold-border pb-3">
+                <div class="flex items-center gap-2.5">
+                    <span class="w-8 h-8 rounded-xl bg-emerald-500/15 text-emerald-600 flex items-center justify-center text-sm"><i class="fa-solid fa-store"></i></span>
+                    <div>
+                        <h3 class="font-extrabold text-sm sm:text-base leading-tight">Operasional Garasi</h3>
+                        <p class="text-[10px] app-muted">Founder &amp; Tim Administrasi</p>
+                    </div>
+                </div>
+                <button type="button" onclick="document.getElementById('modal-gowes-shelter-ops').classList.add('hide')" class="w-8 h-8 rounded-full app-btn-sec flex items-center justify-center text-xs"><i class="fa-solid fa-xmark"></i></button>
+            </div>
+
+            <div class="app-card-soft border rounded-2xl p-4 space-y-3">
+                <div class="flex items-center justify-between gap-3">
+                    <div>
+                        <strong class="text-xs block">Status Operasional Shelter</strong>
+                        <span class="text-[10px] app-muted block">Jika ditutup, beranda Titik Gowes akan menampilkan pengumuman toko tutup sementara.</span>
+                    </div>
+                    <label class="lbk-switch">
+                        <input type="checkbox" id="gso-is-closed-toggle" onchange="toggleShelterClosedReasonField(this.checked)">
+                        <span class="lbk-switch-track"></span>
+                    </label>
+                </div>
+                <div id="gso-status-indicator" class="text-[11px] font-bold text-emerald-600 pt-1">
+                    ● Status: Garasi BUKA &amp; Melayani Rental
+                </div>
+            </div>
+
+            <div id="gso-reason-wrap" class="space-y-1.5">
+                <label class="app-label">Pesan / Alasan Toko Tutup Sementara</label>
+                <textarea id="gso-closed-reason" class="app-input h-24 text-xs" placeholder="Misal: Cuaca hujan lebat di rute kota / Garasi sedang istirahat. Buka kembali besok pukul 05.30 WITA..."></textarea>
+            </div>
+
+            <div class="grid grid-cols-2 gap-2.5">
+                <div>
+                    <label class="app-label">Jam Operasional</label>
+                    <input type="text" id="gso-hours" placeholder="05.30 - 20.00 WITA" class="app-input text-xs">
+                </div>
+                <div>
+                    <label class="app-label">No. WhatsApp CS Shelter</label>
+                    <input type="tel" id="gso-cs-phone" placeholder="08xxxxxxxxxx" class="app-input text-xs">
+                </div>
+            </div>
+
+            <div class="flex gap-2.5 pt-1">
+                <button type="button" onclick="document.getElementById('modal-gowes-shelter-ops').classList.add('hide')" class="flex-1 py-2.5 rounded-xl app-btn-sec text-xs font-bold">Batal</button>
+                <button type="submit" id="btn-save-gso" class="flex-1 gowes-pill-btn py-2.5 rounded-xl text-xs uppercase shadow-lg">Simpan Status</button>
             </div>
         </form>
     </div>
@@ -1291,7 +1422,8 @@
                             <option value="MTB (Gunung)">MTB (Gunung)</option>
                             <option value="Roadbike (Balap)">Roadbike (Balap)</option>
                             <option value="Sepeda Lipat (Folding)">Sepeda Lipat (Folding)</option>
-                            <option value="E-Bike (Listrik)">E-Bike (Listrik)</option>
+                            <option value="Fixie">Fixie</option>
+                            <option value="Touring">Touring / Gravel</option>
                             <option value="City Bike (Santai)">City Bike (Santai)</option>
                         </select>
                     </div>
@@ -1343,7 +1475,7 @@
 
                 <div>
                     <label class="app-label">Deskripsi &amp; Keunggulan Unit</label>
-                    <textarea id="mgb-desc" placeholder="Jelaskan kondisi unit, kenyamanan suspensi, rute yang cocok..." class="app-input h-20"></textarea>
+                    <textarea id="mgb-desc" placeholder="Jelaskan kenyamanan suspensi, rem, atau rute yang cocok..." class="app-input h-20"></textarea>
                 </div>
             </div>
 
@@ -1711,7 +1843,7 @@
     </div>
 
     <!-- ========================================================= -->
-    <!-- MODALS                                                    -->
+    <!-- MODALS UTILITY & WORKSPACE LEMBARKU                       -->
     <!-- ========================================================= -->
 
     <div id="modal-create-choice" class="hide fixed inset-0 z-[80] bg-black/75 backdrop-blur-sm flex items-center justify-center p-4">
@@ -1724,7 +1856,7 @@
                 <button onclick="chooseCreateDoc('undangan')" class="menu-row-card"><span class="menu-row-ic"><i class="fa-solid fa-envelope-open-text"></i></span><div class="flex-1"><strong class="text-xs block">Undangan Digital</strong><span class="text-[10px] app-muted">Pernikahan, Ultah, Aqiqah, Syukuran, Lainnya</span></div><i class="fa-solid fa-chevron-right text-xs app-muted"></i></button>
                 <button onclick="chooseCreateDoc('cv')" class="menu-row-card"><span class="menu-row-ic"><i class="fa-solid fa-id-card"></i></span><div class="flex-1"><strong class="text-xs block">Curriculum Vitae (CV)</strong><span class="text-[10px] app-muted">9 desain profesional + Auto-Scan gabung PDF</span></div><i class="fa-solid fa-chevron-right text-xs app-muted"></i></button>
                 <button onclick="chooseCreateDoc('lamaran')" class="menu-row-card"><span class="menu-row-ic"><i class="fa-solid fa-file-signature"></i></span><div class="flex-1"><strong class="text-xs block">Surat Lamaran Kerja</strong><span class="text-[10px] app-muted">Format resmi siap HRD + gabung lampiran PDF</span></div><i class="fa-solid fa-chevron-right text-xs app-muted"></i></button>
-                <button onclick="document.getElementById('modal-create-choice').classList.add('hide');switchAppMode('titik_gowes');" class="menu-row-card"><span class="menu-row-ic !bg-emerald-500/15 !text-emerald-600"><i class="fa-solid fa-bicycle"></i></span><div class="flex-1"><strong class="text-xs block">Sewa Sepeda (Titik Gowes)</strong><span class="text-[10px] app-muted">Booking unit MTB, Roadbike &amp; Sepeda Lipat</span></div><i class="fa-solid fa-chevron-right text-xs app-muted"></i></button>
+                <button onclick="chooseCreateDoc('gowes')" class="menu-row-card"><span class="menu-row-ic !bg-emerald-500/15 !text-emerald-600"><i class="fa-solid fa-bicycle"></i></span><div class="flex-1"><strong class="text-xs block">Sewa Sepeda (Titik Gowes)</strong><span class="text-[10px] app-muted">Booking unit MTB, Roadbike &amp; Sepeda Lipat</span></div><i class="fa-solid fa-chevron-right text-xs app-muted"></i></button>
                 <button disabled class="menu-row-card opacity-50 cursor-not-allowed"><span class="menu-row-ic"><i class="fa-solid fa-award"></i></span><div class="flex-1"><strong class="text-xs block">Sertifikat &amp; Piagam</strong><span class="text-[10px] app-muted">Segera Hadir (Proyek Berikutnya)</span></div><span class="text-[9px] px-2 py-0.5 rounded-full app-btn-sec font-bold">SOON</span></button>
             </div>
         </div>
@@ -2050,7 +2182,7 @@
         </form>
     </div>
 
-    <!-- MODAL LIVE CHAT LAYAR PENUH + TOMBOL + KONTAK BARU & HAPUS HISTORY -->
+    <!-- MODAL LIVE CHAT LAYAR PENUH -->
     <div id="full-chat-overlay" class="hide fixed inset-0 z-[75] bg-black/80 backdrop-blur-md flex items-center justify-center p-0 sm:p-4">
         <div class="app-card w-full max-w-3xl h-full sm:h-[88vh] sm:rounded-3xl border flex flex-col overflow-hidden shadow-2xl relative">
             <div class="gold-gradient px-5 py-3.5 flex items-center justify-between shrink-0">
@@ -2067,7 +2199,7 @@
             <div class="px-4 py-2 app-card border-t gold-border flex items-center justify-between text-[10px] app-muted shrink-0">
                 <div class="flex items-center gap-2">
                     <img src="./lembarku-logo.png" class="w-5 h-5 rounded bg-white p-0.5 object-contain border border-black/10" onerror="this.style.display='none'">
-                    <span class="font-extrabold app-accent tracking-wide">Lembarku</span>
+                    <span class="font-extrabold app-accent tracking-wide">Lembarku &amp; Titik Gowes</span>
                     <span class="hidden sm:inline">• Layanan Resmi</span>
                 </div>
                 <span class="opacity-0 pointer-events-none select-none">Hosted</span>
