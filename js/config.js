@@ -256,7 +256,7 @@ const DEFAULT_GOWES_SHELTER = {
     mapsUrl: "https://maps.google.com/?q=-0.502,117.153",
     operationalHours: "Setiap Hari: 05.30 - 20.00 WITA",
     csPhone: "085117488828",
-    isClosed: false, // Sakelar toko tutup
+    isClosed: false,
     closedReason: "Garasi Titik Gowes sedang istirahat / tutup sementara. Kami siap melayani kembali besok pukul 05.30 WITA."
 };
 
@@ -277,7 +277,7 @@ const DEFAULT_GOWES_BANNERS = [
         title: "Investasi Sehat di Setiap Kayuhan",
         subtitle: "Tingkatkan stamina kardio & bakar kalori sambil menikmati segarnya udara pagi Samarinda.",
         ctaText: "Lihat Armada",
-        targetSection: "sec-gowes-showcase",
+        targetSection: "gowes-showcase-track",
         img: "https://images.unsplash.com/photo-1517649763962-0c623266ddc0?auto=format&fit=crop&w=1200&q=75"
     },
     {
@@ -286,7 +286,7 @@ const DEFAULT_GOWES_BANNERS = [
         title: "Sewa Cepat Bebas Ribet dengan QRIS",
         subtitle: "Pilih durasi 2 jam, 6 jam, atau seharian penuh. Konfirmasi instan via QRIS DANA Bisnis.",
         ctaText: "Cek Tarif Paket",
-        targetSection: "sec-gowes-showcase",
+        targetSection: "gowes-showcase-track",
         img: "https://images.unsplash.com/photo-1532298229144-0ec0c57515c7?auto=format&fit=crop&w=1200&q=75"
     },
     {
@@ -295,7 +295,7 @@ const DEFAULT_GOWES_BANNERS = [
         title: "Performa Maksimal di Setiap Tanjakan",
         subtitle: "Groupset Shimano presisi, suspensi air fork empuk & rem hidrolik pakem rutin diservis mekanik.",
         ctaText: "Pilih Sepeda",
-        targetSection: "sec-gowes-showcase",
+        targetSection: "gowes-showcase-track",
         img: "https://images.unsplash.com/photo-1485965120184-e220f721d03e?auto=format&fit=crop&w=1200&q=75"
     },
     {
@@ -694,7 +694,6 @@ function switchAppMode(mode) {
         : "Beralih ke Lembarku (Undangan & Berkas)";
     if (typeof showToast === "function") showToast(toastMsg, "info");
 }
-
 // ================= HELPER USER, PRIVASI, BLOKIR, TEMA & HARGA =================
 function getCurrentUserObj() {
     if (!currentSessionUser) return null;
@@ -1617,3 +1616,6 @@ async function processAndUploadCroppedAudio() {
         showToast("Gagal mengunggah lagu. Pastikan koneksi stabil atau pilih durasi lebih singkat.", "error");
     }
 }
+```[cite: 6]
+
+Klik **Commit changes** di GitHub. Total baris sekarang adalah **815 baris** dan indikator merah di commit akan otomatis berubah menjadi centang hijau ✔[cite: 5, 6].
