@@ -730,22 +730,26 @@ function renderMasterWorkspaceContent() {
     }
 
     if (currentMasterWorkspace === "gowes_fleet") {
-        box.innerHTML = `
-            <div class="space-y-4">
-                <div class="flex flex-wrap items-center justify-between gap-3">
-                    <div>
-                        <h4 class="text-sm font-extrabold text-emerald-600"><i class="fa-solid fa-bicycle mr-1.5"></i>Manajemen Armada Sepeda</h4>
-                        <p class="text-[11px] app-muted">Atur unit sepeda sewaan, tarif paket, dan ketersediaan garasi.</p>
+        if (typeof renderGowesFleetWorkspaceHtml === "function") {
+            box.innerHTML = renderGowesFleetWorkspaceHtml();
+        } else {
+            box.innerHTML = `
+                <div class="space-y-4">
+                    <div class="flex flex-wrap items-center justify-between gap-3">
+                        <div>
+                            <h4 class="text-sm font-extrabold text-emerald-600"><i class="fa-solid fa-bicycle mr-1.5"></i>Manajemen Armada Sepeda</h4>
+                            <p class="text-[11px] app-muted">Atur unit sepeda sewaan, tarif paket, dan ketersediaan garasi.</p>
+                        </div>
+                        <button type="button" onclick="if(typeof openMasterGowesBikeModal==='function')openMasterGowesBikeModal()" class="gowes-pill-btn px-4 py-2 rounded-xl text-xs shadow">
+                            <i class="fa-solid fa-plus mr-1"></i>Tambah Unit Sepeda
+                        </button>
                     </div>
-                    <button type="button" onclick="if(typeof openMasterGowesBikeModal==='function')openMasterGowesBikeModal()" class="gowes-pill-btn px-4 py-2 rounded-xl text-xs shadow">
-                        <i class="fa-solid fa-plus mr-1"></i>+ Tambah Unit Sepeda
-                    </button>
+                    <div class="space-y-3">
+                        ${typeof renderGowesBikesAdminList === 'function' ? renderGowesBikesAdminList() : '<p class="text-xs app-muted">Modul armada tidak termuat. Pastikan file js/gowes-admin.js ada.</p>'}
+                    </div>
                 </div>
-                <div class="space-y-3">
-                    ${typeof renderGowesBikesAdminList === 'function' ? renderGowesBikesAdminList() : '<p class="text-xs app-muted">Memuat armada...</p>'}
-                </div>
-            </div>
-        `;
+            `;
+        }
         return;
     }
 
