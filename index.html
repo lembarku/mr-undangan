@@ -489,19 +489,14 @@
                     <div id="gowes-banner-track" class="w-full h-full flex transition-transform duration-700 ease-out"></div>
                 </div>
 
-                <!-- 2. SHOWCASE PILIHAN SEPEDA FULL-BLEED (3:4 SINEMATIK) -->
-                <div class="space-y-2">
-                    <div class="flex items-center justify-between px-1">
-                        <div>
-                            <span class="gowes-brand-tag !text-[8.5px]">SHOWCASE EKSKLUSIF</span>
-                            <h3 class="text-base sm:text-lg font-extrabold tracking-tight mt-0.5">Armada Pilihan Gowes</h3>
-                        </div>
-                        <span class="text-[10px] app-muted font-bold">Geser untuk melihat unit</span>
-                    </div>
+                <!-- 2. SHOWCASE PILIHAN SEPEDA (RASIO 4:3 ELEGAN) -->
+                <div class="space-y-2.5">
+                    <h3 class="text-base sm:text-lg font-extrabold tracking-tight text-center">Pilihan Sepeda</h3>
 
                     <div class="gowes-showcase-fullbleed shadow-md">
                         <div id="gowes-showcase-track" class="gowes-showcase-track"></div>
                     </div>
+                    <div id="gowes-showcase-dots" class="flex items-center justify-center gap-1.5 pt-0.5"></div>
                 </div>
 
                 <!-- 3. TOMBOL TIPE SEPEDA (FILTER CEPAT) -->
@@ -1148,7 +1143,7 @@
             </div>
 
             <div class="p-4 border-t gold-border text-center text-[10px] app-muted">
-                Versi V14.3 • Terintegrasi Penuh
+                Versi V14.4 • Terintegrasi Penuh
             </div>
         </div>
     </div>
@@ -1221,10 +1216,7 @@
                 <!-- 3. Pilihan Unit Sepeda & Paket Durasi -->
                 <div class="space-y-2.5 border-t gold-border pt-3">
                     <label class="app-label !mb-0 text-emerald-600 font-extrabold">3. Pilih Unit &amp; Durasi</label>
-                    <div>
-                        <label class="app-label">Pilih Unit Sepeda</label>
-                        <select id="gw-book-bike-select" onchange="onBookingBikeSelectChange(this.value)" class="app-input font-bold" required></select>
-                    </div>
+                    <div id="gw-book-bikes-container" class="space-y-2.5"></div>
 
                     <div class="space-y-1.5">
                         <label class="app-label">Paket Durasi Sewa:</label>
@@ -1633,7 +1625,7 @@
                             </ul>
                             <div class="pt-3 border-t gold-border flex items-center justify-between text-[11px]">
                                 <span class="app-muted">Versi Aplikasi</span>
-                                <span class="px-2.5 py-0.5 rounded-full app-accent-bg app-accent font-extrabold">V14.3</span>
+                                <span class="px-2.5 py-0.5 rounded-full app-accent-bg app-accent font-extrabold">V14.4</span>
                             </div>
                         </div>
                     </div>
