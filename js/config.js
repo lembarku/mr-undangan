@@ -1,6 +1,6 @@
 // =========================================================================
 // LEMBARKU & TITIK GOWES — CORE CONFIG, CATALOGS & SHARED ENGINE (js/config.js)
-// Versi: V14.3 (Bersih & Terverifikasi)
+// Versi: V14.4 (Bersih, Showcase 4:3, Multi-Sepeda & Kelola Armada Lengkap)
 // =========================================================================
 const CLOUD_API_URL = "https://script.google.com/macros/s/AKfycbyHsITJ02tiA59p0QIXkOQaO3VnBFQmDBp-7iUHcUkmrYjlOtRVwxhlGZCzL4RLKKNW/exec";
 const FOUNDER_USERNAME = "kausar.af";
@@ -260,6 +260,7 @@ const DEFAULT_GOWES_SHELTER = {
     closedReason: "Garasi Titik Gowes sedang istirahat / tutup sementara. Kami siap melayani kembali besok pukul 05.30 WITA."
 };
 
+// 5 SLIDE BANNER PROMOSI RAMPING 16:5
 const DEFAULT_GOWES_BANNERS = [
     {
         id: "gb_1",
@@ -587,13 +588,11 @@ function toggleEcosystemDrawer(show) {
     if (!el) return;
     if (show) {
         renderEcosystemDrawerUser();
-        el.classList.remove("hide");
-        requestAnimationFrame(() => el.classList.add("open"));
+        el.classList.add("open");
         if (btn) btn.classList.add("is-active");
         if (typeof mrNavPush === "function") mrNavPush({ type: "modal", id: "drawer-ecosystem" });
     } else {
         el.classList.remove("open");
-        setTimeout(() => el.classList.add("hide"), 280);
         if (btn) btn.classList.remove("is-active");
         if (typeof _mrDropTopModalById === "function") _mrDropTopModalById("drawer-ecosystem");
     }
@@ -695,7 +694,6 @@ function switchAppMode(mode) {
         : "Beralih ke Lembarku (Undangan & Berkas)";
     if (typeof showToast === "function") showToast(toastMsg, "info");
 }
-
 // ================= HELPER USER, PRIVASI, BLOKIR, TEMA & HARGA =================
 function getCurrentUserObj() {
     if (!currentSessionUser) return null;
