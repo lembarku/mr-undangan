@@ -1,10 +1,11 @@
 // =========================================================================
 // TITIK GOWES — FRONTEND RENTAL & SHOWCASE CONTROLLER (js/gowes.js)
-// Versi: V14.3 (Fixed QRIS Dynamic Integration, 5 Banner 16:5 & Stepper)
+// Versi: V14.4 (Foto 4:3 Elegan, Tanpa Badge Sewa, Multi-Sepeda & QRIS)
 // =========================================================================
 
 let gowesFilterType = "all";
 let activeBookingBike = null;
+let bookingSelectedBikeIds = [];
 let gowesKtpDraft = "";
 let gowesBannerIdx = 0;
 let gowesShowcaseIdx = 0;
@@ -60,7 +61,7 @@ function renderGowesShelterInfo() {
     if (hoursEl) hoursEl.innerText = `Buka: ${shelter.operationalHours || "05.30 - 20.00 WITA"}`;
 }
 
-// ================= 2. BANNER MEMANJANG RAMPING 16 : 5 (5 SLIDE OTOMATIS) =================
+// ================= 2. BANNER MEMANJANG RAMPING 16 : 5 =================
 function _getGowesBannersList() {
     if (Array.isArray(db.gowesBanners) && db.gowesBanners.length) return db.gowesBanners;
     return DEFAULT_GOWES_BANNERS;
@@ -121,6 +122,7 @@ function renderGowesCategoryFilters() {
 
 function filterGowesBikes(typeId) {
     gowesFilterType = typeId || "all";
+    gowesShowcaseIdx = 0;
     document.querySelectorAll(".gowes-filter-btn").forEach(btn => {
         btn.classList.toggle("active", btn.dataset.gt === gowesFilterType);
     });
@@ -132,7 +134,31 @@ function getAvailableGowesBikes() {
     return list.filter(b => b && b.status !== "Dihapus");
 }
 
-// ================= 4. SHOWCASE SEPEDA FULL-BLEED 3 : 4 (POSTER SINEMATIK) =================
+// ================= 4. SHOWCASE PILIHAN SEPEDA (FOTO 4:3 ELEGAN & DOTS) =================
+function renderGowesShowcaseDots(count) {
+    const dotsBox = document.getElementById("gowes-showcase-dots");
+    if (!dotsBox) return;
+    if (count <= 1) {
+        dotsBox.innerHTML = "";
+        return;
+    }
+    dotsBox.innerHTML = Array.from({ length: count }, (_, i) => {
+        const active = i === gowesShowcaseIdx;
+        return `<button type="button" onclick="jumpToGowesShowcaseSlide(${i})" class="gowes-dot-btn ${active ? 'w-5 bg-emerald-500' : 'w-1.5 bg-zinc-400/50'}" aria-label="Unit ${i + 1}"></button>`;
+    }).join("");
+}
+
+function jumpToGowesShowcaseSlide(idx) {
+    const track = document.getElementById("gowes-showcase-track");
+    if (!track || !track.children.length) return;
+    gowesShowcaseIdx = Math.max(0, Math.min(track.children.length - 1, idx));
+    const targetSlide = track.children[gowesShowcaseIdx];
+    if (targetSlide) {
+        track.scrollTo({ left: targetSlide.offsetLeft, behavior: "smooth" });
+    }
+    renderGowesShowcaseDots(track.children.length);
+}
+
 function renderGowesShowcaseTrack() {
     const track = document.getElementById("gowes-showcase-track");
     const countBadge = document.getElementById("gowes-bike-count-badge");
@@ -149,15 +175,17 @@ function renderGowesShowcaseTrack() {
 
     if (!bikes.length) {
         track.innerHTML = `
-            <div class="w-full py-16 px-4 text-center app-card border border-dashed rounded-3xl space-y-2">
+            <div class="w-full py-14 px-4 text-center app-card border border-dashed rounded-3xl space-y-2">
                 <i class="fa-solid fa-bicycle text-4xl text-emerald-600/60"></i>
                 <h4 class="font-extrabold text-sm">Tidak Ada Unit di Kategori Ini</h4>
                 <p class="text-xs app-muted">Silakan pilih kategori sepeda lain atau hubungi petugas kami via Live Chat.</p>
             </div>
         `;
+        renderGowesShowcaseDots(0);
         return;
     }
 
+    if (gowesShowcaseIdx >= bikes.length) gowesShowcaseIdx = 0;
     const fallbackImg = "https://images.unsplash.com/photo-1485965120184-e220f721d03e?auto=format&fit=crop&w=800&q=75";
 
     track.innerHTML = bikes.map((b, idx) => {
@@ -165,55 +193,52 @@ function renderGowesShowcaseTrack() {
         const isInUse = b.status === "Sedang Disewa";
 
         const statusBadge = isAvailable
-            ? `<span class="px-2.5 py-0.5 rounded-full bg-emerald-500 text-white font-extrabold text-[9px] uppercase tracking-wider shadow">● Siap Gowes</span>`
+            ? `<span class="px-2.5 py-0.5 rounded-full bg-emerald-500/90 backdrop-blur-md text-white font-extrabold text-[9px] uppercase tracking-wider shadow">● Siap Gowes</span>`
             : isInUse
-                ? `<span class="px-2.5 py-0.5 rounded-full bg-amber-500 text-black font-extrabold text-[9px] uppercase tracking-wider shadow">● Sedang Digunakan</span>`
-                : `<span class="px-2.5 py-0.5 rounded-full bg-zinc-600 text-white font-extrabold text-[9px] uppercase tracking-wider shadow">✕ Masa Servis</span>`;
+                ? `<span class="px-2.5 py-0.5 rounded-full bg-amber-500/90 backdrop-blur-md text-black font-extrabold text-[9px] uppercase tracking-wider shadow">● Sedang Digunakan</span>`
+                : `<span class="px-2.5 py-0.5 rounded-full bg-zinc-700/90 backdrop-blur-md text-white font-extrabold text-[9px] uppercase tracking-wider shadow">✕ Masa Servis</span>`;
 
         const actionBtn = isAvailable
             ? `<button type="button" onclick="openGowesBookingModal('${esc(b.id)}')" class="w-full gowes-pill-btn py-3 rounded-2xl text-xs uppercase tracking-wider font-extrabold shadow-xl flex items-center justify-center gap-1.5">
                 <i class="fa-solid fa-bicycle"></i> Sewa Unit Ini
                </button>`
-            : `<button type="button" disabled class="w-full py-3 rounded-2xl bg-white/20 text-white/60 text-xs font-bold text-center cursor-not-allowed">
+            : `<button type="button" disabled class="w-full py-3 rounded-2xl bg-white/15 text-white/60 text-xs font-bold text-center cursor-not-allowed">
                 ${isInUse ? 'Sedang Digunakan' : 'Dalam Masa Servis'}
                </button>`;
 
         return `
             <div class="gowes-showcase-slide" data-slide-idx="${idx}">
-                <img src="${b.image || fallbackImg}" alt="${escHtml(b.name)}" loading="lazy" class="absolute inset-0 w-full h-full object-cover object-center">
-                <div class="absolute inset-0 bg-gradient-to-t from-black/95 via-black/45 to-transparent"></div>
-
-                <div class="absolute top-4 inset-x-4 z-10 flex items-center justify-between gap-2">
-                    <div class="flex items-center gap-1.5 flex-wrap">
+                <div class="gowes-showcase-photo-box">
+                    <img src="${b.image || fallbackImg}" alt="${escHtml(b.name)}" loading="lazy">
+                    <div class="absolute inset-x-0 top-0 h-16 bg-gradient-to-b from-black/55 to-transparent pointer-events-none"></div>
+                    <div class="absolute top-3 left-3 z-10 flex items-center gap-1.5 flex-wrap">
                         ${statusBadge}
-                        <span class="px-2.5 py-0.5 rounded-full bg-black/60 text-white text-[9px] font-bold backdrop-blur-sm border border-white/20">${escHtml(b.type || "Sepeda")}</span>
+                        <span class="px-2.5 py-0.5 rounded-full bg-black/55 text-white text-[9px] font-bold backdrop-blur-md border border-white/20">${escHtml(b.type || "Sepeda")}</span>
                     </div>
-                    <span class="px-2.5 py-0.5 rounded-full bg-black/60 text-white text-[9.5px] font-bold backdrop-blur-sm border border-white/20">
-                        <i class="fa-solid fa-person-biking mr-1 text-emerald-400"></i>${b.totalRentedCount || 0}x Sewa
-                    </span>
+                    <div class="gowes-showcase-photo-fade"></div>
                 </div>
 
-                <div class="absolute bottom-4 inset-x-4 z-10 text-white space-y-2.5">
+                <div class="gowes-showcase-info">
                     <div>
-                        <h3 class="text-xl sm:text-2xl font-extrabold leading-tight text-white drop-shadow">${escHtml(b.name)}</h3>
-                        <p class="text-[11px] text-zinc-300 line-clamp-1 mt-0.5">${escHtml(b.description || "")}</p>
+                        <h3 class="text-lg sm:text-xl font-extrabold leading-tight text-white">${escHtml(b.name)}</h3>
+                        <p class="text-[11px] text-zinc-300 line-clamp-2 mt-0.5">${escHtml(b.description || "")}</p>
                     </div>
 
                     <div class="flex flex-wrap gap-1.5 text-[10px]">
-                        <span class="px-2.5 py-1 rounded-xl bg-white/15 backdrop-blur-sm border border-white/20 text-zinc-100 font-semibold">
+                        <span class="px-2.5 py-1 rounded-xl bg-white/10 border border-white/15 text-zinc-100 font-semibold">
                             <i class="fa-solid fa-ruler-combined text-emerald-400 mr-1"></i>${escHtml(b.frameSize || "All Size")}
                         </span>
-                        <span class="px-2.5 py-1 rounded-xl bg-white/15 backdrop-blur-sm border border-white/20 text-zinc-100 font-semibold">
+                        <span class="px-2.5 py-1 rounded-xl bg-white/10 border border-white/15 text-zinc-100 font-semibold">
                             <i class="fa-solid fa-gear text-emerald-400 mr-1"></i>${escHtml(b.gears || "Standar")}
                         </span>
                         ${b.brakes ? `
-                            <span class="px-2.5 py-1 rounded-xl bg-white/15 backdrop-blur-sm border border-white/20 text-zinc-100 font-semibold">
+                            <span class="px-2.5 py-1 rounded-xl bg-white/10 border border-white/15 text-zinc-100 font-semibold">
                                 <i class="fa-solid fa-circle-stop text-emerald-400 mr-1"></i>${escHtml(b.brakes)}
                             </span>
                         ` : ''}
                     </div>
 
-                    <div class="grid grid-cols-3 gap-1.5 p-2 rounded-2xl bg-black/60 backdrop-blur-md border border-white/20 text-center">
+                    <div class="grid grid-cols-3 gap-1.5 p-2 rounded-2xl bg-white/5 border border-white/15 text-center">
                         <div class="p-1">
                             <span class="text-[8.5px] uppercase font-bold text-zinc-400 block">2 Jam</span>
                             <strong class="text-xs font-extrabold text-emerald-400 block">${fmtRp(b.price2Hours || 40000)}</strong>
@@ -235,6 +260,25 @@ function renderGowesShowcaseTrack() {
             </div>
         `;
     }).join("");
+
+    renderGowesShowcaseDots(bikes.length);
+
+    if (!track.dataset.dotScrollBound) {
+        track.dataset.dotScrollBound = "1";
+        let dotRaf = null;
+        track.addEventListener("scroll", () => {
+            if (dotRaf) return;
+            dotRaf = requestAnimationFrame(() => {
+                dotRaf = null;
+                const slideW = track.clientWidth || window.innerWidth || 1;
+                const nextIdx = Math.round(track.scrollLeft / slideW);
+                if (nextIdx !== gowesShowcaseIdx && nextIdx >= 0 && nextIdx < track.children.length) {
+                    gowesShowcaseIdx = nextIdx;
+                    renderGowesShowcaseDots(track.children.length);
+                }
+            });
+        }, { passive: true });
+    }
 }
 
 function startGowesAutoSlides() {
@@ -260,33 +304,57 @@ function startGowesAutoSlides() {
         if (targetSlide) {
             track.scrollTo({ left: targetSlide.offsetLeft, behavior: "smooth" });
         }
-    }, 6000);
+        renderGowesShowcaseDots(track.children.length);
+    }, 6500);
 }
 
-// ================= 5. FORMULIR SEWA SEPEDA, STEPPER & ESTIMASI KEMBALI =================
-function populateBookingBikesDropdown(selectedBikeId = null) {
-    const sel = document.getElementById("gw-book-bike-select");
-    if (!sel) return;
+// ================= 5. FORMULIR SEWA MULTI-SEPEDA & KALKULASI OTOMATIS =================
+function getSelectedBookingBikesObjects() {
     const bikes = getAvailableGowesBikes();
-
-    sel.innerHTML = !bikes.length
-        ? `<option value="">-- Tidak ada sepeda tersedia --</option>`
-        : bikes.map(b => `<option value="${esc(b.id)}" ${(selectedBikeId && String(b.id) === String(selectedBikeId)) ? 'selected' : ''}>${escHtml(b.name)} — ${escHtml(b.type)} (${b.status})</option>`).join("");
+    if (!bikes.length) return [];
+    const fallbackBike = bikes.find(b => b.status === "Tersedia") || bikes[0];
+    return bookingSelectedBikeIds.map(id => {
+        return bikes.find(b => String(b.id) === String(id)) || fallbackBike;
+    });
 }
 
-function onBookingBikeSelectChange(bikeId) {
+function renderBookingBikeSelectors() {
+    const box = document.getElementById("gw-book-bikes-container");
+    if (!box) return;
     const bikes = getAvailableGowesBikes();
-    const found = bikes.find(b => String(b.id) === String(bikeId));
-    if (found) {
-        activeBookingBike = found;
-        const r2 = document.getElementById("gw-rate-2h");
-        const r6 = document.getElementById("gw-rate-6h");
-        const rf = document.getElementById("gw-rate-fullday");
-        if (r2) r2.innerText = fmtRp(found.price2Hours || 40000);
-        if (r6) r6.innerText = fmtRp(found.price6Hours || 75000);
-        if (rf) rf.innerText = fmtRp(found.priceFullDay || 120000);
-        updateGowesBookingPriceCalc();
+
+    if (!bikes.length) {
+        box.innerHTML = `<p class="text-xs text-red-500 font-bold">Belum ada unit sepeda tersedia.</p>`;
+        return;
     }
+
+    const totalUnits = bookingSelectedBikeIds.length || 1;
+    box.innerHTML = bookingSelectedBikeIds.map((selId, idx) => {
+        const labelTxt = totalUnits > 1 ? `Pilih Unit Sepeda #${idx + 1}` : "Pilih Unit Sepeda";
+        const optionsHtml = bikes.map(b => {
+            const isSel = String(b.id) === String(selId);
+            const disAttr = b.status !== "Tersedia" ? "disabled" : "";
+            return `<option value="${esc(b.id)}" ${isSel ? "selected" : ""} ${disAttr}>${escHtml(b.name)} — ${escHtml(b.type)} (${fmtRp(b.price2Hours || 40000)}/2j • ${escHtml(b.status)})</option>`;
+        }).join("");
+
+        return `
+            <div class="space-y-1">
+                <label class="app-label">${labelTxt}</label>
+                <select id="gw-book-bike-select-${idx}" onchange="onBookingBikeSlotChange(${idx}, this.value)" class="app-input font-bold" required>
+                    ${optionsHtml}
+                </select>
+            </div>
+        `;
+    }).join("");
+}
+
+function onBookingBikeSlotChange(slotIdx, bikeId) {
+    bookingSelectedBikeIds[slotIdx] = bikeId;
+    const bikes = getAvailableGowesBikes();
+    if (slotIdx === 0) {
+        activeBookingBike = bikes.find(b => String(b.id) === String(bikeId)) || activeBookingBike;
+    }
+    updateGowesBookingPriceCalc();
 }
 
 function changeBookingBikeQty(delta) {
@@ -294,10 +362,24 @@ function changeBookingBikeQty(delta) {
     const lbl = document.getElementById("gw-book-qty-lbl");
     if (!inp || !lbl) return;
 
+    const bikes = getAvailableGowesBikes();
+    const readyBikes = bikes.filter(b => b.status === "Tersedia");
+    const pool = readyBikes.length ? readyBikes : bikes;
+
     let cur = parseInt(inp.value, 10) || 1;
     cur = Math.max(1, Math.min(10, cur + delta));
     inp.value = cur;
     lbl.innerText = String(cur);
+
+    while (bookingSelectedBikeIds.length < cur) {
+        const nextCandidate = pool[bookingSelectedBikeIds.length % pool.length] || pool[0];
+        bookingSelectedBikeIds.push(nextCandidate ? nextCandidate.id : "");
+    }
+    if (bookingSelectedBikeIds.length > cur) {
+        bookingSelectedBikeIds = bookingSelectedBikeIds.slice(0, cur);
+    }
+
+    renderBookingBikeSelectors();
     updateGowesBookingPriceCalc();
 }
 
@@ -337,19 +419,26 @@ function updateGowesReturnEstimate() {
 }
 
 function updateGowesBookingPriceCalc() {
-    if (!activeBookingBike) return;
+    const selectedObjs = getSelectedBookingBikesObjects();
+    if (!selectedObjs.length) return;
+
+    const sum2h = selectedObjs.reduce((s, b) => s + Number(b.price2Hours || 40000), 0);
+    const sum6h = selectedObjs.reduce((s, b) => s + Number(b.price6Hours || 75000), 0);
+    const sumFull = selectedObjs.reduce((s, b) => s + Number(b.priceFullDay || 120000), 0);
+
+    const r2 = document.getElementById("gw-rate-2h");
+    const r6 = document.getElementById("gw-rate-6h");
+    const rf = document.getElementById("gw-rate-fullday");
+    if (r2) r2.innerText = fmtRp(sum2h);
+    if (r6) r6.innerText = fmtRp(sum6h);
+    if (rf) rf.innerText = fmtRp(sumFull);
+
     const durRadio = document.querySelector('input[name="gw_duration"]:checked');
     const durVal = durRadio ? durRadio.value : "2_hours";
-    const qtyInp = document.getElementById("gw-book-qty");
-    const qty = parseInt((qtyInp && qtyInp.value) || "1", 10) || 1;
+    const total = durVal === "6_hours" ? sum6h : durVal === "full_day" ? sumFull : sum2h;
 
-    let baseRate = Number(activeBookingBike.price2Hours || 40000);
-    if (durVal === "6_hours") baseRate = Number(activeBookingBike.price6Hours || 75000);
-    else if (durVal === "full_day") baseRate = Number(activeBookingBike.priceFullDay || 120000);
-
-    const total = baseRate * qty;
     const calcEl = document.getElementById("gw-book-total-calc");
-    if (calcEl) calcEl.innerText = `${fmtRp(total)} (${qty} Sepeda)`;
+    if (calcEl) calcEl.innerText = `${fmtRp(total)} (${selectedObjs.length} Sepeda)`;
 
     updateGowesReturnEstimate();
 }
@@ -365,15 +454,14 @@ function openGowesBookingModal(bikeId = null) {
     if (!bikes.length) return showToast("Belum ada unit sepeda yang tersedia.", "info");
 
     const curU = typeof getCurrentUserObj === "function" ? getCurrentUserObj() : null;
-    activeBookingBike = bikeId ? (bikes.find(b => String(b.id) === String(bikeId)) || bikes[0]) : bikes[0];
+    const readyFirst = bikes.find(b => b.status === "Tersedia") || bikes[0];
+    activeBookingBike = bikeId ? (bikes.find(b => String(b.id) === String(bikeId)) || readyFirst) : readyFirst;
+    bookingSelectedBikeIds = [activeBookingBike.id];
     gowesKtpDraft = "";
-
-    populateBookingBikesDropdown(activeBookingBike.id);
 
     const nameInp = document.getElementById("gw-book-name");
     const phInp = document.getElementById("gw-book-phone");
     const addrInp = document.getElementById("gw-book-address");
-
     if (nameInp) nameInp.value = (curU && (curU.name || curU.username)) || "";
     if (phInp) phInp.value = (curU && curU.phone) || "";
     if (addrInp) addrInp.value = (curU && curU.address) || "";
@@ -386,10 +474,7 @@ function openGowesBookingModal(bikeId = null) {
     const now = new Date();
     const todayStr = now.toISOString().split("T")[0];
     const dateInp = document.getElementById("gw-book-date");
-    if (dateInp) {
-        dateInp.value = todayStr;
-        dateInp.min = todayStr;
-    }
+    if (dateInp) { dateInp.value = todayStr; dateInp.min = todayStr; }
 
     const timeInp = document.getElementById("gw-book-time");
     if (timeInp) {
@@ -401,14 +486,12 @@ function openGowesBookingModal(bikeId = null) {
     if (rad2h) rad2h.checked = true;
 
     const ktpPrev = document.getElementById("gw-ktp-preview");
-    if (ktpPrev) {
-        ktpPrev.src = "";
-        ktpPrev.classList.add("hide");
-    }
+    if (ktpPrev) { ktpPrev.src = ""; ktpPrev.classList.add("hide"); }
     const ktpInp = document.getElementById("gw-ktp-input");
     if (ktpInp) ktpInp.value = "";
 
-    onBookingBikeSelectChange(activeBookingBike.id);
+    renderBookingBikeSelectors();
+    updateGowesBookingPriceCalc();
 
     const modal = document.getElementById("modal-gowes-booking");
     if (modal) modal.classList.remove("hide");
@@ -417,6 +500,7 @@ function openGowesBookingModal(bikeId = null) {
 
 function closeGowesBookingModal() {
     activeBookingBike = null;
+    bookingSelectedBikeIds = [];
     gowesKtpDraft = "";
     document.getElementById("modal-gowes-booking")?.classList.add("hide");
     if (typeof _mrDropTopModalById === "function") _mrDropTopModalById("modal-gowes-booking");
@@ -431,10 +515,7 @@ function handleGowesKtpPick(inp) {
         openImageCropper(file, 1.6, "Potong Foto KTP / SIM Penjamin", 800, 500, (dataUrl) => {
             gowesKtpDraft = dataUrl;
             const prev = document.getElementById("gw-ktp-preview");
-            if (prev) {
-                prev.src = dataUrl;
-                prev.classList.remove("hide");
-            }
+            if (prev) { prev.src = dataUrl; prev.classList.remove("hide"); }
             if (typeof showToast === "function") showToast("Foto KTP siap dilampirkan.");
         });
     } else {
@@ -442,10 +523,7 @@ function handleGowesKtpPick(inp) {
         reader.onload = (e) => {
             gowesKtpDraft = e.target.result;
             const prev = document.getElementById("gw-ktp-preview");
-            if (prev) {
-                prev.src = gowesKtpDraft;
-                prev.classList.remove("hide");
-            }
+            if (prev) { prev.src = gowesKtpDraft; prev.classList.remove("hide"); }
         };
         reader.readAsDataURL(file);
     }
@@ -453,9 +531,9 @@ function handleGowesKtpPick(inp) {
 
 async function submitGowesRentalBooking(e) {
     e.preventDefault();
-    if (!activeBookingBike) return showToast("Pilih unit sepeda terlebih dahulu.", "error");
+    const selectedObjs = getSelectedBookingBikesObjects();
+    if (!selectedObjs.length) return showToast("Pilih minimal 1 unit sepeda terlebih dahulu.", "error");
 
-    const bikeId = document.getElementById("gw-book-bike-select")?.value || activeBookingBike.id;
     const durRadio = document.querySelector('input[name="gw_duration"]:checked');
     const durationKey = durRadio ? durRadio.value : "2_hours";
     const durLabel = durationKey === "6_hours" ? "Paket 6 Jam" : durationKey === "full_day" ? "Full Day" : "Paket 2 Jam";
@@ -465,7 +543,7 @@ async function submitGowesRentalBooking(e) {
     const customerAddress = document.getElementById("gw-book-address")?.value.trim() || "";
     const startDate = document.getElementById("gw-book-date")?.value.trim() || "";
     const startTime = document.getElementById("gw-book-time")?.value.trim() || "";
-    const quantity = parseInt(document.getElementById("gw-book-qty")?.value || "1", 10) || 1;
+    const quantity = selectedObjs.length;
     const note = document.getElementById("gw-book-note")?.value.trim() || "";
 
     if (!customerName) return showToast("Nama pemesan wajib diisi.", "error");
@@ -474,12 +552,22 @@ async function submitGowesRentalBooking(e) {
     if (!startDate || !startTime) return showToast("Tentukan tanggal dan jam sewa.", "error");
     if (!gowesKtpDraft) return showToast("Silakan unggah foto KTP/SIM penjamin.", "error");
 
+    const firstBike = selectedObjs[0];
+    const uniqueNames = Array.from(new Set(selectedObjs.map(b => b.name)));
+    const combinedBikeName = uniqueNames.length === 1 ? uniqueNames[0] : uniqueNames.join(" + ");
+
     setBtnLoading("btn-submit-gw-booking", true, "Menyimpan Booking...");
 
     const bookingPayload = {
-        bikeId,
-        bikeName: activeBookingBike.name,
-        bikeImage: activeBookingBike.image || "",
+        bikeId: firstBike.id,
+        bikeName: combinedBikeName,
+        bikeImage: firstBike.image || "",
+        selectedBikes: selectedObjs.map(b => ({
+            bikeId: b.id,
+            bikeName: b.name,
+            bikeType: b.type || "",
+            bikeImage: b.image || ""
+        })),
         durationKey,
         durationLabel: durLabel,
         quantity,
@@ -492,11 +580,7 @@ async function submitGowesRentalBooking(e) {
         note
     };
 
-    const res = await apiAction({
-        action: "gowes_create_booking",
-        booking: bookingPayload
-    });
-
+    const res = await apiAction({ action: "gowes_create_booking", booking: bookingPayload });
     setBtnLoading("btn-submit-gw-booking", false);
 
     if (!res || !res.ok || !res.rental) {
@@ -510,7 +594,6 @@ async function submitGowesRentalBooking(e) {
 
     closeGowesBookingModal();
     showToast("Pesanan sewa berhasil dibuat! Selesaikan pembayaran melalui QRIS.");
-
     openGowesRentalPayment(res.rental.id);
 }
 
@@ -527,7 +610,6 @@ async function openGowesRentalPayment(rentalId) {
     const viewPay = document.getElementById("view-payment");
     if (viewPay) viewPay.classList.remove("hide");
 
-    // Sinkronkan dengan activePaymentState milik js/qris.js agar Salin Nominal & Unduh QRIS berfungsi
     if (typeof activePaymentState !== "undefined") {
         activePaymentState.kind = "gowes_rental";
         activePaymentState.id = rental.id;
@@ -551,7 +633,10 @@ async function openGowesRentalPayment(rentalId) {
     }
     if (headingText) headingText.innerText = "Konfirmasi Sewa Sepeda";
     if (itemName) {
-        itemName.innerHTML = `<strong>${escHtml(rental.bikeName)}</strong> (${rental.quantity || 1} Unit) • ${escHtml(rental.durationLabel)}<br><span class="text-[10px] app-muted">Jadwal: ${escHtml(rental.startDate)} pukul ${escHtml(rental.startTime)} WITA</span>`;
+        const multiHtml = (Array.isArray(rental.selectedBikes) && rental.selectedBikes.length > 1)
+            ? `<div class="text-[10px] app-muted mt-1">${rental.selectedBikes.map((sb, i) => `Unit #${i + 1}: <strong>${escHtml(sb.bikeName)}</strong>`).join(" • ")}</div>`
+            : "";
+        itemName.innerHTML = `<strong>${escHtml(rental.bikeName)}</strong> (${rental.quantity || 1} Unit) • ${escHtml(rental.durationLabel)}${multiHtml}<span class="block text-[10px] app-muted mt-0.5">Jadwal: ${escHtml(rental.startDate)} pukul ${escHtml(rental.startTime)} WITA</span>`;
     }
     if (finalPrice) finalPrice.innerText = fmtRp(rental.totalPrice);
     if (uniqueHint) {
@@ -561,7 +646,6 @@ async function openGowesRentalPayment(rentalId) {
     if (origPrice) origPrice.classList.add("hide");
     if (discBadge) discBadge.classList.add("hide");
 
-    // Gunakan engine QRIS resmi dari js/qris.js
     const ms = db.masterSettings || {};
     if (typeof renderPaymentQrisCode === "function") {
         await renderPaymentQrisCode(ms, Number(rental.totalPrice || 0));
@@ -577,9 +661,7 @@ async function openGowesRentalPayment(rentalId) {
                     <strong class="font-mono text-sm block">${escHtml(b.no)}</strong>
                     <span class="text-[10px] app-muted block">a.n. ${escHtml(b.holder)}</span>
                 </div>
-                <button type="button" onclick="navigator.clipboard.writeText('${esc(b.no)}');showToast('Nomor rekening disalin!');" class="px-3 py-1.5 rounded-xl app-btn-sec text-[11px] font-bold">
-                    Salin
-                </button>
+                <button type="button" onclick="navigator.clipboard.writeText('${esc(b.no)}');showToast('Nomor rekening disalin!');" class="px-3 py-1.5 rounded-xl app-btn-sec text-[11px] font-bold">Salin</button>
             </div>
         `).join("");
     }
@@ -612,18 +694,10 @@ async function submitGowesPaymentProof(rentalId) {
     }
 
     setBtnLoading("btn-send-proof", true, "Mengirim Bukti...");
-
     let proofDataUrl = prevSrc;
-    if (file) {
-        proofDataUrl = await quickResizeImage(file, 900, 0.82);
-    }
+    if (file) proofDataUrl = await quickResizeImage(file, 900, 0.82);
 
-    const res = await apiAction({
-        action: "gowes_submit_payment",
-        rentalId: rentalId,
-        paymentProof: proofDataUrl
-    });
-
+    const res = await apiAction({ action: "gowes_submit_payment", rentalId, paymentProof: proofDataUrl });
     setBtnLoading("btn-send-proof", false);
 
     if (!res || !res.ok || !res.rental) {
@@ -657,9 +731,7 @@ function buildUserRentalCardHtml(rental) {
                     : `<span class="text-[9px] px-2 py-0.5 rounded-full bg-red-500/20 text-red-500 font-extrabold uppercase">● Menunggu Bayar</span>`;
 
     const payActionHtml = isPay
-        ? `<button type="button" onclick="openGowesRentalPayment('${esc(rental.id)}')" class="gowes-pill-btn px-3 py-1.5 rounded-xl text-xs font-bold shadow-sm">
-            <i class="fa-solid fa-qrcode mr-1"></i>Bayar QRIS
-           </button>`
+        ? `<button type="button" onclick="openGowesRentalPayment('${esc(rental.id)}')" class="gowes-pill-btn px-3 py-1.5 rounded-xl text-xs font-bold shadow-sm"><i class="fa-solid fa-qrcode mr-1"></i>Bayar QRIS</button>`
         : "";
 
     return `
@@ -677,9 +749,7 @@ function buildUserRentalCardHtml(rental) {
                 </div>
             </div>
             <div class="flex items-center justify-between gap-2 pt-2 border-t gold-border">
-                <button type="button" onclick="openGowesRentalDetail('${esc(rental.id)}')" class="px-3 py-1.5 rounded-xl app-btn-sec text-xs font-bold">
-                    <i class="fa-regular fa-eye mr-1"></i>Rincian
-                </button>
+                <button type="button" onclick="openGowesRentalDetail('${esc(rental.id)}')" class="px-3 py-1.5 rounded-xl app-btn-sec text-xs font-bold"><i class="fa-regular fa-eye mr-1"></i>Rincian</button>
                 <div class="flex gap-1.5">
                     ${payActionHtml}
                     ${isConfirmed ? `<span class="text-[10px] text-emerald-600 font-bold self-center"><i class="fa-solid fa-circle-check mr-1"></i>Tunjukkan KTP di shelter</span>` : ""}
@@ -703,6 +773,13 @@ function openGowesRentalDetail(rentalId) {
         document.body.appendChild(modal);
     }
 
+    const bikesListHtml = (Array.isArray(r.selectedBikes) && r.selectedBikes.length > 1)
+        ? `<div class="app-card-soft border rounded-2xl p-3 space-y-1">
+            <span class="text-[10px] font-bold uppercase text-emerald-600 block">Rincian Unit Sepeda (${r.selectedBikes.length} Unit):</span>
+            ${r.selectedBikes.map((sb, i) => `<div class="text-[11px]">${i + 1}. <strong>${escHtml(sb.bikeName)}</strong> <span class="app-muted">(${escHtml(sb.bikeType || "Sepeda")})</span></div>`).join("")}
+           </div>`
+        : "";
+
     modal.innerHTML = `
         <div class="app-card border rounded-3xl max-w-md w-full max-h-[90vh] flex flex-col overflow-hidden shadow-2xl" onclick="event.stopPropagation()">
             <div class="px-5 py-3.5 border-b gold-border flex items-center justify-between shrink-0">
@@ -721,7 +798,7 @@ function openGowesRentalDetail(rentalId) {
                         <span class="text-xs font-bold text-emerald-600 block">${fmtRp(r.totalPrice)}</span>
                     </div>
                 </div>
-
+                ${bikesListHtml}
                 <div class="app-card-soft border rounded-2xl p-3 space-y-1.5">
                     <div class="flex justify-between"><span class="app-muted">Penyewa:</span><strong class="font-bold">${escHtml(r.customerName || r.customerUsername)} (@${escHtml(r.customerUsername)})</strong></div>
                     <div class="flex justify-between"><span class="app-muted">WhatsApp:</span><strong class="font-bold">${escHtml(r.customerPhone || "-")}</strong></div>
@@ -729,27 +806,9 @@ function openGowesRentalDetail(rentalId) {
                     <div class="flex justify-between"><span class="app-muted">Shelter Ambil:</span><strong class="font-bold">${escHtml(r.pickupLocation || "Shelter Utama")}</strong></div>
                     <div class="flex justify-between"><span class="app-muted">Status:</span><span class="font-extrabold text-emerald-600">${escHtml(r.status)}</span></div>
                 </div>
-
-                ${r.handoverOutPhoto ? `
-                    <div class="space-y-1">
-                        <span class="text-[10px] font-bold uppercase app-muted block">Foto Fisik Sepeda Saat Diambil:</span>
-                        <img src="${r.handoverOutPhoto}" class="w-full h-36 object-contain rounded-xl bg-black border gold-border">
-                    </div>
-                ` : ""}
-
-                ${r.handoverInPhoto ? `
-                    <div class="space-y-1">
-                        <span class="text-[10px] font-bold uppercase app-muted block">Foto Fisik Sepeda Saat Kembali:</span>
-                        <img src="${r.handoverInPhoto}" class="w-full h-36 object-contain rounded-xl bg-black border gold-border">
-                    </div>
-                ` : ""}
-
-                ${r.paymentProof ? `
-                    <div class="space-y-1">
-                        <span class="text-[10px] font-bold uppercase app-muted block">Bukti Pembayaran QRIS:</span>
-                        <img src="${r.paymentProof}" class="w-full max-h-48 object-contain rounded-xl bg-black border gold-border">
-                    </div>
-                ` : ""}
+                ${r.handoverOutPhoto ? `<div class="space-y-1"><span class="text-[10px] font-bold uppercase app-muted block">Foto Fisik Sepeda Saat Diambil:</span><img src="${r.handoverOutPhoto}" class="w-full h-36 object-contain rounded-xl bg-black border gold-border"></div>` : ""}
+                ${r.handoverInPhoto ? `<div class="space-y-1"><span class="text-[10px] font-bold uppercase app-muted block">Foto Fisik Sepeda Saat Kembali:</span><img src="${r.handoverInPhoto}" class="w-full h-36 object-contain rounded-xl bg-black border gold-border"></div>` : ""}
+                ${r.paymentProof ? `<div class="space-y-1"><span class="text-[10px] font-bold uppercase app-muted block">Bukti Pembayaran QRIS:</span><img src="${r.paymentProof}" class="w-full max-h-48 object-contain rounded-xl bg-black border gold-border"></div>` : ""}
             </div>
             <div class="px-5 py-3 border-t gold-border flex justify-end shrink-0">
                 <button type="button" onclick="document.getElementById('modal-gowes-rental-detail').classList.add('hide')" class="gowes-pill-btn px-6 py-2 rounded-xl text-xs">Tutup</button>
