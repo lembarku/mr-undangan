@@ -1,6 +1,6 @@
 // =========================================================================
 // LEMBARKU & TITIK GOWES — CORE CONFIG, CATALOGS & SHARED ENGINE (js/config.js)
-// Versi: V14.6 (Multi-Cabang + Maps, Status Jam Booking Hari Ini & Tarif Fleksibel)
+// Versi: V14.7 (Banner Full Header, Dropdown Lokasi, Visual Bike Picker & Booking Sekarang)
 // =========================================================================
 const CLOUD_API_URL = "https://script.google.com/macros/s/AKfycbyHsITJ02tiA59p0QIXkOQaO3VnBFQmDBp-7iUHcUkmrYjlOtRVwxhlGZCzL4RLKKNW/exec";
 const FOUNDER_USERNAME = "kausar.af";
@@ -301,7 +301,6 @@ const DEFAULT_GOWES_BANNERS = [
         subtitle: "RASAKAN MANFAATNYA! Sewa unit prima & jelajahi rute favoritmu hari ini.",
         ctaText: "",
         targetSection: "gowes-showcase-track",
-        localImg: "./assets/gowes-banner-1.jpg",
         img: "https://images.unsplash.com/photo-1541625602330-2277a4c46182?auto=format&fit=crop&w=1200&q=80"
     },
     {
@@ -310,8 +309,7 @@ const DEFAULT_GOWES_BANNERS = [
         title: "ENERGI PAGI, STAMINA MAKSIMAL!",
         subtitle: "Gratis Helm SNI, Kunci Spiral & Lampu di setiap peminjaman unit.",
         ctaText: "",
-        targetSection: "sec-gowes-booking-cta",
-        localImg: "./assets/gowes-banner-2.jpg",
+        targetSection: "open_booking",
         img: "https://images.unsplash.com/photo-1517649763962-0c623266ddc0?auto=format&fit=crop&w=1200&q=80"
     },
     {
@@ -321,7 +319,6 @@ const DEFAULT_GOWES_BANNERS = [
         subtitle: "Pilih durasi fleksibel, konfirmasi instan & ambil di gerai terdekat.",
         ctaText: "",
         targetSection: "sec-gowes-shelter",
-        localImg: "./assets/gowes-banner-3.jpg",
         img: "https://images.unsplash.com/photo-1534787238916-9ba6764efd4f?auto=format&fit=crop&w=1200&q=80"
     },
     {
@@ -331,7 +328,6 @@ const DEFAULT_GOWES_BANNERS = [
         subtitle: "MTB, Roadbike & Sepeda Lipat rutin diservis mekanik profesional.",
         ctaText: "",
         targetSection: "gowes-showcase-track",
-        localImg: "./assets/gowes-banner-4.jpg",
         img: "https://images.unsplash.com/photo-1571068316344-75bc76f77890?auto=format&fit=crop&w=1200&q=80"
     },
     {
@@ -341,7 +337,6 @@ const DEFAULT_GOWES_BANNERS = [
         subtitle: "Tersedia di Samarinda, Sanga-Sanga & Muara Jawa. Cek peta gerai sekarang.",
         ctaText: "",
         targetSection: "sec-gowes-shelter",
-        localImg: "./assets/gowes-banner-5.jpg",
         img: "https://images.unsplash.com/photo-1507035895480-2b3156c31fc8?auto=format&fit=crop&w=1200&q=80"
     }
 ];

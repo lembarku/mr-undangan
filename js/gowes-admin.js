@@ -1,6 +1,6 @@
 // =========================================================================
 // TITIK GOWES — ADMIN FLEET, MULTI-CABANG, BANNER & HANDOVER (js/gowes-admin.js)
-// Versi: V14.6 (CRUD Cabang Daerah + Google Maps, Rem & Label Tarif Fleksibel)
+// Versi: V14.7 (CRUD Cabang Daerah + Google Maps, Rem & Label Tarif Fleksibel)
 // =========================================================================
 
 let mgbTempPhotoUrl = "";
@@ -130,7 +130,7 @@ function renderGowesFleetWorkspaceHtml() {
                     <input type="text" id="gwb-sub" placeholder="Deskripsi singkat banner..." class="app-input text-xs" required>
                     <select id="gwb-target" class="app-input text-xs">
                         <option value="gowes-showcase-track">Arahkan ke Pilihan Sepeda</option>
-                        <option value="sec-gowes-booking-cta">Arahkan ke Tombol Booking</option>
+                        <option value="open_booking">Buka Formulir Booking Langsung</option>
                         <option value="sec-gowes-shelter">Arahkan ke Lokasi Garasi</option>
                     </select>
                     <input type="url" id="gwb-img-url" oninput="if(this.value.startsWith('http'))document.getElementById('gwb-preview-img').src=this.value;" placeholder="Atau tempel URL foto (https://...)" class="app-input text-xs">

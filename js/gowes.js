@@ -1,6 +1,6 @@
 // =========================================================================
 // TITIK GOWES — FRONTEND RENTAL, MULTI-CABANG & SHOWCASE CONTROLLER (js/gowes.js)
-// Versi: V14.6 (Ready Hari Ini + Jam Booked Ringkas, Auto-Cabang & Google Maps)
+// Versi: V14.7 (Banner Full, Dropdown Lokasi Memanjang & Pemilih Sepeda Bergambar)
 // =========================================================================
 
 let gowesFilterType = "all";
@@ -12,6 +12,7 @@ let gowesShowcaseIdx = 0;
 let gowesBannerTimer = null;
 let gowesShowcaseTimer = null;
 let activeGowesShelterId = "";
+let openBookingBikePickerIdx = -1;
 
 // ================= 1. DETEKSI & MANAJEMEN CABANG AKTIF OTOMATIS =================
 function getGowesSheltersList() {
@@ -150,6 +151,22 @@ function _buildGoogleMapsEmbedUrl(shelter) {
     return `https://maps.google.com/maps?q=${encodeURIComponent(q)}&t=&z=15&ie=UTF8&iwloc=&output=embed`;
 }
 
+function toggleGowesBranchDropdown(forceState = null) {
+    const menu = document.getElementById("gowes-branch-dropdown-menu");
+    const btn = document.getElementById("gowes-branch-dropdown-btn");
+    const chev = document.getElementById("gowes-branch-dd-chevron");
+    if (!menu || !btn) return;
+    const willOpen = forceState !== null ? !!forceState : menu.classList.contains("hide");
+    menu.classList.toggle("hide", !willOpen);
+    btn.classList.toggle("is-open", willOpen);
+    if (chev) chev.style.transform = willOpen ? "rotate(180deg)" : "rotate(0deg)";
+}
+
+function selectGowesBranchFromDropdown(branchId) {
+    toggleGowesBranchDropdown(false);
+    switchGowesActiveBranch(branchId);
+}
+
 function renderGowesShelterSection() {
     const container = document.getElementById("sec-gowes-shelter");
     if (!container) return;
@@ -159,31 +176,66 @@ function renderGowesShelterSection() {
     const mapsHref = current.mapsUrl || `https://maps.google.com/?q=${encodeURIComponent(current.address || current.city || "Samarinda")}`;
     const embedUrl = _buildGoogleMapsEmbedUrl(current);
 
-    const pillsHtml = shelters.map(s => {
+    const dropdownItemsHtml = shelters.map(s => {
         const isSel = String(s.id) === String(current.id);
         return `
-            <button type="button" onclick="switchGowesActiveBranch('${esc(s.id)}')" class="gowes-filter-btn ${isSel ? 'active' : ''}">
-                <i class="fa-solid fa-location-dot mr-1 text-[10px]"></i>${escHtml(s.city || s.name)}
+            <button type="button" onclick="selectGowesBranchFromDropdown('${esc(s.id)}')" class="w-full px-3.5 py-3 flex items-center justify-between gap-3 text-left transition hover:bg-emerald-500/10 ${isSel ? 'bg-emerald-500/10' : ''}">
+                <div class="flex items-center gap-2.5 min-w-0 flex-1">
+                    <span class="w-8 h-8 rounded-xl ${isSel ? 'bg-emerald-500 text-white' : 'app-card-soft border text-emerald-600'} flex items-center justify-center text-xs shrink-0">
+                        <i class="fa-solid fa-location-dot"></i>
+                    </span>
+                    <div class="min-w-0">
+                        <div class="flex items-center gap-1.5">
+                            <strong class="text-xs sm:text-sm font-extrabold truncate">${escHtml(s.city || s.name)}</strong>
+                            ${s.isClosed ? `<span class="text-[8.5px] px-1.5 py-0.5 rounded-full bg-red-500/15 text-red-500 font-extrabold uppercase shrink-0">Tutup</span>` : ""}
+                        </div>
+                        <p class="text-[10px] app-muted truncate">${escHtml(s.address || s.name)}</p>
+                    </div>
+                </div>
+                ${isSel ? `<i class="fa-solid fa-circle-check text-emerald-600 text-base shrink-0"></i>` : `<i class="fa-regular fa-circle app-muted text-sm opacity-45 shrink-0"></i>`}
             </button>
         `;
     }).join("");
 
     container.innerHTML = `
         <div class="space-y-3">
-            <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
-                <div>
-                    <span class="gowes-brand-tag">GERAI &amp; POS GARASI</span>
-                    <h4 class="text-xs font-extrabold uppercase app-muted tracking-wider mt-1">Pilih Cabang Daerah</h4>
+            <div class="space-y-2">
+                <div class="flex items-center justify-between gap-2">
+                    <div>
+                        <span class="gowes-brand-tag">GERAI &amp; POS GARASI</span>
+                        <h4 class="text-xs font-extrabold uppercase app-muted tracking-wider mt-1">Pilih Cabang Daerah</h4>
+                    </div>
+                    <span class="text-[10px] font-bold text-emerald-600">${shelters.length} Lokasi</span>
                 </div>
-                <div class="flex gap-1.5 overflow-x-auto no-scrollbar pb-0.5">
-                    ${pillsHtml}
+
+                <!-- Tombol Dropdown Lokasi Memanjang Profesional -->
+                <div id="gowes-branch-dropdown-wrap" class="relative">
+                    <button type="button" id="gowes-branch-dropdown-btn" onclick="toggleGowesBranchDropdown()" class="gowes-branch-select-btn" aria-haspopup="listbox">
+                        <span class="flex items-center gap-2.5 min-w-0 flex-1">
+                            <span class="w-8 h-8 rounded-xl bg-emerald-500 text-white flex items-center justify-center text-xs shadow-sm shrink-0">
+                                <i class="fa-solid fa-location-dot"></i>
+                            </span>
+                            <span class="min-w-0 flex-1">
+                                <span class="block text-xs sm:text-sm font-extrabold truncate leading-tight">${escHtml(current.city || current.name)}</span>
+                                <span class="block text-[10px] app-muted truncate">${escHtml(current.name)}</span>
+                            </span>
+                        </span>
+                        <span class="flex items-center gap-1.5 shrink-0">
+                            <span class="text-[9.5px] font-extrabold text-emerald-600 uppercase hidden sm:inline">Ganti Lokasi</span>
+                            <i id="gowes-branch-dd-chevron" class="fa-solid fa-chevron-down text-xs text-emerald-600 transition-transform duration-200"></i>
+                        </span>
+                    </button>
+
+                    <div id="gowes-branch-dropdown-menu" class="hide gowes-branch-dropdown-menu divide-y divide-black/10">
+                        ${dropdownItemsHtml}
+                    </div>
                 </div>
             </div>
 
             <div class="flex flex-wrap items-center justify-between gap-3 pt-1">
                 <div class="flex items-center gap-3 min-w-0 flex-1">
                     <div class="w-11 h-11 rounded-2xl bg-emerald-500/15 border border-emerald-500/35 text-emerald-600 flex items-center justify-center text-lg shrink-0">
-                        <i class="fa-solid fa-location-dot"></i>
+                        <i class="fa-solid fa-store"></i>
                     </div>
                     <div class="min-w-0">
                         <h3 id="gowes-shelter-name" class="font-extrabold text-sm sm:text-base truncate">${escHtml(current.name)}</h3>
@@ -222,6 +274,17 @@ function renderGowesShelterSection() {
     `;
 }
 
+// Tutup dropdown lokasi jika klik di luar area dropdown
+if (!window.__gowesBranchOutsideBound) {
+    window.__gowesBranchOutsideBound = true;
+    document.addEventListener("click", (ev) => {
+        const wrap = document.getElementById("gowes-branch-dropdown-wrap");
+        if (wrap && !wrap.contains(ev.target)) {
+            toggleGowesBranchDropdown(false);
+        }
+    });
+}
+
 // ================= 4. BANNER PROMOSI RAMPING 16 : 5 (GAYA REALISTIS) =================
 function _getGowesBannersList() {
     if (Array.isArray(db.gowesBanners) && db.gowesBanners.length) return db.gowesBanners;
@@ -234,17 +297,17 @@ function renderGowesBannerSlider() {
     const slides = _getGowesBannersList();
     if (gowesBannerIdx >= slides.length) gowesBannerIdx = 0;
 
+    const safeDefaultImg = "https://images.unsplash.com/photo-1541625602330-2277a4c46182?auto=format&fit=crop&w=1200&q=80";
     track.innerHTML = slides.map((s, idx) => {
-        const primaryImg = s.localImg || s.img || "https://images.unsplash.com/photo-1541625602330-2277a4c46182?auto=format&fit=crop&w=1200&q=80";
-        const fallbackImg = s.img || "https://images.unsplash.com/photo-1541625602330-2277a4c46182?auto=format&fit=crop&w=1200&q=80";
+        const primaryImg = (s.img && String(s.img).trim()) ? s.img : safeDefaultImg;
         return `
-            <div onclick="handleGowesBannerClick(${idx})" class="min-w-full h-full relative flex items-center px-4 sm:px-8 cursor-pointer select-none overflow-hidden bg-zinc-950">
-                <img src="${esc(primaryImg)}" ${imgFbAttr(fallbackImg)} class="absolute inset-0 w-full h-full object-cover object-center">
-                <div class="absolute inset-0 bg-gradient-to-r from-black/75 via-black/30 to-transparent"></div>
-                <div class="relative z-10 max-w-[68%] sm:max-w-md space-y-1 text-white">
-                    <h3 class="gowes-banner-headline text-sm sm:text-xl leading-[1.12] text-white">${escHtml(s.title || "SEHAT & BAHAGIA DENGAN BERSEPEDA!")}</h3>
-                    <p class="text-[9.5px] sm:text-xs text-white/90 font-semibold italic line-clamp-2 drop-shadow">${escHtml(s.subtitle || "RASAKAN MANFAATNYA!")}</p>
-                    ${s.ctaText ? `<span class="inline-block mt-1 px-3 py-1 rounded-lg bg-emerald-500/90 text-[9.5px] font-extrabold text-white shadow">${escHtml(s.ctaText)} <i class="fa-solid fa-arrow-right ml-1 text-[8px]"></i></span>` : ""}
+            <div onclick="handleGowesBannerClick(${idx})" class="min-w-full h-full relative flex items-center px-5 sm:px-8 cursor-pointer select-none overflow-hidden" style="background:linear-gradient(135deg,#064e3b 0%,#0f172a 55%,#09090b 100%);">
+                <img src="${esc(primaryImg)}" alt="" onerror="if(this.dataset.tried!=='1'){this.dataset.tried='1';this.src='${safeDefaultImg}';}else{this.style.display='none';}" class="absolute inset-0 w-full h-full object-cover object-center">
+                <div class="absolute inset-0 bg-gradient-to-r from-black/78 via-black/38 to-black/15"></div>
+                <div class="relative z-10 max-w-[74%] sm:max-w-md space-y-1 text-white">
+                    <h3 class="gowes-banner-headline text-base sm:text-2xl leading-[1.12] text-white">${escHtml(s.title || "SEHAT & BAHAGIA DENGAN BERSEPEDA!")}</h3>
+                    <p class="text-[10.5px] sm:text-xs text-white/90 font-semibold italic line-clamp-2 drop-shadow">${escHtml(s.subtitle || "RASAKAN MANFAATNYA!")}</p>
+                    ${s.ctaText ? `<span class="inline-block mt-1 px-3 py-1 rounded-lg bg-emerald-500/90 text-[10px] font-extrabold text-white shadow">${escHtml(s.ctaText)} <i class="fa-solid fa-arrow-right ml-1 text-[8px]"></i></span>` : ""}
                 </div>
             </div>
         `;
@@ -261,11 +324,13 @@ function updateGowesBannerPos() {
 function handleGowesBannerClick(idx) {
     const s = _getGowesBannersList()[idx];
     if (!s) return;
-    if (s.targetSection) {
-        document.getElementById(s.targetSection)?.scrollIntoView({ behavior: "smooth" });
-    } else {
+    if (!s.targetSection || s.targetSection === "open_booking" || s.targetSection === "sec-gowes-booking-cta") {
         openGowesBookingModal();
+        return;
     }
+    const targetEl = document.getElementById(s.targetSection);
+    if (targetEl) targetEl.scrollIntoView({ behavior: "smooth" });
+    else openGowesBookingModal();
 }
 
 // ================= 5. STATUS KETERSEDIAAN HARI INI & JADWAL BOOKED RINGKAS =================
@@ -551,10 +616,22 @@ function getSelectedBookingBikesObjects() {
     });
 }
 
+function toggleBookingBikePicker(slotIdx) {
+    openBookingBikePickerIdx = (openBookingBikePickerIdx === slotIdx) ? -1 : slotIdx;
+    renderBookingBikeSelectors();
+}
+
+function pickBookingBikeVisual(slotIdx, bikeId) {
+    openBookingBikePickerIdx = -1;
+    onBookingBikeSlotChange(slotIdx, bikeId);
+    renderBookingBikeSelectors();
+}
+
 function renderBookingBikeSelectors() {
     const box = document.getElementById("gw-book-bikes-container");
     if (!box) return;
     const bikes = getAvailableGowesBikes();
+    const fallbackImg = "https://images.unsplash.com/photo-1485965120184-e220f721d03e?auto=format&fit=crop&w=800&q=75";
 
     if (!bikes.length) {
         box.innerHTML = `<p class="text-xs text-red-500 font-bold">Belum ada unit sepeda tersedia.</p>`;
@@ -564,20 +641,66 @@ function renderBookingBikeSelectors() {
     const totalUnits = bookingSelectedBikeIds.length || 1;
     box.innerHTML = bookingSelectedBikeIds.map((selId, idx) => {
         const labelTxt = totalUnits > 1 ? `Pilih Unit Sepeda #${idx + 1}` : "Pilih Unit Sepeda";
-        const optionsHtml = bikes.map(b => {
-            const isSel = String(b.id) === String(selId);
-            const disAttr = b.status === "Servis" ? "disabled" : "";
+        const selBike = bikes.find(b => String(b.id) === String(selId)) || bikes.find(b => b.status !== "Servis") || bikes[0];
+        const isOpen = openBookingBikePickerIdx === idx;
+        const selSlots = getBikeTodayBookingSlots(selBike.id);
+        const selBadgeHtml = selBike.status === "Servis"
+            ? `<span class="inline-block px-1.5 py-0.5 rounded-md bg-zinc-600/20 text-zinc-500 text-[9px] font-extrabold">Masa Servis</span>`
+            : selSlots.length
+                ? `<span class="inline-block px-1.5 py-0.5 rounded-md bg-amber-400/25 text-amber-700 text-[9px] font-extrabold">Booked ${escHtml(selSlots[0])}</span>`
+                : `<span class="inline-block px-1.5 py-0.5 rounded-md bg-emerald-500/15 text-emerald-700 text-[9px] font-extrabold">● Ready Hari Ini</span>`;
+
+        const listItemsHtml = bikes.map(b => {
+            const isSel = String(b.id) === String(selBike.id);
+            const isMaint = b.status === "Servis";
             const slots = getBikeTodayBookingSlots(b.id);
-            const slotNote = b.status === "Servis" ? "Servis" : (slots.length ? `Booked ${slots[0]}` : "Ready");
-            return `<option value="${esc(b.id)}" ${isSel ? "selected" : ""} ${disAttr}>${escHtml(b.name)} — ${escHtml(b.type)} (${fmtRp(b.price2Hours || 40000)} • ${escHtml(slotNote)})</option>`;
+            const statusPill = isMaint
+                ? `<span class="px-1.5 py-0.5 rounded bg-zinc-500/20 text-zinc-500 text-[8.5px] font-extrabold uppercase">Servis</span>`
+                : slots.length
+                    ? `<span class="px-1.5 py-0.5 rounded bg-amber-400/30 text-amber-800 text-[8.5px] font-extrabold">Booked ${escHtml(slots[0])}</span>`
+                    : `<span class="px-1.5 py-0.5 rounded bg-emerald-500/15 text-emerald-700 text-[8.5px] font-extrabold">● Ready</span>`;
+
+            const specsLine = [b.type, b.frameSize, b.gears].filter(Boolean).join(" • ");
+
+            return `
+                <button type="button" ${isMaint ? "disabled" : `onclick="pickBookingBikeVisual(${idx},'${esc(b.id)}')"`} class="w-full p-2.5 flex items-center gap-3 text-left transition ${isSel ? 'bg-emerald-500/12' : 'hover:bg-black/5'} ${isMaint ? 'opacity-45 cursor-not-allowed' : 'cursor-pointer'}">
+                    <img src="${esc(b.image || fallbackImg)}" alt="${escHtml(b.name)}" onerror="this.src='${fallbackImg}'" class="w-16 h-12 rounded-xl object-cover bg-black border gold-border shrink-0">
+                    <div class="min-w-0 flex-1 space-y-0.5">
+                        <div class="flex items-center gap-1.5 flex-wrap">
+                            <strong class="text-xs font-extrabold truncate">${escHtml(b.name)}</strong>
+                            ${statusPill}
+                        </div>
+                        <p class="text-[10px] app-muted truncate">${escHtml(specsLine || "Sepeda Siap Gowes")}</p>
+                        <p class="text-[10.5px] font-extrabold text-emerald-600">${fmtRp(b.price2Hours || 40000)} <span class="font-normal app-muted">/ ${escHtml(b.label2Hours || "2 Jam")}</span></p>
+                    </div>
+                    <span class="shrink-0 pr-1">
+                        ${isSel
+                            ? `<i class="fa-solid fa-circle-check text-emerald-600 text-base"></i>`
+                            : `<i class="fa-regular fa-circle app-muted text-base opacity-45"></i>`}
+                    </span>
+                </button>
+            `;
         }).join("");
 
         return `
             <div class="space-y-1">
                 <label class="app-label">${labelTxt}</label>
-                <select id="gw-book-bike-select-${idx}" onchange="onBookingBikeSlotChange(${idx}, this.value)" class="app-input font-bold" required>
-                    ${optionsHtml}
-                </select>
+                <input type="hidden" id="gw-book-bike-select-${idx}" value="${esc(selBike.id)}">
+                <button type="button" id="gw-bike-picker-btn-${idx}" onclick="toggleBookingBikePicker(${idx})" class="gowes-bike-picker-trigger ${isOpen ? 'is-open' : ''}">
+                    <img src="${esc(selBike.image || fallbackImg)}" alt="${escHtml(selBike.name)}" onerror="this.src='${fallbackImg}'" class="w-16 h-12 rounded-xl object-cover bg-black border gold-border shrink-0">
+                    <div class="min-w-0 flex-1 space-y-0.5">
+                        <strong class="text-xs sm:text-sm font-extrabold block truncate leading-tight">${escHtml(selBike.name)}</strong>
+                        <span class="text-[10px] app-muted block truncate">${escHtml(selBike.type || "Sepeda")} • <strong class="text-emerald-600">${fmtRp(selBike.price2Hours || 40000)}</strong></span>
+                        <div>${selBadgeHtml}</div>
+                    </div>
+                    <div class="flex flex-col items-end gap-0.5 shrink-0 pr-0.5">
+                        <span class="text-[9px] font-bold text-emerald-600 uppercase">${isOpen ? 'Tutup' : 'Ganti'}</span>
+                        <i class="fa-solid fa-chevron-down text-xs text-emerald-600 transition-transform duration-200" style="transform:${isOpen ? 'rotate(180deg)' : 'rotate(0deg)'}"></i>
+                    </div>
+                </button>
+                <div id="gw-bike-picker-list-${idx}" class="${isOpen ? '' : 'hide'} gowes-bike-picker-list divide-y divide-black/10">
+                    ${listItemsHtml}
+                </div>
             </div>
         `;
     }).join("");
@@ -588,8 +711,29 @@ function onBookingBikeSlotChange(slotIdx, bikeId) {
     const bikes = getAvailableGowesBikes();
     if (slotIdx === 0) {
         activeBookingBike = bikes.find(b => String(b.id) === String(bikeId)) || activeBookingBike;
+        _refreshBookingBranchBadge();
     }
     updateGowesBookingPriceCalc();
+}
+
+function _refreshBookingBranchBadge() {
+    const branchBadge = document.getElementById("gw-book-branch-badge");
+    if (!branchBadge || !activeBookingBike) return;
+    const currentBranch = getActiveShelterObject();
+    const bookedToday = getBikeTodayBookingSlots(activeBookingBike.id);
+    const bookedHint = bookedToday.length
+        ? `<span class="block text-[10px] text-amber-600 font-bold mt-1"><i class="fa-regular fa-clock mr-1"></i>Info hari ini: unit #1 terbooking jam ${escHtml(bookedToday.join(" & "))} WITA — pilih jam lain yang kosong.</span>`
+        : "";
+    branchBadge.innerHTML = `
+        <div class="rounded-2xl p-3 bg-emerald-500/10 border border-emerald-500/35 space-y-0.5">
+            <div class="flex items-center justify-between gap-2 text-xs">
+                <strong class="text-emerald-700 truncate"><i class="fa-solid fa-location-dot mr-1.5"></i>Form Cabang ${escHtml(currentBranch.city || "Utama")}</strong>
+                <span class="text-[9.5px] px-2 py-0.5 rounded-full bg-emerald-500 text-white font-extrabold shrink-0">OTOMATIS</span>
+            </div>
+            <p class="text-[10.5px] app-muted truncate">${escHtml(currentBranch.name)} • ${escHtml(currentBranch.address)}</p>
+            ${bookedHint}
+        </div>
+    `;
 }
 
 function changeBookingBikeQty(delta) {
@@ -705,6 +849,7 @@ function openGowesBookingModal(bikeId = null) {
     const readyFirst = bikes.find(b => b.status !== "Servis") || bikes[0];
     activeBookingBike = bikeId ? (bikes.find(b => String(b.id) === String(bikeId)) || readyFirst) : readyFirst;
     bookingSelectedBikeIds = [activeBookingBike.id];
+    openBookingBikePickerIdx = -1;
     gowesKtpDraft = "";
 
     // Otomatis menampilkan formulir cabang sesuai daerah aktif (tanpa dropdown manual)
@@ -768,6 +913,7 @@ function openGowesBookingModal(bikeId = null) {
 function closeGowesBookingModal() {
     activeBookingBike = null;
     bookingSelectedBikeIds = [];
+    openBookingBikePickerIdx = -1;
     gowesKtpDraft = "";
     document.getElementById("modal-gowes-booking")?.classList.add("hide");
     if (typeof _mrDropTopModalById === "function") _mrDropTopModalById("modal-gowes-booking");

@@ -483,15 +483,20 @@
             </div>
 
             <!-- KONTEN BERANDA NORMAL SAAT GARASI BUKA -->
-            <div id="gowes-open-content" class="space-y-5">
-                <!-- 1. BANNER MEMANJANG 16:5 (5 SLIDE SHOW AUTO-SLIDE) -->
-                <div class="gowes-banner-16-5 shadow-sm rounded-2xl">
+            <div id="gowes-open-content" class="-mt-3 md:mt-0 space-y-4 sm:space-y-5">
+                <!-- 1. BANNER PROMOSI FULL MENTOK DI BAWAH HEADER (TANPA LENGKUNG DI MOBILE) -->
+                <div class="gowes-banner-16-5">
                     <div id="gowes-banner-track" class="w-full h-full flex transition-transform duration-700 ease-out"></div>
                 </div>
 
-                <!-- 2. SHOWCASE PILIHAN SEPEDA (RASIO 4:3 ELEGAN) -->
+                <!-- 2. SHOWCASE PILIHAN SEPEDA (JUDUL KIRI + TOMBOL BOOKING SEKARANG KANAN) -->
                 <div class="space-y-2.5">
-                    <h3 class="text-base sm:text-lg font-extrabold tracking-tight text-center">Pilihan Sepeda</h3>
+                    <div class="flex items-center justify-between gap-2">
+                        <h3 class="text-base sm:text-lg font-extrabold tracking-tight text-left">Pilihan Sepeda</h3>
+                        <button type="button" onclick="openGowesBookingModal()" class="gowes-pill-btn px-3.5 py-2 rounded-xl text-[11px] sm:text-xs font-extrabold shadow-md flex items-center gap-1.5 shrink-0">
+                            <i class="fa-solid fa-bicycle text-xs"></i> Booking Sekarang
+                        </button>
+                    </div>
 
                     <div class="gowes-showcase-fullbleed shadow-md">
                         <div id="gowes-showcase-track" class="gowes-showcase-track"></div>
@@ -500,26 +505,12 @@
                 </div>
 
                 <!-- 3. TOMBOL TIPE SEPEDA (FILTER CEPAT) -->
-                <div class="space-y-2 pt-1">
-                    <div class="flex items-center justify-between px-1">
+                <div class="space-y-2 pt-0.5">
+                    <div class="flex items-center justify-between px-0.5">
                         <h4 class="text-xs font-extrabold uppercase app-muted tracking-wider">Kategori Unit Armada</h4>
                         <span id="gowes-bike-count-badge" class="text-[10px] font-bold text-emerald-600"></span>
                     </div>
                     <div id="gowes-category-filters" class="flex gap-1.5 overflow-x-auto no-scrollbar pb-1 px-0.5"></div>
-                </div>
-
-                <!-- 4. TOMBOL BESAR BOOKING SEPEDA SEKARANG (CTA) -->
-                <div id="sec-gowes-booking-cta" class="pt-1">
-                    <div class="app-card border-2 border-emerald-500/50 rounded-3xl p-4 sm:p-5 shadow-md flex flex-col sm:flex-row sm:items-center justify-between gap-3.5 bg-gradient-to-r from-emerald-500/10 via-transparent to-transparent">
-                        <div class="space-y-1">
-                            <span class="text-[9px] uppercase tracking-widest font-extrabold px-2 py-0.5 rounded-full bg-emerald-500 text-white">PESAN MUDAH &amp; CEPAT</span>
-                            <h3 class="font-extrabold text-base leading-tight">Siap Menjelajah Rute Favoritmu?</h3>
-                            <p class="text-[11px] app-muted leading-relaxed">Pesan unit sekarang, tentukan durasi sewa, dan dapatkan jaminan unit terawat siap gowes.</p>
-                        </div>
-                        <button type="button" onclick="openGowesBookingModal()" class="gowes-pill-btn px-6 py-3.5 rounded-2xl text-xs uppercase tracking-wider font-extrabold shadow-lg shrink-0 flex items-center justify-center gap-2">
-                            <i class="fa-solid fa-bicycle text-sm"></i> Booking Sepeda Sekarang
-                        </button>
-                    </div>
                 </div>
 
                 <!-- 5. INFORMASI POS SHELTER MULTI-CABANG & PETA GOOGLE MAPS ELEGAN -->
@@ -1120,7 +1111,7 @@
             </div>
 
             <div class="p-4 border-t gold-border text-center text-[10px] app-muted">
-                Versi V14.6 • Terintegrasi Penuh
+                Versi V14.7 • Terintegrasi Penuh
             </div>
         </div>
     </div>
@@ -1635,7 +1626,7 @@
                             </ul>
                             <div class="pt-3 border-t gold-border flex items-center justify-between text-[11px]">
                                 <span class="app-muted">Versi Aplikasi</span>
-                                <span class="px-2.5 py-0.5 rounded-full app-accent-bg app-accent font-extrabold">V14.6</span>
+                                <span class="px-2.5 py-0.5 rounded-full app-accent-bg app-accent font-extrabold">V14.7</span>
                             </div>
                         </div>
                     </div>

@@ -1,5 +1,5 @@
 /* =========================================================================
-   LEMBARKU & TITIK GOWES — STYLESHEET RESMI (V14.6)
+   LEMBARKU & TITIK GOWES — STYLESHEET RESMI (V14.7)
    File: css/styles.css
    ========================================================================= */
 
@@ -556,7 +556,7 @@ body {
 .hide { display: none !important; }
 
 /* =========================================================================
-   TITIK GOWES — MODULAR EXTENSION STYLES (SAFE APPEND V14.6)
+   TITIK GOWES — MODULAR EXTENSION STYLES (SAFE APPEND V14.7)
    ========================================================================= */
 
 /* 1. Tombol Garis 2 Threads di Sisi Kiri Header (Hanya di Beranda) */
@@ -661,17 +661,18 @@ body:not(.in-home) #header-threads-btn {
     background-color: var(--gowes-emerald-soft);
 }
 
-/* 3. Banner Promosi Ramping Rasio 16 : 5 (Auto-Slide) */
+/* 3. Banner Promosi Full-Bleed Mentok Bawah Header (Tanpa Sudut Lengkung di Mobile) */
 .gowes-banner-16-5 {
     position: relative;
     width: 100vw;
     margin-left: calc(-50vw + 50%);
     margin-right: calc(-50vw + 50%);
-    aspect-ratio: 16 / 5;
-    min-height: 105px;
-    max-height: 220px;
+    aspect-ratio: 16 / 6.2;
+    min-height: 145px;
+    max-height: 240px;
+    border-radius: 0;
     overflow: hidden;
-    background: #064e3b;
+    background: linear-gradient(135deg, #064e3b 0%, #09090b 100%);
 }
 @media (min-width: 768px) {
     .gowes-banner-16-5 {
@@ -679,7 +680,7 @@ body:not(.in-home) #header-threads-btn {
         margin-left: 0;
         margin-right: 0;
         border-radius: 1.25rem;
-        height: 175px;
+        height: 200px;
     }
 }
 
@@ -851,7 +852,7 @@ body:not(.in-home) #header-threads-btn {
     box-shadow: 0 4px 12px rgba(5, 150, 105, 0.28);
 }
 
-/* 8. V14.6 — Kartu Peta Google Maps Elegan & Banner Tipografi Promosi */
+/* 8. V14.7 — Kartu Peta Google Maps Elegan & Banner Tipografi Promosi */
 .gowes-map-card-frame {
     position: relative;
     width: 100%;
@@ -889,4 +890,65 @@ body:not(.in-home) #header-threads-btn {
     letter-spacing: -0.015em;
     text-transform: uppercase;
     text-shadow: 0 2px 12px rgba(0, 0, 0, 0.72);
+}
+
+/* 9. V14.7 — Dropdown Pemilih Cabang Memanjang & Pemilih Sepeda Bergambar */
+.gowes-branch-select-btn {
+    width: 100%;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 0.75rem;
+    padding: 0.72rem 0.95rem;
+    border-radius: 0.95rem;
+    background-color: var(--app-card-soft);
+    border: 1.5px solid rgba(16, 185, 129, 0.42);
+    color: var(--app-text);
+    text-align: left;
+    transition: border-color 0.2s ease, box-shadow 0.2s ease, background-color 0.2s ease;
+    cursor: pointer;
+}
+.gowes-branch-select-btn:hover,
+.gowes-branch-select-btn.is-open {
+    border-color: var(--gowes-emerald);
+    box-shadow: 0 0 0 3px var(--gowes-emerald-soft);
+}
+.gowes-branch-dropdown-menu {
+    position: relative;
+    z-index: 30;
+    margin-top: 0.45rem;
+    border-radius: 1rem;
+    background-color: var(--app-card);
+    border: 1px solid rgba(16, 185, 129, 0.35);
+    box-shadow: 0 12px 30px rgba(0, 0, 0, 0.14);
+    overflow: hidden;
+}
+.gowes-bike-picker-trigger {
+    width: 100%;
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+    padding: 0.55rem 0.7rem;
+    border-radius: 1rem;
+    background-color: var(--app-card-soft);
+    border: 1.5px solid rgba(16, 185, 129, 0.38);
+    color: var(--app-text);
+    text-align: left;
+    transition: border-color 0.2s ease, box-shadow 0.2s ease;
+    cursor: pointer;
+}
+.gowes-bike-picker-trigger:hover,
+.gowes-bike-picker-trigger.is-open {
+    border-color: var(--gowes-emerald);
+    box-shadow: 0 0 0 3px var(--gowes-emerald-soft);
+}
+.gowes-bike-picker-list {
+    margin-top: 0.45rem;
+    border-radius: 1rem;
+    background-color: var(--app-card);
+    border: 1px solid rgba(16, 185, 129, 0.38);
+    box-shadow: 0 14px 32px rgba(0, 0, 0, 0.16);
+    max-height: 268px;
+    overflow-y: auto;
+    -webkit-overflow-scrolling: touch;
 }
