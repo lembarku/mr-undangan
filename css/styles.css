@@ -1,5 +1,5 @@
 /* =========================================================================
-   LEMBARKU & TITIK GOWES — STYLESHEET RESMI (V14.3)
+   LEMBARKU & TITIK GOWES — STYLESHEET RESMI (V14.6)
    File: css/styles.css
    ========================================================================= */
 
@@ -556,7 +556,7 @@ body {
 .hide { display: none !important; }
 
 /* =========================================================================
-   TITIK GOWES — MODULAR EXTENSION STYLES (SAFE APPEND V14.3)
+   TITIK GOWES — MODULAR EXTENSION STYLES (SAFE APPEND V14.6)
    ========================================================================= */
 
 /* 1. Tombol Garis 2 Threads di Sisi Kiri Header (Hanya di Beranda) */
@@ -849,4 +849,44 @@ body:not(.in-home) #header-threads-btn {
     color: #ffffff;
     border-color: var(--gowes-emerald);
     box-shadow: 0 4px 12px rgba(5, 150, 105, 0.28);
+}
+
+/* 8. V14.6 — Kartu Peta Google Maps Elegan & Banner Tipografi Promosi */
+.gowes-map-card-frame {
+    position: relative;
+    width: 100%;
+    height: 185px;
+    border-radius: 1.15rem;
+    overflow: hidden;
+    background: #09090b;
+    border: 1px solid var(--app-border);
+}
+.gowes-map-card-frame iframe {
+    width: 100%;
+    height: 100%;
+    border: 0;
+    filter: contrast(1.04) saturate(1.08);
+    pointer-events: none;
+}
+.gowes-map-click-overlay {
+    position: absolute;
+    inset: 0;
+    z-index: 10;
+    display: flex;
+    flex-direction: column;
+    justify-content: flex-end;
+    padding: 0.75rem;
+    background: linear-gradient(to top, rgba(9, 9, 11, 0.82) 0%, rgba(9, 9, 11, 0.12) 48%, transparent 100%);
+    text-decoration: none;
+    transition: background 0.2s ease;
+}
+.gowes-map-click-overlay:hover {
+    background: linear-gradient(to top, rgba(6, 78, 59, 0.88) 0%, rgba(6, 78, 59, 0.16) 55%, transparent 100%);
+}
+.gowes-banner-headline {
+    font-style: italic;
+    font-weight: 900;
+    letter-spacing: -0.015em;
+    text-transform: uppercase;
+    text-shadow: 0 2px 12px rgba(0, 0, 0, 0.72);
 }

@@ -1,6 +1,6 @@
 // =========================================================================
-// TITIK GOWES — ADMIN FLEET, OPS, BANNER & HANDOVER CONTROLLER (js/gowes-admin.js)
-// Versi: V14.4 (4 Tab Pengaturan Lengkap, Cropper 4:3, Multi-Sepeda & Toko Tutup)
+// TITIK GOWES — ADMIN FLEET, MULTI-CABANG, BANNER & HANDOVER (js/gowes-admin.js)
+// Versi: V14.6 (CRUD Cabang Daerah + Google Maps, Rem & Label Tarif Fleksibel)
 // =========================================================================
 
 let mgbTempPhotoUrl = "";
@@ -15,12 +15,19 @@ function switchGowesFleetAdminTab(tab) {
     }
 }
 
+function _getAdminSheltersList() {
+    if (typeof getGowesSheltersList === "function") return getGowesSheltersList();
+    if (Array.isArray(db.gowesShelters) && db.gowesShelters.length) return db.gowesShelters;
+    return typeof DEFAULT_GOWES_SHELTERS !== "undefined" ? DEFAULT_GOWES_SHELTERS : [db.gowesShelter || DEFAULT_GOWES_SHELTER];
+}
+
 // ================= 0. PUSAT PENGATURAN LENGKAP TITIK GOWES (4 TAB) =================
 function renderGowesFleetWorkspaceHtml() {
     const curU = typeof getCurrentUserObj === "function" ? getCurrentUserObj() : null;
     const isMaster = !!(curU && curU.role === "master");
-    const shelter = db.gowesShelter || DEFAULT_GOWES_SHELTER;
-    const isClosed = !!(shelter && shelter.isClosed);
+    const shelters = _getAdminSheltersList();
+    const activeSh = typeof getActiveShelterObject === "function" ? getActiveShelterObject() : shelters[0];
+    const isClosed = !!(activeSh && activeSh.isClosed);
     const bikes = (Array.isArray(db.gowesBikes) && db.gowesBikes.length ? db.gowesBikes : DEFAULT_GOWES_BIKES).filter(b => b && b.status !== "Dihapus");
     const banners = Array.isArray(db.gowesBanners) && db.gowesBanners.length ? db.gowesBanners : DEFAULT_GOWES_BANNERS;
     const cats = Array.isArray(db.gowesCategories) && db.gowesCategories.length ? db.gowesCategories : DEFAULT_GOWES_CATEGORIES;
@@ -31,7 +38,7 @@ function renderGowesFleetWorkspaceHtml() {
                 <i class="fa-solid fa-bicycle mr-1"></i>Armada (${bikes.length})
             </button>
             <button type="button" onclick="switchGowesFleetAdminTab('ops')" class="px-3.5 py-2 rounded-xl text-xs font-extrabold whitespace-nowrap transition ${_gowesFleetAdminTab === 'ops' ? 'gowes-pill-btn shadow' : 'app-btn-sec'}">
-                <i class="fa-solid ${isClosed ? 'fa-store-slash text-red-400' : 'fa-store'} mr-1"></i>Status Garasi
+                <i class="fa-solid fa-store mr-1"></i>Gerai &amp; Cabang (${shelters.length})
             </button>
             ${isMaster ? `
                 <button type="button" onclick="switchGowesFleetAdminTab('banners')" class="px-3.5 py-2 rounded-xl text-xs font-extrabold whitespace-nowrap transition ${_gowesFleetAdminTab === 'banners' ? 'gowes-pill-btn shadow' : 'app-btn-sec'}">
@@ -47,34 +54,55 @@ function renderGowesFleetWorkspaceHtml() {
     let paneHtml = "";
     if (_gowesFleetAdminTab === "ops") {
         paneHtml = `
-            <div class="app-card border rounded-3xl p-5 space-y-4 shadow-sm">
-                <div class="flex flex-wrap items-center justify-between gap-3">
-                    <div class="flex items-center gap-3">
-                        <span class="w-12 h-12 rounded-2xl ${isClosed ? 'bg-red-500/20 text-red-500 border border-red-500/40' : 'bg-emerald-500/20 text-emerald-600 border border-emerald-500/40'} flex items-center justify-center text-xl">
-                            <i class="fa-solid ${isClosed ? 'fa-store-slash' : 'fa-store'}"></i>
-                        </span>
-                        <div>
-                            <strong class="text-sm block">Garasi Saat Ini: ${isClosed ? '<span class="text-red-500">TUTUP SEMENTARA</span>' : '<span class="text-emerald-600">BUKA &amp; MELAYANI</span>'}</strong>
-                            <span class="text-[11px] app-muted block">${escHtml(shelter.name || "Titik Gowes Shelter Utama")}</span>
-                        </div>
+            <div class="space-y-3.5">
+                <div class="app-card border rounded-2xl p-4 flex flex-wrap items-center justify-between gap-3 shadow-sm bg-gradient-to-r from-emerald-500/10 via-transparent to-transparent">
+                    <div>
+                        <h4 class="text-sm font-extrabold text-emerald-600"><i class="fa-solid fa-map-location-dot mr-1.5"></i>Daftar Gerai / Cabang Daerah</h4>
+                        <p class="text-[11px] app-muted">Tambah cabang kota baru, edit link Google Maps, atau buka/tutup tiap gerai.</p>
                     </div>
-                    <button type="button" onclick="openGowesShelterOpsModal()" class="gowes-pill-btn px-4 py-2.5 rounded-xl text-xs shadow">
-                        <i class="fa-solid fa-sliders mr-1.5"></i>Ubah Status / Jam Operasional
+                    <button type="button" onclick="openGowesShelterOpsModal(null, true)" class="gowes-pill-btn px-4 py-2 rounded-xl text-xs shadow">
+                        <i class="fa-solid fa-plus mr-1"></i>Tambah Gerai Cabang
                     </button>
                 </div>
-                <div class="grid sm:grid-cols-2 gap-2.5 text-xs pt-2 border-t gold-border">
-                    <div class="app-card-soft border rounded-2xl p-3">
-                        <span class="text-[10px] app-muted font-bold uppercase block">Jam Operasional</span>
-                        <strong class="block mt-0.5">${escHtml(shelter.operationalHours || "05.30 - 20.00 WITA")}</strong>
-                    </div>
-                    <div class="app-card-soft border rounded-2xl p-3">
-                        <span class="text-[10px] app-muted font-bold uppercase block">WhatsApp CS Shelter</span>
-                        <strong class="block mt-0.5">${escHtml(shelter.csPhone || "085117488828")}</strong>
-                    </div>
-                    <div class="app-card-soft border rounded-2xl p-3 sm:col-span-2">
-                        <span class="text-[10px] app-muted font-bold uppercase block">Pesan Pemberitahuan Saat Tutup</span>
-                        <p class="mt-0.5 leading-relaxed">${escHtml(shelter.closedReason || "-")}</p>
-                    </div>
+
+                <div class="space-y-2.5">
+                    ${shelters.map(s => {
+                        const sClosed = !!s.isClosed;
+                        const branchLink = `${getCleanBaseUrl()}?branch=${encodeURIComponent(s.city || s.id)}`;
+                        return `
+                            <div class="app-card border rounded-2xl p-4 space-y-2.5 shadow-sm">
+                                <div class="flex flex-wrap items-start justify-between gap-3">
+                                    <div class="flex items-start gap-3 min-w-0 flex-1">
+                                        <span class="w-10 h-10 rounded-2xl ${sClosed ? 'bg-red-500/20 text-red-500 border border-red-500/40' : 'bg-emerald-500/20 text-emerald-600 border border-emerald-500/40'} flex items-center justify-center text-base shrink-0">
+                                            <i class="fa-solid ${sClosed ? 'fa-store-slash' : 'fa-store'}"></i>
+                                        </span>
+                                        <div class="min-w-0">
+                                            <div class="flex items-center gap-1.5 flex-wrap">
+                                                <span class="gowes-brand-tag !text-[8.5px]">${escHtml(s.city || "Cabang")}</span>
+                                                <span class="text-[9px] font-extrabold uppercase px-2 py-0.5 rounded-full ${sClosed ? 'bg-red-500/15 text-red-500' : 'bg-emerald-500/15 text-emerald-600'}">● ${sClosed ? 'TUTUP' : 'BUKA'}</span>
+                                            </div>
+                                            <strong class="text-sm block truncate mt-0.5">${escHtml(s.name)}</strong>
+                                            <p class="text-[11px] app-muted line-clamp-1">${escHtml(s.address)}</p>
+                                            <p class="text-[10px] app-muted mt-0.5"><i class="fa-regular fa-clock text-emerald-600 mr-1"></i>${escHtml(s.operationalHours || "05.30 - 20.00 WITA")} • WA: ${escHtml(s.csPhone || "-")}</p>
+                                        </div>
+                                    </div>
+                                    <div class="flex flex-wrap items-center gap-1.5 shrink-0">
+                                        <button type="button" onclick="navigator.clipboard.writeText('${esc(branchLink)}');showToast('Link khusus cabang ${esc(s.city || s.name)} disalin!');" class="px-2.5 py-1.5 rounded-xl app-card-soft border text-[11px] font-bold" title="Salin link langsung halaman cabang ini">
+                                            <i class="fa-solid fa-link mr-1 text-emerald-600"></i>Link
+                                        </button>
+                                        <button type="button" onclick="openGowesShelterOpsModal('${esc(s.id)}', false)" class="px-3 py-1.5 rounded-xl app-card-soft border app-accent text-[11px] font-bold">
+                                            <i class="fa-solid fa-pen mr-1"></i>Edit
+                                        </button>
+                                        ${isMaster && shelters.length > 1 ? `
+                                            <button type="button" onclick="deleteGowesShelterBranch('${esc(s.id)}')" class="px-2.5 py-1.5 rounded-xl bg-red-600/15 text-red-500 text-[11px] font-bold" title="Hapus Cabang">
+                                                <i class="fa-solid fa-trash"></i>
+                                            </button>
+                                        ` : ""}
+                                    </div>
+                                </div>
+                            </div>
+                        `;
+                    }).join("")}
                 </div>
             </div>
         `;
@@ -88,15 +116,15 @@ function renderGowesFleetWorkspaceHtml() {
                     </div>
                     <input type="hidden" id="gwb-id">
                     <div class="w-full rounded-xl overflow-hidden border gold-border bg-black" style="aspect-ratio:16/5;">
-                        <img id="gwb-preview-img" src="${(banners[0] && banners[0].img) || 'https://images.unsplash.com/photo-1544717305-2782549b5136?auto=format&fit=crop&w=1200&q=75'}" class="w-full h-full object-cover">
+                        <img id="gwb-preview-img" src="${(banners[0] && banners[0].img) || 'https://images.unsplash.com/photo-1541625602330-2277a4c46182?auto=format&fit=crop&w=1200&q=80'}" class="w-full h-full object-cover">
                     </div>
                     <label class="block gowes-pill-btn py-2 rounded-xl text-center cursor-pointer text-xs">
                         <i class="fa-solid fa-crop-simple mr-1"></i>Pilih &amp; Crop Foto Banner (16 : 5)
                         <input type="file" accept="image/*" class="hide" onchange="pickCroppedGowesBanner(this)">
                     </label>
                     <div class="grid grid-cols-2 gap-2">
-                        <input type="text" id="gwb-badge" placeholder="Label (GRATIS HELM)" class="app-input text-xs">
-                        <input type="text" id="gwb-cta" placeholder="Tombol (Booking)" class="app-input text-xs">
+                        <input type="text" id="gwb-badge" placeholder="Label (TITIK GOWES)" class="app-input text-xs">
+                        <input type="text" id="gwb-cta" placeholder="Tombol (opsional)" class="app-input text-xs">
                     </div>
                     <input type="text" id="gwb-title" placeholder="Judul Banner Promosi" class="app-input text-xs" required>
                     <input type="text" id="gwb-sub" placeholder="Deskripsi singkat banner..." class="app-input text-xs" required>
@@ -157,13 +185,13 @@ function renderGowesFleetWorkspaceHtml() {
                             <i class="fa-solid ${isClosed ? 'fa-store-slash' : 'fa-store'}"></i>
                         </span>
                         <div>
-                            <strong class="text-xs block">Garasi: ${isClosed ? '<span class="text-red-500">TUTUP SEMENTARA</span>' : '<span class="text-emerald-600">BUKA</span>'}</strong>
-                            <span class="text-[10px] app-muted block">${escHtml(shelter.operationalHours || "05.30 - 20.00 WITA")}</span>
+                            <strong class="text-xs block">${escHtml(activeSh.city || "Utama")}: ${isClosed ? '<span class="text-red-500">TUTUP SEMENTARA</span>' : '<span class="text-emerald-600">BUKA</span>'}</strong>
+                            <span class="text-[10px] app-muted block">${shelters.length} Gerai Terdaftar • ${escHtml(activeSh.operationalHours || "05.30 - 20.00 WITA")}</span>
                         </div>
                     </div>
                     <div class="flex flex-wrap gap-2">
-                        <button type="button" onclick="openGowesShelterOpsModal()" class="px-3 py-2 rounded-xl app-card-soft border text-xs font-bold">
-                            <i class="fa-solid fa-store mr-1 text-emerald-600"></i>Buka / Tutup Toko
+                        <button type="button" onclick="switchGowesFleetAdminTab('ops')" class="px-3 py-2 rounded-xl app-card-soft border text-xs font-bold">
+                            <i class="fa-solid fa-store mr-1 text-emerald-600"></i>Kelola Gerai
                         </button>
                         <button type="button" onclick="openMasterGowesBikeModal()" class="gowes-pill-btn px-4 py-2 rounded-xl text-xs shadow">
                             <i class="fa-solid fa-plus mr-1"></i>Tambah Unit Sepeda
@@ -228,8 +256,8 @@ async function saveGowesBannerForm(e) {
     const img = gwBannerTempImg || document.getElementById("gwb-img-url").value.trim() || document.getElementById("gwb-preview-img").src;
     const item = {
         id: idVal || ("gb_" + Date.now()),
-        badge: document.getElementById("gwb-badge").value.trim() || "PROMO GOWES",
-        ctaText: document.getElementById("gwb-cta").value.trim() || "Lihat Armada",
+        badge: document.getElementById("gwb-badge").value.trim() || "TITIK GOWES",
+        ctaText: document.getElementById("gwb-cta").value.trim(),
         title: document.getElementById("gwb-title").value.trim(),
         subtitle: document.getElementById("gwb-sub").value.trim(),
         targetSection: document.getElementById("gwb-target").value || "gowes-showcase-track",
@@ -280,26 +308,36 @@ async function toggleGowesCategoryActive(idx, checked) {
     }
 }
 
-// ================= 1. OPERASIONAL SHELTER & SAKELAR TOKO TUTUP =================
-function openGowesShelterOpsModal() {
+// ================= 1. KELOLA GERAI CABANG & SAKELAR TOKO TUTUP =================
+function openGowesShelterOpsModal(branchId = null, isNew = false) {
     const curU = typeof getCurrentUserObj === "function" ? getCurrentUserObj() : null;
     if (!curU || (curU.role !== "master" && curU.role !== "administrasi")) {
-        return showToast("Hanya Founder dan Tim Administrasi yang dapat mengatur operasional garasi.", "error");
+        return showToast("Hanya Founder dan Tim Administrasi yang dapat mengatur gerai cabang.", "error");
     }
 
-    const shelter = db.gowesShelter || DEFAULT_GOWES_SHELTER;
-    const isClosed = !!(shelter && shelter.isClosed);
+    const shelters = _getAdminSheltersList();
+    let target = null;
+    if (!isNew) {
+        target = branchId
+            ? shelters.find(s => String(s.id) === String(branchId))
+            : (typeof getActiveShelterObject === "function" ? getActiveShelterObject() : shelters[0]);
+    }
+
+    const isClosed = !!(target && target.isClosed);
+    const titleEl = document.getElementById("gso-modal-title");
+    if (titleEl) titleEl.innerText = isNew ? "Tambah Gerai / Cabang Baru" : `Edit Gerai: ${(target && target.city) || "Utama"}`;
+
+    document.getElementById("gso-id").value = target ? (target.id || "") : "";
+    document.getElementById("gso-city").value = target ? (target.city || "") : "";
+    document.getElementById("gso-name").value = target ? (target.name || "") : "";
+    document.getElementById("gso-address").value = target ? (target.address || "") : "";
+    document.getElementById("gso-maps-url").value = target ? (target.mapsUrl || "") : "";
+    document.getElementById("gso-hours").value = target ? (target.operationalHours || "Setiap Hari: 05.30 - 20.00 WITA") : "Setiap Hari: 06.00 - 19.30 WITA";
+    document.getElementById("gso-cs-phone").value = target ? (target.csPhone || "085117488828") : "085117488828";
+    document.getElementById("gso-closed-reason").value = target ? (target.closedReason || "") : "Garasi cabang sedang istirahat sementara. Buka kembali besok pagi.";
 
     const toggleEl = document.getElementById("gso-is-closed-toggle");
-    const reasonInp = document.getElementById("gso-closed-reason");
-    const hoursInp = document.getElementById("gso-hours");
-    const phoneInp = document.getElementById("gso-cs-phone");
-
     if (toggleEl) toggleEl.checked = isClosed;
-    if (reasonInp) reasonInp.value = shelter.closedReason || "Garasi Titik Gowes sedang istirahat / tutup sementara. Buka kembali pada jadwal berikutnya.";
-    if (hoursInp) hoursInp.value = shelter.operationalHours || "05.30 - 20.00 WITA";
-    if (phoneInp) phoneInp.value = shelter.csPhone || "085117488828";
-
     toggleShelterClosedReasonField(isClosed);
 
     const modal = document.getElementById("modal-gowes-shelter-ops");
@@ -314,10 +352,10 @@ function toggleShelterClosedReasonField(isClosed) {
     if (indicator) {
         if (isClosed) {
             indicator.className = "text-[11px] font-bold text-red-500 pt-1";
-            indicator.innerText = "● Status: Garasi TUTUP SEMENTARA (Beranda dialihkan ke layar tutup)";
+            indicator.innerText = "● Status: Gerai TUTUP SEMENTARA (Pengumuman tutup tampil di cabang ini)";
         } else {
             indicator.className = "text-[11px] font-bold text-emerald-600 pt-1";
-            indicator.innerText = "● Status: Garasi BUKA & Melayani Rental Sepeda";
+            indicator.innerText = "● Status: Gerai BUKA & Melayani Rental Sepeda";
         }
     }
     if (reasonWrap) reasonWrap.classList.toggle("opacity-50", !isClosed);
@@ -326,33 +364,81 @@ function toggleShelterClosedReasonField(isClosed) {
 async function submitGowesShelterOps(e) {
     e.preventDefault();
 
+    const idVal = document.getElementById("gso-id")?.value.trim() || "";
+    const city = document.getElementById("gso-city")?.value.trim() || "";
+    const name = document.getElementById("gso-name")?.value.trim() || "";
+    const address = document.getElementById("gso-address")?.value.trim() || "";
+    const mapsUrl = document.getElementById("gso-maps-url")?.value.trim() || "";
+    const operationalHours = document.getElementById("gso-hours")?.value.trim() || "Setiap Hari: 05.30 - 20.00 WITA";
+    const csPhone = document.getElementById("gso-cs-phone")?.value.trim() || "085117488828";
     const isClosed = !!document.getElementById("gso-is-closed-toggle")?.checked;
     const closedReason = document.getElementById("gso-closed-reason")?.value.trim() || "";
-    const operationalHours = document.getElementById("gso-hours")?.value.trim() || "05.30 - 20.00 WITA";
-    const csPhone = document.getElementById("gso-cs-phone")?.value.trim() || "085117488828";
 
-    const prevShelter = db.gowesShelter || DEFAULT_GOWES_SHELTER;
-    const updatedShelter = Object.assign({}, prevShelter, { isClosed, closedReason, operationalHours, csPhone });
+    if (!city || !name || !address) return showToast("Kota, nama gerai, dan alamat wajib diisi.", "error");
 
-    setBtnLoading("btn-save-gso", true, "Menyimpan Status...");
-    const res = await apiAction({ action: "gowes_update_shelter_ops", shelter: updatedShelter });
+    const shelterObj = {
+        id: idVal || ("sh_" + Date.now()),
+        city,
+        name,
+        address,
+        mapsUrl,
+        operationalHours,
+        csPhone,
+        isClosed,
+        closedReason
+    };
+
+    setBtnLoading("btn-save-gso", true, "Menyimpan Gerai...");
+    const res = await apiAction({ action: "gowes_upsert_shelter", shelter: shelterObj });
     setBtnLoading("btn-save-gso", false);
 
     if (!res || !res.ok) {
-        return showToast((res && res.message) || "Gagal memperbarui status operasional garasi.", "error");
+        return showToast((res && res.message) || "Gagal menyimpan data gerai.", "error");
     }
 
-    db.gowesShelter = res.shelter || updatedShelter;
+    if (Array.isArray(res.shelters) && res.shelters.length) {
+        db.gowesShelters = res.shelters;
+        db.gowesShelter = res.shelters[0];
+    } else {
+        const list = [..._getAdminSheltersList()];
+        const idx = list.findIndex(x => String(x.id) === String(shelterObj.id));
+        if (idx >= 0) list[idx] = shelterObj; else list.push(shelterObj);
+        db.gowesShelters = list;
+        db.gowesShelter = list[0];
+    }
+
     document.getElementById("modal-gowes-shelter-ops")?.classList.add("hide");
     if (typeof _mrDropTopModalById === "function") _mrDropTopModalById("modal-gowes-shelter-ops");
 
     if (typeof renderGowesLandingPage === "function" && currentAppMode === "titik_gowes") renderGowesLandingPage();
     if (typeof renderMasterWorkspaceContent === "function") renderMasterWorkspaceContent();
 
-    showToast(isClosed ? "Garasi Titik Gowes ditandai TUTUP sementara." : "Garasi Titik Gowes dibuka kembali & siap melayani!", "info");
+    showToast(`Gerai ${city} berhasil disimpan!`);
 }
 
-// ================= 2. KELOLA ARMADA SEPEDA (CRUD FOUNDER & ADMIN) =================
+async function deleteGowesShelterBranch(branchId) {
+    const shelters = _getAdminSheltersList();
+    if (shelters.length <= 1) return showToast("Minimal harus menyisakan 1 gerai aktif.", "info");
+    const target = shelters.find(s => String(s.id) === String(branchId));
+    const ok = await showConfirm("Hapus Gerai Cabang", `Hapus gerai "${(target && target.name) || "cabang ini"}"?`, "fa-solid fa-trash", "Ya, Hapus");
+    if (!ok) return;
+
+    showLoading("Menghapus gerai...");
+    const res = await apiAction({ action: "gowes_delete_shelter", shelterId: String(branchId) });
+    hideLoading();
+
+    if (!res || !res.ok) return showToast((res && res.message) || "Gagal menghapus gerai.", "error");
+
+    db.gowesShelters = Array.isArray(res.shelters) && res.shelters.length
+        ? res.shelters
+        : shelters.filter(s => String(s.id) !== String(branchId));
+    db.gowesShelter = db.gowesShelters[0];
+    if (typeof renderGowesLandingPage === "function" && currentAppMode === "titik_gowes") renderGowesLandingPage();
+    if (typeof renderMasterWorkspaceContent === "function") renderMasterWorkspaceContent();
+    showToast("Gerai cabang dihapus.", "info");
+}
+
+// ================= 2. KELOLA ARMADA SEPEDA (REM & LABEL TARIF FLEKSIBEL) =================
 function openMasterGowesBikeModal(bikeId = null) {
     const isEdit = !!bikeId;
     const bikes = Array.isArray(db.gowesBikes) && db.gowesBikes.length ? db.gowesBikes : DEFAULT_GOWES_BIKES;
@@ -368,6 +454,16 @@ function openMasterGowesBikeModal(bikeId = null) {
     document.getElementById("mgb-type").value = isEdit ? b.type : "MTB (Gunung)";
     document.getElementById("mgb-frame").value = isEdit ? (b.frameSize || "") : "M (165-175 cm)";
     document.getElementById("mgb-gears").value = isEdit ? (b.gears || "") : "1x11 Speed Shimano";
+    const brkEl = document.getElementById("mgb-brakes");
+    if (brkEl) brkEl.value = isEdit ? (b.brakes || "") : "Hydraulic Disc Brake Shimano";
+
+    const l2 = document.getElementById("mgb-l2h");
+    const l6 = document.getElementById("mgb-l6h");
+    const lf = document.getElementById("mgb-lfullday");
+    if (l2) l2.value = isEdit ? (b.label2Hours || "2 Jam") : "2 Jam";
+    if (l6) l6.value = isEdit ? (b.label6Hours || "6 Jam") : "6 Jam";
+    if (lf) lf.value = isEdit ? (b.labelFullDay || "Full Day") : "Full Day";
+
     document.getElementById("mgb-p2h").value = isEdit ? (b.price2Hours || 40000) : 40000;
     document.getElementById("mgb-p6h").value = isEdit ? (b.price6Hours || 75000) : 75000;
     document.getElementById("mgb-pfullday").value = isEdit ? (b.priceFullDay || 120000) : 120000;
@@ -392,7 +488,6 @@ function pickGowesBikePhoto(inp) {
     inp.value = "";
 
     if (typeof openImageCropper === "function") {
-        // Disinkronkan ke rasio 4:3 agar presisi sempurna di etalase Pilihan Sepeda
         openImageCropper(file, 4 / 3, "Atur Foto Unit Sepeda (4:3)", 960, 720, (dataUrl) => {
             mgbTempPhotoUrl = dataUrl;
             const prev = document.getElementById("mgb-preview-img");
@@ -422,6 +517,10 @@ async function submitMasterGowesBikeModal(e) {
     const type = document.getElementById("mgb-type").value;
     const frameSize = document.getElementById("mgb-frame").value.trim();
     const gears = document.getElementById("mgb-gears").value.trim();
+    const brakes = (document.getElementById("mgb-brakes")?.value || "").trim();
+    const label2Hours = (document.getElementById("mgb-l2h")?.value || "2 Jam").trim();
+    const label6Hours = (document.getElementById("mgb-l6h")?.value || "6 Jam").trim();
+    const labelFullDay = (document.getElementById("mgb-lfullday")?.value || "Full Day").trim();
     const price2Hours = Number(document.getElementById("mgb-p2h").value || 40000);
     const price6Hours = Number(document.getElementById("mgb-p6h").value || 75000);
     const priceFullDay = Number(document.getElementById("mgb-pfullday").value || 120000);
@@ -435,7 +534,10 @@ async function submitMasterGowesBikeModal(e) {
 
     const bikePayload = {
         id: bikeId || ("bike_" + Date.now()),
-        name, type, frameSize, gears, price2Hours, price6Hours, priceFullDay, status, freeAccessories, description, image: finalImage
+        name, type, frameSize, gears, brakes,
+        label2Hours, label6Hours, labelFullDay,
+        price2Hours, price6Hours, priceFullDay,
+        status, freeAccessories, description, image: finalImage
     };
 
     setBtnLoading("btn-save-mgb", true, "Menyimpan Unit...");
@@ -546,7 +648,7 @@ function renderGowesBikesAdminList() {
                             <span class="text-[9px] font-extrabold uppercase px-2 py-0.5 rounded-full ${statusCls}">● ${escHtml(b.status)}</span>
                         </div>
                         <h4 class="font-extrabold text-xs sm:text-sm truncate pt-0.5">${escHtml(b.name)}</h4>
-                        <p class="text-[10px] app-muted truncate">2 Jam: ${fmtRp(b.price2Hours)} • 6 Jam: ${fmtRp(b.price6Hours)} • Full: ${fmtRp(b.priceFullDay)}</p>
+                        <p class="text-[10px] app-muted truncate">${escHtml(b.label2Hours || "2 Jam")}: ${fmtRp(b.price2Hours)} • ${escHtml(b.label6Hours || "6 Jam")}: ${fmtRp(b.price6Hours)} • ${escHtml(b.labelFullDay || "Full")}: ${fmtRp(b.priceFullDay)}</p>
                     </div>
                 </div>
 
@@ -689,6 +791,7 @@ function buildGowesOrderCardHtml(rental, options = {}) {
             <div class="min-w-0 space-y-1">
                 <div class="flex flex-wrap items-center gap-1.5">
                     <span class="gowes-brand-tag !text-[8.5px]"><i class="fa-solid fa-bicycle"></i> RENTAL TITIK GOWES</span>
+                    ${rental.branchCity ? `<span class="text-[9px] px-2 py-0.5 rounded-full bg-emerald-500/15 text-emerald-700 font-extrabold uppercase">${escHtml(rental.branchCity)}</span>` : ""}
                     ${statusBadge}
                 </div>
                 <h4 class="font-bold text-sm truncate">
@@ -700,7 +803,7 @@ function buildGowesOrderCardHtml(rental, options = {}) {
                 <p class="text-xs app-muted">Paket: <strong class="app-accent">${escHtml(rental.durationLabel)}</strong> • ${priceInfo}</p>
                 <div class="flex flex-wrap items-center gap-2 text-[10px] text-emerald-600 font-semibold pt-0.5">
                     <span><i class="fa-regular fa-calendar-check mr-1"></i>${escHtml(rental.startDate)} (${escHtml(rental.startTime)} WITA)</span>
-                    <span>• Pos: ${escHtml(rental.pickupLocation || "Shelter Utama")}</span>
+                    <span>• Gerai: ${escHtml(rental.pickupLocation || "Shelter Utama")}</span>
                     ${rental.handoverOutPhoto ? `<span class="text-blue-500"><i class="fa-solid fa-camera mr-0.5"></i>Foto Keluar ✓</span>` : ""}
                     ${rental.handoverInPhoto ? `<span class="text-emerald-500"><i class="fa-solid fa-camera mr-0.5"></i>Foto Kembali ✓</span>` : ""}
                 </div>
@@ -847,8 +950,9 @@ function buildGowesAnalyticsDashboardHtml() {
         count: Math.max(Number(b.totalRentedCount || 0), bikeRentMap[b.id] || 0)
     })).sort((a, b) => b.count - a.count).slice(0, 4);
 
-    const shelter = db.gowesShelter || DEFAULT_GOWES_SHELTER;
-    const isClosed = !!(shelter && shelter.isClosed);
+    const shelters = _getAdminSheltersList();
+    const activeSh = typeof getActiveShelterObject === "function" ? getActiveShelterObject() : shelters[0];
+    const isClosed = !!(activeSh && activeSh.isClosed);
 
     return `
         <div class="space-y-4">
@@ -858,12 +962,12 @@ function buildGowesAnalyticsDashboardHtml() {
                         <i class="fa-solid ${isClosed ? 'fa-store-slash' : 'fa-store'}"></i>
                     </span>
                     <div>
-                        <strong class="text-xs sm:text-sm block">Status Garasi: ${isClosed ? '<span class="text-red-500 font-extrabold">TUTUP SEMENTARA</span>' : '<span class="text-emerald-600 font-extrabold">BUKA &amp; MELAYANI</span>'}</strong>
-                        <span class="text-[10px] app-muted block">${isClosed ? escHtml(shelter.closedReason || "Pemberitahuan tutup aktif di beranda") : `Jam operasional: ${escHtml(shelter.operationalHours || "05.30 - 20.00 WITA")}`}</span>
+                        <strong class="text-xs sm:text-sm block">${shelters.length} Gerai Cabang Terdaftar (${escHtml(activeSh.city || "Utama")}: ${isClosed ? '<span class="text-red-500 font-extrabold">TUTUP</span>' : '<span class="text-emerald-600 font-extrabold">BUKA</span>'})</strong>
+                        <span class="text-[10px] app-muted block">Kelola jam buka, alamat, Google Maps &amp; cabang baru</span>
                     </div>
                 </div>
-                <button type="button" onclick="openGowesShelterOpsModal()" class="px-4 py-2 rounded-xl app-card-soft border gold-border text-xs font-bold app-accent shadow-sm">
-                    <i class="fa-solid fa-sliders mr-1.5"></i>Atur Status Garasi
+                <button type="button" onclick="openMasterWorkspace('gowes_fleet');switchGowesFleetAdminTab('ops');" class="px-4 py-2 rounded-xl app-card-soft border gold-border text-xs font-bold app-accent shadow-sm">
+                    <i class="fa-solid fa-sliders mr-1.5"></i>Kelola Gerai Cabang
                 </button>
             </div>
 

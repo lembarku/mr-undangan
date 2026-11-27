@@ -1,6 +1,6 @@
 // =========================================================================
-// TITIK GOWES — FRONTEND RENTAL & SHOWCASE CONTROLLER (js/gowes.js)
-// Versi: V14.4 (Foto 4:3 Elegan, Tanpa Badge Sewa, Multi-Sepeda & QRIS)
+// TITIK GOWES — FRONTEND RENTAL, MULTI-CABANG & SHOWCASE CONTROLLER (js/gowes.js)
+// Versi: V14.6 (Ready Hari Ini + Jam Booked Ringkas, Auto-Cabang & Google Maps)
 // =========================================================================
 
 let gowesFilterType = "all";
@@ -11,13 +11,98 @@ let gowesBannerIdx = 0;
 let gowesShowcaseIdx = 0;
 let gowesBannerTimer = null;
 let gowesShowcaseTimer = null;
+let activeGowesShelterId = "";
 
-// ================= 1. INISIALISASI & BERANDA TITIK GOWES =================
+// ================= 1. DETEKSI & MANAJEMEN CABANG AKTIF OTOMATIS =================
+function getGowesSheltersList() {
+    if (Array.isArray(db.gowesShelters) && db.gowesShelters.length) return db.gowesShelters;
+    if (typeof DEFAULT_GOWES_SHELTERS !== "undefined" && Array.isArray(DEFAULT_GOWES_SHELTERS) && DEFAULT_GOWES_SHELTERS.length) {
+        return DEFAULT_GOWES_SHELTERS;
+    }
+    const single = db.gowesShelter || DEFAULT_GOWES_SHELTER;
+    return [Object.assign({ id: "sh_smd_1", city: "Samarinda" }, single)];
+}
+
+function _matchBranchByKeyword(keyword) {
+    const k = String(keyword || "").trim().toLowerCase().replace(/[_-]+/g, " ");
+    if (!k) return null;
+    const list = getGowesSheltersList();
+    return list.find(s =>
+        String(s.id || "").toLowerCase() === k ||
+        String(s.city || "").toLowerCase().includes(k) ||
+        String(s.name || "").toLowerCase().includes(k) ||
+        k.includes(String(s.city || "").toLowerCase())
+    ) || null;
+}
+
+function resolveInitialGowesBranch() {
+    const list = getGowesSheltersList();
+    if (!list.length) return DEFAULT_GOWES_SHELTER;
+
+    // 1. Cek parameter URL (?branch=muara-jawa / ?cabang=samarinda / ?gerai=sanga-sanga)
+    try {
+        const q = new URLSearchParams(window.location.search);
+        const qBranch = q.get("branch") || q.get("cabang") || q.get("gerai") || q.get("daerah") || "";
+        if (qBranch) {
+            const matchedUrl = _matchBranchByKeyword(qBranch);
+            if (matchedUrl) {
+                activeGowesShelterId = matchedUrl.id;
+                localStorage.setItem(typeof GOWES_BRANCH_KEY !== "undefined" ? GOWES_BRANCH_KEY : "GOWES_ACTIVE_BRANCH_ID", matchedUrl.id);
+                return matchedUrl;
+            }
+        }
+    } catch {}
+
+    // 2. Cek pilihan cabang yang aktif saat ini
+    if (activeGowesShelterId) {
+        const foundCur = list.find(s => String(s.id) === String(activeGowesShelterId));
+        if (foundCur) return foundCur;
+    }
+
+    // 3. Cek simpanan localStorage terakhir di halaman/HP ini
+    const savedId = localStorage.getItem(typeof GOWES_BRANCH_KEY !== "undefined" ? GOWES_BRANCH_KEY : "GOWES_ACTIVE_BRANCH_ID") || "";
+    if (savedId) {
+        const foundSaved = list.find(s => String(s.id) === String(savedId));
+        if (foundSaved) {
+            activeGowesShelterId = foundSaved.id;
+            return foundSaved;
+        }
+    }
+
+    // 4. Cek alamat profil pengguna yang sedang login (auto-match Muara Jawa / Sanga-Sanga / Samarinda)
+    const curU = typeof getCurrentUserObj === "function" ? getCurrentUserObj() : null;
+    if (curU && curU.address) {
+        const matchedAddr = _matchBranchByKeyword(curU.address);
+        if (matchedAddr) {
+            activeGowesShelterId = matchedAddr.id;
+            return matchedAddr;
+        }
+    }
+
+    activeGowesShelterId = list[0].id;
+    return list[0];
+}
+
+function getActiveShelterObject() {
+    return resolveInitialGowesBranch();
+}
+
+function switchGowesActiveBranch(branchId) {
+    const list = getGowesSheltersList();
+    const target = list.find(s => String(s.id) === String(branchId));
+    if (!target) return;
+    activeGowesShelterId = target.id;
+    localStorage.setItem(typeof GOWES_BRANCH_KEY !== "undefined" ? GOWES_BRANCH_KEY : "GOWES_ACTIVE_BRANCH_ID", target.id);
+    renderGowesLandingPage();
+    showToast(`Cabang aktif: ${target.city || target.name}`, "info");
+}
+
+// ================= 2. INISIALISASI & BERANDA TITIK GOWES =================
 function renderGowesLandingPage() {
     const vGws = document.getElementById("view-gowes");
     if (!vGws || vGws.classList.contains("hide")) return;
 
-    const shelter = db.gowesShelter || DEFAULT_GOWES_SHELTER;
+    const shelter = getActiveShelterObject();
     const isClosed = !!(shelter && shelter.isClosed);
 
     const closedNotice = document.getElementById("gowes-closed-notice");
@@ -29,11 +114,11 @@ function renderGowesLandingPage() {
         if (closedNotice) closedNotice.classList.remove("hide");
         if (openContent) openContent.classList.add("hide");
         if (closedDesc) {
-            closedDesc.innerText = shelter.closedReason || "Garasi Titik Gowes sedang istirahat / tutup sementara. Kami siap melayani kembali pada jadwal operasional berikutnya.";
+            closedDesc.innerText = shelter.closedReason || `Garasi ${shelter.name} sedang istirahat / tutup sementara. Kami siap melayani kembali pada jadwal operasional berikutnya.`;
         }
         if (closedWaBtn) {
             const rawPhone = String(shelter.csPhone || "085117488828").replace(/\D/g, "");
-            closedWaBtn.href = `https://wa.me/${rawPhone}?text=${encodeURIComponent("Halo Admin Titik Gowes, saya ingin menanyakan jadwal buka rental sepeda.")}`;
+            closedWaBtn.href = `https://wa.me/${rawPhone}?text=${encodeURIComponent("Halo Admin " + (shelter.name || "Titik Gowes") + ", saya ingin menanyakan jadwal buka rental sepeda.")}`;
         }
         return;
     }
@@ -44,24 +129,100 @@ function renderGowesLandingPage() {
     renderGowesBannerSlider();
     renderGowesCategoryFilters();
     renderGowesShowcaseTrack();
-    renderGowesShelterInfo();
+    renderGowesShelterSection();
     startGowesAutoSlides();
 }
 
-function renderGowesShelterInfo() {
-    const shelter = db.gowesShelter || DEFAULT_GOWES_SHELTER;
-    const nameEl = document.getElementById("gowes-shelter-name");
-    const addrEl = document.getElementById("gowes-shelter-address");
-    const mapBtn = document.getElementById("gowes-shelter-map-btn");
-    const hoursEl = document.getElementById("gowes-hours-lbl");
-
-    if (nameEl) nameEl.innerText = shelter.name || "Titik Gowes Shelter Utama";
-    if (addrEl) addrEl.innerText = shelter.address || "Jl. Mulawarman No. 88, Samarinda";
-    if (mapBtn && shelter.mapsUrl) mapBtn.href = shelter.mapsUrl;
-    if (hoursEl) hoursEl.innerText = `Buka: ${shelter.operationalHours || "05.30 - 20.00 WITA"}`;
+// ================= 3. PETA GOOGLE MAPS ELEGAN & PILIHAN GERAI DAERAH =================
+function _buildGoogleMapsEmbedUrl(shelter) {
+    if (!shelter) return "https://maps.google.com/maps?q=Samarinda&t=&z=14&ie=UTF8&iwloc=&output=embed";
+    let q = String(shelter.mapsQuery || "").trim();
+    if (!q && shelter.mapsUrl) {
+        const mCoords = String(shelter.mapsUrl).match(/[?&](?:q|ll)=([^&]+)/i);
+        if (mCoords) {
+            try { q = decodeURIComponent(mCoords[1]); } catch { q = mCoords[1]; }
+        } else {
+            const mAt = String(shelter.mapsUrl).match(/@(-?\d+\.\d+,-?\d+\.\d+)/);
+            if (mAt) q = mAt[1];
+        }
+    }
+    if (!q) q = [shelter.name, shelter.address, shelter.city].filter(Boolean).join(", ");
+    return `https://maps.google.com/maps?q=${encodeURIComponent(q)}&t=&z=15&ie=UTF8&iwloc=&output=embed`;
 }
 
-// ================= 2. BANNER MEMANJANG RAMPING 16 : 5 =================
+function renderGowesShelterSection() {
+    const container = document.getElementById("sec-gowes-shelter");
+    if (!container) return;
+
+    const shelters = getGowesSheltersList();
+    const current = getActiveShelterObject();
+    const mapsHref = current.mapsUrl || `https://maps.google.com/?q=${encodeURIComponent(current.address || current.city || "Samarinda")}`;
+    const embedUrl = _buildGoogleMapsEmbedUrl(current);
+
+    const pillsHtml = shelters.map(s => {
+        const isSel = String(s.id) === String(current.id);
+        return `
+            <button type="button" onclick="switchGowesActiveBranch('${esc(s.id)}')" class="gowes-filter-btn ${isSel ? 'active' : ''}">
+                <i class="fa-solid fa-location-dot mr-1 text-[10px]"></i>${escHtml(s.city || s.name)}
+            </button>
+        `;
+    }).join("");
+
+    container.innerHTML = `
+        <div class="space-y-3">
+            <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+                <div>
+                    <span class="gowes-brand-tag">GERAI &amp; POS GARASI</span>
+                    <h4 class="text-xs font-extrabold uppercase app-muted tracking-wider mt-1">Pilih Cabang Daerah</h4>
+                </div>
+                <div class="flex gap-1.5 overflow-x-auto no-scrollbar pb-0.5">
+                    ${pillsHtml}
+                </div>
+            </div>
+
+            <div class="flex flex-wrap items-center justify-between gap-3 pt-1">
+                <div class="flex items-center gap-3 min-w-0 flex-1">
+                    <div class="w-11 h-11 rounded-2xl bg-emerald-500/15 border border-emerald-500/35 text-emerald-600 flex items-center justify-center text-lg shrink-0">
+                        <i class="fa-solid fa-location-dot"></i>
+                    </div>
+                    <div class="min-w-0">
+                        <h3 id="gowes-shelter-name" class="font-extrabold text-sm sm:text-base truncate">${escHtml(current.name)}</h3>
+                        <p id="gowes-shelter-address" class="text-[11px] app-muted line-clamp-2">${escHtml(current.address)}</p>
+                    </div>
+                </div>
+                <a id="gowes-shelter-map-btn" href="${esc(mapsHref)}" target="_blank" rel="noopener noreferrer" class="gowes-pill-btn px-3.5 py-2 rounded-xl text-xs flex items-center gap-1.5 shadow shrink-0">
+                    <i class="fa-solid fa-diamond-turn-right"></i> Rute Maps
+                </a>
+            </div>
+
+            <!-- Tampilan Maps Elegan Mengacu Google Maps (Klik untuk Navigasi Langsung) -->
+            <div class="gowes-map-card-frame shadow-sm">
+                <iframe src="${esc(embedUrl)}" loading="lazy" referrerpolicy="no-referrer-when-downgrade" title="Peta ${escHtml(current.name)}"></iframe>
+                <a href="${esc(mapsHref)}" target="_blank" rel="noopener noreferrer" class="gowes-map-click-overlay" title="Buka rute di Google Maps">
+                    <div class="flex items-center justify-between gap-2">
+                        <div class="min-w-0 text-white">
+                            <span class="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-emerald-500 text-white text-[9px] font-extrabold uppercase shadow">
+                                <i class="fa-solid fa-map-pin text-[8px]"></i> ${escHtml(current.city || "Lokasi Resmi")}
+                            </span>
+                            <p class="text-xs font-extrabold truncate mt-1 drop-shadow">${escHtml(current.name)}</p>
+                        </div>
+                        <span class="px-3 py-1.5 rounded-xl bg-white/95 text-zinc-900 text-[10px] font-extrabold shadow shrink-0 flex items-center gap-1">
+                            <i class="fa-solid fa-location-arrow text-emerald-600"></i> Buka Maps
+                        </span>
+                    </div>
+                </a>
+            </div>
+
+            <div class="grid grid-cols-2 sm:grid-cols-3 gap-2 pt-2 border-t gold-border text-[11px]">
+                <div class="flex items-center gap-1.5"><i class="fa-regular fa-clock text-emerald-600"></i><span id="gowes-hours-lbl" class="app-muted font-medium">Buka: ${escHtml(current.operationalHours || "05.30 - 20.00 WITA")}</span></div>
+                <div class="flex items-center gap-1.5"><i class="fa-solid fa-shield-halved text-emerald-600"></i><span class="app-muted font-medium">Jaminan: KTP / SIM Asli</span></div>
+                <div class="flex items-center gap-1.5"><i class="fa-solid fa-helmet-safety text-emerald-600"></i><span class="app-muted font-medium">Gratis Helm &amp; Kunci</span></div>
+            </div>
+        </div>
+    `;
+}
+
+// ================= 4. BANNER PROMOSI RAMPING 16 : 5 (GAYA REALISTIS) =================
 function _getGowesBannersList() {
     if (Array.isArray(db.gowesBanners) && db.gowesBanners.length) return db.gowesBanners;
     return DEFAULT_GOWES_BANNERS;
@@ -73,18 +234,21 @@ function renderGowesBannerSlider() {
     const slides = _getGowesBannersList();
     if (gowesBannerIdx >= slides.length) gowesBannerIdx = 0;
 
-    track.innerHTML = slides.map((s, idx) => `
-        <div onclick="handleGowesBannerClick(${idx})" class="min-w-full h-full relative flex items-center px-4 sm:px-8 cursor-pointer select-none overflow-hidden">
-            <img src="${s.img || 'https://images.unsplash.com/photo-1544717305-2782549b5136?auto=format&fit=crop&w=1200&q=75'}" class="absolute inset-0 w-full h-full object-cover opacity-75">
-            <div class="absolute inset-0 bg-gradient-to-r from-emerald-950/95 via-emerald-900/60 to-black/35"></div>
-            <div class="relative z-10 max-w-md space-y-0.5 sm:space-y-1 text-white">
-                <span class="inline-block px-2 py-0.5 rounded-full bg-emerald-400 text-emerald-950 font-extrabold text-[8px] uppercase tracking-wider shadow">${escHtml(s.badge || "PROMO GOWES")}</span>
-                <h3 class="text-xs sm:text-base font-extrabold leading-tight drop-shadow truncate">${escHtml(s.title || "Titik Gowes")}</h3>
-                <p class="text-[9.5px] sm:text-xs text-zinc-200 line-clamp-1 opacity-90">${escHtml(s.subtitle || "")}</p>
-                ${s.ctaText ? `<span class="inline-block mt-0.5 px-3 py-1 rounded-lg bg-white/20 backdrop-blur-sm text-[9.5px] font-bold text-white border border-white/30">${escHtml(s.ctaText)} <i class="fa-solid fa-arrow-right ml-1 text-[8px]"></i></span>` : ""}
+    track.innerHTML = slides.map((s, idx) => {
+        const primaryImg = s.localImg || s.img || "https://images.unsplash.com/photo-1541625602330-2277a4c46182?auto=format&fit=crop&w=1200&q=80";
+        const fallbackImg = s.img || "https://images.unsplash.com/photo-1541625602330-2277a4c46182?auto=format&fit=crop&w=1200&q=80";
+        return `
+            <div onclick="handleGowesBannerClick(${idx})" class="min-w-full h-full relative flex items-center px-4 sm:px-8 cursor-pointer select-none overflow-hidden bg-zinc-950">
+                <img src="${esc(primaryImg)}" ${imgFbAttr(fallbackImg)} class="absolute inset-0 w-full h-full object-cover object-center">
+                <div class="absolute inset-0 bg-gradient-to-r from-black/75 via-black/30 to-transparent"></div>
+                <div class="relative z-10 max-w-[68%] sm:max-w-md space-y-1 text-white">
+                    <h3 class="gowes-banner-headline text-sm sm:text-xl leading-[1.12] text-white">${escHtml(s.title || "SEHAT & BAHAGIA DENGAN BERSEPEDA!")}</h3>
+                    <p class="text-[9.5px] sm:text-xs text-white/90 font-semibold italic line-clamp-2 drop-shadow">${escHtml(s.subtitle || "RASAKAN MANFAATNYA!")}</p>
+                    ${s.ctaText ? `<span class="inline-block mt-1 px-3 py-1 rounded-lg bg-emerald-500/90 text-[9.5px] font-extrabold text-white shadow">${escHtml(s.ctaText)} <i class="fa-solid fa-arrow-right ml-1 text-[8px]"></i></span>` : ""}
+                </div>
             </div>
-        </div>
-    `).join("");
+        `;
+    }).join("");
 
     updateGowesBannerPos();
 }
@@ -104,7 +268,87 @@ function handleGowesBannerClick(idx) {
     }
 }
 
-// ================= 3. FILTER TIPE SEPEDA DINAMIS =================
+// ================= 5. STATUS KETERSEDIAAN HARI INI & JADWAL BOOKED RINGKAS =================
+function _formatBookingSlotRange(startTime, durationKey) {
+    const cleanTime = String(startTime || "08:00").trim();
+    const parts = cleanTime.split(":");
+    let hh = parseInt(parts[0], 10);
+    let mm = parseInt(parts[1], 10);
+    if (isNaN(hh)) hh = 8;
+    if (isNaN(mm)) mm = 0;
+
+    let endHh = hh + 2;
+    if (durationKey === "6_hours") endHh = hh + 6;
+    else if (durationKey === "full_day") endHh = 20;
+    if (endHh > 20 && durationKey === "full_day") endHh = 20;
+    endHh = endHh % 24;
+
+    const startLbl = `${String(hh).padStart(2, "0")}.${String(mm).padStart(2, "0")}`;
+    const endLbl = `${String(endHh).padStart(2, "0")}.${String(mm).padStart(2, "0")}`;
+    return `${startLbl}-${endLbl}`;
+}
+
+function getBikeTodayBookingSlots(bikeId) {
+    const todayStr = new Date().toISOString().split("T")[0];
+    const sources = [];
+    if (Array.isArray(db.gowesTodayBookings)) sources.push(...db.gowesTodayBookings);
+    if (Array.isArray(db.gowesRentals)) sources.push(...db.gowesRentals);
+
+    const seenIds = new Set();
+    const slots = [];
+
+    sources.forEach(r => {
+        if (!r) return;
+        const rid = String(r.id || `${r.bikeId}_${r.startDate}_${r.startTime}`);
+        if (seenIds.has(rid)) return;
+        seenIds.add(rid);
+
+        const st = String(r.status || "");
+        if (st === "Dibatalkan" || st === "Selesai") return;
+        if (String(r.startDate || "") !== todayStr) return;
+
+        const matchesBike = (Array.isArray(r.selectedBikes) && r.selectedBikes.length)
+            ? r.selectedBikes.some(sb => String(sb.bikeId) === String(bikeId))
+            : String(r.bikeId) === String(bikeId);
+
+        if (matchesBike) {
+            slots.push({
+                startTime: r.startTime || "08:00",
+                rangeText: _formatBookingSlotRange(r.startTime, r.durationKey)
+            });
+        }
+    });
+
+    slots.sort((a, b) => String(a.startTime).localeCompare(String(b.startTime)));
+    return Array.from(new Set(slots.map(x => x.rangeText)));
+}
+
+function buildBikeStatusBadgesHtml(bike) {
+    if (bike.status === "Servis") {
+        return `<span class="px-2.5 py-0.5 rounded-full bg-zinc-700/90 backdrop-blur-md text-white font-extrabold text-[9px] uppercase tracking-wider shadow">✕ Masa Servis</span>`;
+    }
+
+    const todaySlots = getBikeTodayBookingSlots(bike.id);
+    if (todaySlots.length > 0) {
+        const compactRanges = todaySlots.length <= 2
+            ? todaySlots.join(" & ")
+            : `${todaySlots.slice(0, 2).join(", ")} +${todaySlots.length - 2}`;
+        return `
+            <span class="px-2.5 py-0.5 rounded-full bg-emerald-500/90 backdrop-blur-md text-white font-extrabold text-[9px] uppercase tracking-wider shadow">● Ready Hari Ini</span>
+            <span class="px-2.5 py-0.5 rounded-full bg-amber-400/95 backdrop-blur-md text-zinc-950 font-extrabold text-[9px] tracking-tight shadow" title="Sudah dibooking hari ini pada jam tersebut">
+                <i class="fa-regular fa-clock mr-1"></i>Booked ${escHtml(compactRanges)}
+            </span>
+        `;
+    }
+
+    if (bike.status === "Sedang Disewa") {
+        return `<span class="px-2.5 py-0.5 rounded-full bg-amber-400/95 backdrop-blur-md text-zinc-950 font-extrabold text-[9px] uppercase tracking-wider shadow">● Sedang Dipakai</span>`;
+    }
+
+    return `<span class="px-2.5 py-0.5 rounded-full bg-emerald-500/90 backdrop-blur-md text-white font-extrabold text-[9px] uppercase tracking-wider shadow">● Ready Hari Ini</span>`;
+}
+
+// ================= 6. FILTER TIPE & SHOWCASE PILIHAN SEPEDA (4:3 ELEGAN) =================
 function renderGowesCategoryFilters() {
     const box = document.getElementById("gowes-category-filters");
     if (!box) return;
@@ -134,7 +378,6 @@ function getAvailableGowesBikes() {
     return list.filter(b => b && b.status !== "Dihapus");
 }
 
-// ================= 4. SHOWCASE PILIHAN SEPEDA (FOTO 4:3 ELEGAN & DOTS) =================
 function renderGowesShowcaseDots(count) {
     const dotsBox = document.getElementById("gowes-showcase-dots");
     if (!dotsBox) return;
@@ -170,7 +413,8 @@ function renderGowesShowcaseTrack() {
     }
 
     if (countBadge) {
-        countBadge.innerText = `${bikes.length} Unit Siap Gowes`;
+        const readyCnt = bikes.filter(b => b.status !== "Servis").length;
+        countBadge.innerText = `${readyCnt} Unit Ready`;
     }
 
     if (!bikes.length) {
@@ -189,21 +433,18 @@ function renderGowesShowcaseTrack() {
     const fallbackImg = "https://images.unsplash.com/photo-1485965120184-e220f721d03e?auto=format&fit=crop&w=800&q=75";
 
     track.innerHTML = bikes.map((b, idx) => {
-        const isAvailable = b.status === "Tersedia";
-        const isInUse = b.status === "Sedang Disewa";
+        const isMaintenance = b.status === "Servis";
+        const statusBadgesHtml = buildBikeStatusBadgesHtml(b);
+        const l2h = b.label2Hours || "2 Jam";
+        const l6h = b.label6Hours || "6 Jam";
+        const lFull = b.labelFullDay || "Full Day";
 
-        const statusBadge = isAvailable
-            ? `<span class="px-2.5 py-0.5 rounded-full bg-emerald-500/90 backdrop-blur-md text-white font-extrabold text-[9px] uppercase tracking-wider shadow">● Siap Gowes</span>`
-            : isInUse
-                ? `<span class="px-2.5 py-0.5 rounded-full bg-amber-500/90 backdrop-blur-md text-black font-extrabold text-[9px] uppercase tracking-wider shadow">● Sedang Digunakan</span>`
-                : `<span class="px-2.5 py-0.5 rounded-full bg-zinc-700/90 backdrop-blur-md text-white font-extrabold text-[9px] uppercase tracking-wider shadow">✕ Masa Servis</span>`;
-
-        const actionBtn = isAvailable
+        const actionBtn = !isMaintenance
             ? `<button type="button" onclick="openGowesBookingModal('${esc(b.id)}')" class="w-full gowes-pill-btn py-3 rounded-2xl text-xs uppercase tracking-wider font-extrabold shadow-xl flex items-center justify-center gap-1.5">
                 <i class="fa-solid fa-bicycle"></i> Sewa Unit Ini
                </button>`
             : `<button type="button" disabled class="w-full py-3 rounded-2xl bg-white/15 text-white/60 text-xs font-bold text-center cursor-not-allowed">
-                ${isInUse ? 'Sedang Digunakan' : 'Dalam Masa Servis'}
+                Dalam Masa Servis
                </button>`;
 
         return `
@@ -211,8 +452,8 @@ function renderGowesShowcaseTrack() {
                 <div class="gowes-showcase-photo-box">
                     <img src="${b.image || fallbackImg}" alt="${escHtml(b.name)}" loading="lazy">
                     <div class="absolute inset-x-0 top-0 h-16 bg-gradient-to-b from-black/55 to-transparent pointer-events-none"></div>
-                    <div class="absolute top-3 left-3 z-10 flex items-center gap-1.5 flex-wrap">
-                        ${statusBadge}
+                    <div class="absolute top-3 inset-x-3 z-10 flex items-center gap-1.5 flex-wrap">
+                        ${statusBadgesHtml}
                         <span class="px-2.5 py-0.5 rounded-full bg-black/55 text-white text-[9px] font-bold backdrop-blur-md border border-white/20">${escHtml(b.type || "Sepeda")}</span>
                     </div>
                     <div class="gowes-showcase-photo-fade"></div>
@@ -225,30 +466,22 @@ function renderGowesShowcaseTrack() {
                     </div>
 
                     <div class="flex flex-wrap gap-1.5 text-[10px]">
-                        <span class="px-2.5 py-1 rounded-xl bg-white/10 border border-white/15 text-zinc-100 font-semibold">
-                            <i class="fa-solid fa-ruler-combined text-emerald-400 mr-1"></i>${escHtml(b.frameSize || "All Size")}
-                        </span>
-                        <span class="px-2.5 py-1 rounded-xl bg-white/10 border border-white/15 text-zinc-100 font-semibold">
-                            <i class="fa-solid fa-gear text-emerald-400 mr-1"></i>${escHtml(b.gears || "Standar")}
-                        </span>
-                        ${b.brakes ? `
-                            <span class="px-2.5 py-1 rounded-xl bg-white/10 border border-white/15 text-zinc-100 font-semibold">
-                                <i class="fa-solid fa-circle-stop text-emerald-400 mr-1"></i>${escHtml(b.brakes)}
-                            </span>
-                        ` : ''}
+                        ${b.frameSize ? `<span class="px-2.5 py-1 rounded-xl bg-white/10 border border-white/15 text-zinc-100 font-semibold"><i class="fa-solid fa-ruler-combined text-emerald-400 mr-1"></i>${escHtml(b.frameSize)}</span>` : ""}
+                        ${b.gears ? `<span class="px-2.5 py-1 rounded-xl bg-white/10 border border-white/15 text-zinc-100 font-semibold"><i class="fa-solid fa-gear text-emerald-400 mr-1"></i>${escHtml(b.gears)}</span>` : ""}
+                        ${b.brakes ? `<span class="px-2.5 py-1 rounded-xl bg-white/10 border border-white/15 text-zinc-100 font-semibold"><i class="fa-solid fa-circle-stop text-emerald-400 mr-1"></i>${escHtml(b.brakes)}</span>` : ""}
                     </div>
 
                     <div class="grid grid-cols-3 gap-1.5 p-2 rounded-2xl bg-white/5 border border-white/15 text-center">
                         <div class="p-1">
-                            <span class="text-[8.5px] uppercase font-bold text-zinc-400 block">2 Jam</span>
+                            <span class="text-[8.5px] uppercase font-bold text-zinc-400 block truncate">${escHtml(l2h)}</span>
                             <strong class="text-xs font-extrabold text-emerald-400 block">${fmtRp(b.price2Hours || 40000)}</strong>
                         </div>
                         <div class="p-1 border-x border-white/15">
-                            <span class="text-[8.5px] uppercase font-bold text-zinc-400 block">6 Jam</span>
+                            <span class="text-[8.5px] uppercase font-bold text-zinc-400 block truncate">${escHtml(l6h)}</span>
                             <strong class="text-xs font-extrabold text-emerald-400 block">${fmtRp(b.price6Hours || 75000)}</strong>
                         </div>
                         <div class="p-1">
-                            <span class="text-[8.5px] uppercase font-bold text-zinc-400 block">Full Day</span>
+                            <span class="text-[8.5px] uppercase font-bold text-zinc-400 block truncate">${escHtml(lFull)}</span>
                             <strong class="text-xs font-extrabold text-emerald-400 block">${fmtRp(b.priceFullDay || 120000)}</strong>
                         </div>
                     </div>
@@ -308,11 +541,11 @@ function startGowesAutoSlides() {
     }, 6500);
 }
 
-// ================= 5. FORMULIR SEWA MULTI-SEPEDA & KALKULASI OTOMATIS =================
+// ================= 7. FORMULIR SEWA MULTI-SEPEDA & CABANG OTOMATIS =================
 function getSelectedBookingBikesObjects() {
     const bikes = getAvailableGowesBikes();
     if (!bikes.length) return [];
-    const fallbackBike = bikes.find(b => b.status === "Tersedia") || bikes[0];
+    const fallbackBike = bikes.find(b => b.status !== "Servis") || bikes[0];
     return bookingSelectedBikeIds.map(id => {
         return bikes.find(b => String(b.id) === String(id)) || fallbackBike;
     });
@@ -333,8 +566,10 @@ function renderBookingBikeSelectors() {
         const labelTxt = totalUnits > 1 ? `Pilih Unit Sepeda #${idx + 1}` : "Pilih Unit Sepeda";
         const optionsHtml = bikes.map(b => {
             const isSel = String(b.id) === String(selId);
-            const disAttr = b.status !== "Tersedia" ? "disabled" : "";
-            return `<option value="${esc(b.id)}" ${isSel ? "selected" : ""} ${disAttr}>${escHtml(b.name)} — ${escHtml(b.type)} (${fmtRp(b.price2Hours || 40000)}/2j • ${escHtml(b.status)})</option>`;
+            const disAttr = b.status === "Servis" ? "disabled" : "";
+            const slots = getBikeTodayBookingSlots(b.id);
+            const slotNote = b.status === "Servis" ? "Servis" : (slots.length ? `Booked ${slots[0]}` : "Ready");
+            return `<option value="${esc(b.id)}" ${isSel ? "selected" : ""} ${disAttr}>${escHtml(b.name)} — ${escHtml(b.type)} (${fmtRp(b.price2Hours || 40000)} • ${escHtml(slotNote)})</option>`;
         }).join("");
 
         return `
@@ -363,7 +598,7 @@ function changeBookingBikeQty(delta) {
     if (!inp || !lbl) return;
 
     const bikes = getAvailableGowesBikes();
-    const readyBikes = bikes.filter(b => b.status === "Tersedia");
+    const readyBikes = bikes.filter(b => b.status !== "Servis");
     const pool = readyBikes.length ? readyBikes : bikes;
 
     let cur = parseInt(inp.value, 10) || 1;
@@ -391,6 +626,10 @@ function updateGowesReturnEstimate() {
 
     const timeVal = timeInp ? timeInp.value : "";
     const durVal = durRadio ? durRadio.value : "2_hours";
+    const firstBike = getSelectedBookingBikesObjects()[0];
+    const lbl2 = (firstBike && firstBike.label2Hours) || "2 Jam";
+    const lbl6 = (firstBike && firstBike.label6Hours) || "6 Jam";
+    const lblFull = (firstBike && firstBike.labelFullDay) || "Full Day";
 
     if (!timeVal) {
         textEl.innerText = "Pilih jam ambil untuk melihat perkiraan batas kembali";
@@ -407,14 +646,14 @@ function updateGowesReturnEstimate() {
         let returnHh = hh + 2;
         let dayNote = "";
         if (returnHh >= 24) { returnHh %= 24; dayNote = " (Besok)"; }
-        textEl.innerHTML = `Batas kembali: <strong>Pukul ${String(returnHh).padStart(2, "0")}:${String(mm).padStart(2, "0")} WITA${dayNote}</strong> (Paket 2 Jam)`;
+        textEl.innerHTML = `Batas kembali: <strong>Pukul ${String(returnHh).padStart(2, "0")}:${String(mm).padStart(2, "0")} WITA${dayNote}</strong> (${escHtml(lbl2)})`;
     } else if (durVal === "6_hours") {
         let returnHh = hh + 6;
         let dayNote = "";
         if (returnHh >= 24) { returnHh %= 24; dayNote = " (Besok)"; }
-        textEl.innerHTML = `Batas kembali: <strong>Pukul ${String(returnHh).padStart(2, "0")}:${String(mm).padStart(2, "0")} WITA${dayNote}</strong> (Paket 6 Jam)`;
+        textEl.innerHTML = `Batas kembali: <strong>Pukul ${String(returnHh).padStart(2, "0")}:${String(mm).padStart(2, "0")} WITA${dayNote}</strong> (${escHtml(lbl6)})`;
     } else {
-        textEl.innerHTML = `Batas kembali: <strong>Pukul 20.00 WITA</strong> hari yang sama (Garasi Tutup)`;
+        textEl.innerHTML = `Batas kembali: <strong>Pukul 20.00 WITA</strong> hari yang sama (${escHtml(lblFull)})`;
     }
 }
 
@@ -422,9 +661,17 @@ function updateGowesBookingPriceCalc() {
     const selectedObjs = getSelectedBookingBikesObjects();
     if (!selectedObjs.length) return;
 
+    const first = selectedObjs[0];
     const sum2h = selectedObjs.reduce((s, b) => s + Number(b.price2Hours || 40000), 0);
     const sum6h = selectedObjs.reduce((s, b) => s + Number(b.price6Hours || 75000), 0);
     const sumFull = selectedObjs.reduce((s, b) => s + Number(b.priceFullDay || 120000), 0);
+
+    const l2 = document.getElementById("gw-lbl-2h");
+    const l6 = document.getElementById("gw-lbl-6h");
+    const lf = document.getElementById("gw-lbl-fullday");
+    if (l2) l2.innerText = first.label2Hours || "Paket 2 Jam";
+    if (l6) l6.innerText = first.label6Hours || "Paket 6 Jam";
+    if (lf) lf.innerText = first.labelFullDay || "Full Day";
 
     const r2 = document.getElementById("gw-rate-2h");
     const r6 = document.getElementById("gw-rate-6h");
@@ -454,17 +701,37 @@ function openGowesBookingModal(bikeId = null) {
     if (!bikes.length) return showToast("Belum ada unit sepeda yang tersedia.", "info");
 
     const curU = typeof getCurrentUserObj === "function" ? getCurrentUserObj() : null;
-    const readyFirst = bikes.find(b => b.status === "Tersedia") || bikes[0];
+    const currentBranch = getActiveShelterObject();
+    const readyFirst = bikes.find(b => b.status !== "Servis") || bikes[0];
     activeBookingBike = bikeId ? (bikes.find(b => String(b.id) === String(bikeId)) || readyFirst) : readyFirst;
     bookingSelectedBikeIds = [activeBookingBike.id];
     gowesKtpDraft = "";
+
+    // Otomatis menampilkan formulir cabang sesuai daerah aktif (tanpa dropdown manual)
+    const branchBadge = document.getElementById("gw-book-branch-badge");
+    if (branchBadge) {
+        const bookedToday = getBikeTodayBookingSlots(activeBookingBike.id);
+        const bookedHint = bookedToday.length
+            ? `<span class="block text-[10px] text-amber-600 font-bold mt-1"><i class="fa-regular fa-clock mr-1"></i>Info hari ini: unit #1 terbooking jam ${escHtml(bookedToday.join(" & "))} WITA — pilih jam lain yang kosong.</span>`
+            : "";
+        branchBadge.innerHTML = `
+            <div class="rounded-2xl p-3 bg-emerald-500/10 border border-emerald-500/35 space-y-0.5">
+                <div class="flex items-center justify-between gap-2 text-xs">
+                    <strong class="text-emerald-700 truncate"><i class="fa-solid fa-location-dot mr-1.5"></i>Form Cabang ${escHtml(currentBranch.city || "Utama")}</strong>
+                    <span class="text-[9.5px] px-2 py-0.5 rounded-full bg-emerald-500 text-white font-extrabold shrink-0">OTOMATIS</span>
+                </div>
+                <p class="text-[10.5px] app-muted truncate">${escHtml(currentBranch.name)} • ${escHtml(currentBranch.address)}</p>
+                ${bookedHint}
+            </div>
+        `;
+    }
 
     const nameInp = document.getElementById("gw-book-name");
     const phInp = document.getElementById("gw-book-phone");
     const addrInp = document.getElementById("gw-book-address");
     if (nameInp) nameInp.value = (curU && (curU.name || curU.username)) || "";
     if (phInp) phInp.value = (curU && curU.phone) || "";
-    if (addrInp) addrInp.value = (curU && curU.address) || "";
+    if (addrInp) addrInp.value = (curU && curU.address) || currentBranch.city || "";
 
     const qtyInp = document.getElementById("gw-book-qty");
     const qtyLbl = document.getElementById("gw-book-qty-lbl");
@@ -534,10 +801,16 @@ async function submitGowesRentalBooking(e) {
     const selectedObjs = getSelectedBookingBikesObjects();
     if (!selectedObjs.length) return showToast("Pilih minimal 1 unit sepeda terlebih dahulu.", "error");
 
+    const firstBike = selectedObjs[0];
     const durRadio = document.querySelector('input[name="gw_duration"]:checked');
     const durationKey = durRadio ? durRadio.value : "2_hours";
-    const durLabel = durationKey === "6_hours" ? "Paket 6 Jam" : durationKey === "full_day" ? "Full Day" : "Paket 2 Jam";
+    const durLabel = durationKey === "6_hours"
+        ? (firstBike.label6Hours || "Paket 6 Jam")
+        : durationKey === "full_day"
+            ? (firstBike.labelFullDay || "Full Day")
+            : (firstBike.label2Hours || "Paket 2 Jam");
 
+    const currentBranch = getActiveShelterObject();
     const customerName = document.getElementById("gw-book-name")?.value.trim() || "";
     const customerPhone = document.getElementById("gw-book-phone")?.value.trim() || "";
     const customerAddress = document.getElementById("gw-book-address")?.value.trim() || "";
@@ -552,7 +825,6 @@ async function submitGowesRentalBooking(e) {
     if (!startDate || !startTime) return showToast("Tentukan tanggal dan jam sewa.", "error");
     if (!gowesKtpDraft) return showToast("Silakan unggah foto KTP/SIM penjamin.", "error");
 
-    const firstBike = selectedObjs[0];
     const uniqueNames = Array.from(new Set(selectedObjs.map(b => b.name)));
     const combinedBikeName = uniqueNames.length === 1 ? uniqueNames[0] : uniqueNames.join(" + ");
 
@@ -576,6 +848,9 @@ async function submitGowesRentalBooking(e) {
         customerAddress,
         startDate,
         startTime,
+        branchId: currentBranch.id || "sh_smd_1",
+        branchCity: currentBranch.city || "Samarinda",
+        pickupLocation: currentBranch.name || "Titik Gowes Shelter Utama",
         ktpImage: gowesKtpDraft,
         note
     };
@@ -597,7 +872,7 @@ async function submitGowesRentalBooking(e) {
     openGowesRentalPayment(res.rental.id);
 }
 
-// ================= 6. PEMBAYARAN QRIS TERPADU TITIK GOWES =================
+// ================= 8. PEMBAYARAN QRIS TERPADU TITIK GOWES =================
 async function openGowesRentalPayment(rentalId) {
     const list = Array.isArray(db.gowesRentals) ? db.gowesRentals : [];
     const rental = list.find(r => String(r.id) === String(rentalId));
@@ -636,7 +911,7 @@ async function openGowesRentalPayment(rentalId) {
         const multiHtml = (Array.isArray(rental.selectedBikes) && rental.selectedBikes.length > 1)
             ? `<div class="text-[10px] app-muted mt-1">${rental.selectedBikes.map((sb, i) => `Unit #${i + 1}: <strong>${escHtml(sb.bikeName)}</strong>`).join(" • ")}</div>`
             : "";
-        itemName.innerHTML = `<strong>${escHtml(rental.bikeName)}</strong> (${rental.quantity || 1} Unit) • ${escHtml(rental.durationLabel)}${multiHtml}<span class="block text-[10px] app-muted mt-0.5">Jadwal: ${escHtml(rental.startDate)} pukul ${escHtml(rental.startTime)} WITA</span>`;
+        itemName.innerHTML = `<strong>${escHtml(rental.bikeName)}</strong> (${rental.quantity || 1} Unit) • ${escHtml(rental.durationLabel)}${multiHtml}<span class="block text-[10px] app-muted mt-0.5">Gerai: ${escHtml(rental.pickupLocation || "Shelter Utama")} • Jadwal: ${escHtml(rental.startDate)} pukul ${escHtml(rental.startTime)} WITA</span>`;
     }
     if (finalPrice) finalPrice.innerText = fmtRp(rental.totalPrice);
     if (uniqueHint) {
@@ -712,7 +987,7 @@ async function submitGowesPaymentProof(rentalId) {
     if (typeof routeDashboard === "function") routeDashboard();
 }
 
-// ================= 7. KARTU RIWAYAT SEWA PELANGGAN & DETAIL =================
+// ================= 9. KARTU RIWAYAT SEWA PELANGGAN & DETAIL =================
 function buildUserRentalCardHtml(rental) {
     const isPay = rental.status === "Menunggu Pembayaran";
     const isVerif = rental.status === "Menunggu Verifikasi";
@@ -745,7 +1020,7 @@ function buildUserRentalCardHtml(rental) {
                     </div>
                     <h4 class="font-extrabold text-xs sm:text-sm truncate pt-0.5">${escHtml(rental.bikeName)} (${rental.quantity || 1} Unit)</h4>
                     <p class="text-[10px] app-muted truncate">${escHtml(rental.durationLabel)} • ${fmtRp(rental.totalPrice)}</p>
-                    <p class="text-[9.5px] text-emerald-600 font-semibold"><i class="fa-regular fa-clock mr-1"></i>Jadwal: ${escHtml(rental.startDate)} pukul ${escHtml(rental.startTime)} WITA</p>
+                    <p class="text-[9.5px] text-emerald-600 font-semibold"><i class="fa-regular fa-clock mr-1"></i>${escHtml(rental.startDate)} pukul ${escHtml(rental.startTime)} WITA • ${escHtml(rental.pickupLocation || "Shelter Utama")}</p>
                 </div>
             </div>
             <div class="flex items-center justify-between gap-2 pt-2 border-t gold-border">
@@ -803,7 +1078,7 @@ function openGowesRentalDetail(rentalId) {
                     <div class="flex justify-between"><span class="app-muted">Penyewa:</span><strong class="font-bold">${escHtml(r.customerName || r.customerUsername)} (@${escHtml(r.customerUsername)})</strong></div>
                     <div class="flex justify-between"><span class="app-muted">WhatsApp:</span><strong class="font-bold">${escHtml(r.customerPhone || "-")}</strong></div>
                     <div class="flex justify-between"><span class="app-muted">Jadwal:</span><strong class="font-bold text-emerald-600">${escHtml(r.startDate)} pukul ${escHtml(r.startTime)} WITA</strong></div>
-                    <div class="flex justify-between"><span class="app-muted">Shelter Ambil:</span><strong class="font-bold">${escHtml(r.pickupLocation || "Shelter Utama")}</strong></div>
+                    <div class="flex justify-between"><span class="app-muted">Gerai Cabang:</span><strong class="font-bold">${escHtml(r.pickupLocation || "Shelter Utama")}</strong></div>
                     <div class="flex justify-between"><span class="app-muted">Status:</span><span class="font-extrabold text-emerald-600">${escHtml(r.status)}</span></div>
                 </div>
                 ${r.handoverOutPhoto ? `<div class="space-y-1"><span class="text-[10px] font-bold uppercase app-muted block">Foto Fisik Sepeda Saat Diambil:</span><img src="${r.handoverOutPhoto}" class="w-full h-36 object-contain rounded-xl bg-black border gold-border"></div>` : ""}

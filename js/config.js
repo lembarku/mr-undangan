@@ -1,6 +1,6 @@
 // =========================================================================
 // LEMBARKU & TITIK GOWES — CORE CONFIG, CATALOGS & SHARED ENGINE (js/config.js)
-// Versi: V14.4 (Bersih, Showcase 4:3, Multi-Sepeda & Kelola Armada Lengkap)
+// Versi: V14.6 (Multi-Cabang + Maps, Status Jam Booking Hari Ini & Tarif Fleksibel)
 // =========================================================================
 const CLOUD_API_URL = "https://script.google.com/macros/s/AKfycbyHsITJ02tiA59p0QIXkOQaO3VnBFQmDBp-7iUHcUkmrYjlOtRVwxhlGZCzL4RLKKNW/exec";
 const FOUNDER_USERNAME = "kausar.af";
@@ -10,6 +10,7 @@ const SESSION_TOKEN_KEY = "MR_UNDANGAN_SESSION_TOKEN";
 const DISPLAY_NAME_KEY = "MR_UNDANGAN_DISPLAY_NAME";
 const APP_THEME_KEY = "MR_UNDANGAN_APP_THEME";
 const APP_MODE_KEY = "MR_APP_MODE"; // 'lembarku' | 'titik_gowes'
+const GOWES_BRANCH_KEY = "GOWES_ACTIVE_BRANCH_ID";
 const PWA_REMIND_KEY = "MR_PWA_REMIND_TS";
 const LOGIN_REMIND_KEY = "MR_LOGIN_REMIND_TS";
 const DRAFT_INV_KEY = "MR_DRAFT_INV";
@@ -250,62 +251,98 @@ const CERT_SHOWCASE = [
 ];
 
 // ================= KATALOG BAWAAN TITIK GOWES =================
-const DEFAULT_GOWES_SHELTER = {
-    name: "Titik Gowes Shelter Utama",
-    address: "Jl. Mulawarman No. 88, Samarinda (Dekat Taman Kota)",
-    mapsUrl: "https://maps.google.com/?q=-0.502,117.153",
-    operationalHours: "Setiap Hari: 05.30 - 20.00 WITA",
-    csPhone: "085117488828",
-    isClosed: false,
-    closedReason: "Garasi Titik Gowes sedang istirahat / tutup sementara. Kami siap melayani kembali besok pukul 05.30 WITA."
-};
+const DEFAULT_GOWES_SHELTERS = [
+    {
+        id: "sh_smd_1",
+        city: "Samarinda",
+        name: "Titik Gowes Shelter Utama — Samarinda",
+        address: "Jl. Mulawarman No. 88, Samarinda (Dekat Taman Kota)",
+        mapsUrl: "https://maps.google.com/?q=-0.502,117.153",
+        mapsQuery: "-0.502,117.153",
+        operationalHours: "Setiap Hari: 05.30 - 20.00 WITA",
+        csPhone: "085117488828",
+        isClosed: false,
+        closedReason: "Garasi Titik Gowes Samarinda sedang istirahat / tutup sementara. Kami siap melayani kembali besok pukul 05.30 WITA."
+    },
+    {
+        id: "sh_sanga_1",
+        city: "Sanga-Sanga",
+        name: "Titik Gowes Cabang Sanga-Sanga",
+        address: "Jl. Jenderal Sudirman No. 12, Sanga-Sanga, Kutai Kartanegara",
+        mapsUrl: "https://maps.google.com/?q=-0.598,117.268",
+        mapsQuery: "-0.598,117.268",
+        operationalHours: "Setiap Hari: 06.00 - 19.30 WITA",
+        csPhone: "085117488828",
+        isClosed: false,
+        closedReason: "Garasi Titik Gowes Sanga-Sanga sedang istirahat sementara. Buka kembali besok pukul 06.00 WITA."
+    },
+    {
+        id: "sh_mj_1",
+        city: "Muara Jawa",
+        name: "Titik Gowes Cabang Muara Jawa",
+        address: "Jl. Ahmad Yani No. 45, Muara Jawa Pesisir, Kutai Kartanegara",
+        mapsUrl: "https://maps.google.com/?q=-0.817,117.234",
+        mapsQuery: "-0.817,117.234",
+        operationalHours: "Setiap Hari: 06.00 - 19.00 WITA",
+        csPhone: "085117488828",
+        isClosed: false,
+        closedReason: "Garasi Titik Gowes Muara Jawa sedang tutup sementara. Buka kembali besok pagi."
+    }
+];
+
+const DEFAULT_GOWES_SHELTER = DEFAULT_GOWES_SHELTERS[0];
 
 // 5 SLIDE BANNER PROMOSI RAMPING 16:5
 const DEFAULT_GOWES_BANNERS = [
     {
         id: "gb_1",
-        badge: "GRATIS AKSESORIS LENGKAP",
-        title: "Gowes Nyaman & Aman Tanpa Khawatir",
-        subtitle: "Setiap sewa unit sudah termasuk Helm SNI, Kunci Pengaman Spiral & Lampu Malam gratis.",
-        ctaText: "Booking Sekarang",
-        targetSection: "sec-gowes-booking-cta",
-        img: "https://images.unsplash.com/photo-1544717305-2782549b5136?auto=format&fit=crop&w=1200&q=75"
+        badge: "TITIK GOWES OFFICIAL",
+        title: "SEHAT & BAHAGIA DENGAN BERSEPEDA!",
+        subtitle: "RASAKAN MANFAATNYA! Sewa unit prima & jelajahi rute favoritmu hari ini.",
+        ctaText: "",
+        targetSection: "gowes-showcase-track",
+        localImg: "./assets/gowes-banner-1.jpg",
+        img: "https://images.unsplash.com/photo-1541625602330-2277a4c46182?auto=format&fit=crop&w=1200&q=80"
     },
     {
         id: "gb_2",
-        badge: "KEBUGARAN & IMUN",
-        title: "Investasi Sehat di Setiap Kayuhan",
-        subtitle: "Tingkatkan stamina kardio & bakar kalori sambil menikmati segarnya udara pagi Samarinda.",
-        ctaText: "Lihat Armada",
-        targetSection: "gowes-showcase-track",
-        img: "https://images.unsplash.com/photo-1517649763962-0c623266ddc0?auto=format&fit=crop&w=1200&q=75"
+        badge: "GOWES BARENG KOMUNITAS",
+        title: "ENERGI PAGI, STAMINA MAKSIMAL!",
+        subtitle: "Gratis Helm SNI, Kunci Spiral & Lampu di setiap peminjaman unit.",
+        ctaText: "",
+        targetSection: "sec-gowes-booking-cta",
+        localImg: "./assets/gowes-banner-2.jpg",
+        img: "https://images.unsplash.com/photo-1517649763962-0c623266ddc0?auto=format&fit=crop&w=1200&q=80"
     },
     {
         id: "gb_3",
-        badge: "PEMBAYARAN INSTAN",
-        title: "Sewa Cepat Bebas Ribet dengan QRIS",
-        subtitle: "Pilih durasi 2 jam, 6 jam, atau seharian penuh. Konfirmasi instan via QRIS DANA Bisnis.",
-        ctaText: "Cek Tarif Paket",
-        targetSection: "gowes-showcase-track",
-        img: "https://images.unsplash.com/photo-1532298229144-0ec0c57515c7?auto=format&fit=crop&w=1200&q=75"
+        badge: "RENTAL PRAKTIS QRIS",
+        title: "BOOKING CEPAT TANPA RIBET!",
+        subtitle: "Pilih durasi fleksibel, konfirmasi instan & ambil di gerai terdekat.",
+        ctaText: "",
+        targetSection: "sec-gowes-shelter",
+        localImg: "./assets/gowes-banner-3.jpg",
+        img: "https://images.unsplash.com/photo-1534787238916-9ba6764efd4f?auto=format&fit=crop&w=1200&q=80"
     },
     {
         id: "gb_4",
-        badge: "ARMADA PRIMA",
-        title: "Performa Maksimal di Setiap Tanjakan",
-        subtitle: "Groupset Shimano presisi, suspensi air fork empuk & rem hidrolik pakem rutin diservis mekanik.",
-        ctaText: "Pilih Sepeda",
+        badge: "ARMADA TERAWAT",
+        title: "SIAP TAKLUKKAN SETIAP RUTE!",
+        subtitle: "MTB, Roadbike & Sepeda Lipat rutin diservis mekanik profesional.",
+        ctaText: "",
         targetSection: "gowes-showcase-track",
-        img: "https://images.unsplash.com/photo-1485965120184-e220f721d03e?auto=format&fit=crop&w=1200&q=75"
+        localImg: "./assets/gowes-banner-4.jpg",
+        img: "https://images.unsplash.com/photo-1571068316344-75bc76f77890?auto=format&fit=crop&w=1200&q=80"
     },
     {
         id: "gb_5",
         badge: "SUNSET RIDE",
-        title: "Eksplorasi Sudut Kota & Rute Sore",
-        subtitle: "Nikmati pemandangan tepi sungai dan momen santai bersama teman dan keluarga.",
-        ctaText: "Rute Garasi Shelter",
+        title: "NIKMATI SORE SANTAI BERSEPEDA!",
+        subtitle: "Tersedia di Samarinda, Sanga-Sanga & Muara Jawa. Cek peta gerai sekarang.",
+        ctaText: "",
         targetSection: "sec-gowes-shelter",
-        img: "https://images.unsplash.com/photo-1507035895480-2b3156c31fc8?auto=format&fit=crop&w=1200&q=75"
+        localImg: "./assets/gowes-banner-5.jpg",
+        img: "https://images.unsplash.com/photo-1507035895480-2b3156c31fc8?auto=format&fit=crop&w=1200&q=80"
     }
 ];
 
@@ -326,6 +363,9 @@ const DEFAULT_GOWES_BIKES = [
         frameSize: "M (165-175 cm)",
         gears: "1x11 Speed Shimano Deore",
         brakes: "Hydraulic Disc Brake Shimano",
+        label2Hours: "2 Jam",
+        label6Hours: "6 Jam",
+        labelFullDay: "Full Day",
         price2Hours: 40000,
         price6Hours: 75000,
         priceFullDay: 120000,
@@ -343,6 +383,9 @@ const DEFAULT_GOWES_BIKES = [
         frameSize: "S/M (160-172 cm)",
         gears: "2x9 Speed Shimano Sora",
         brakes: "Caliper Dual-Pivot Rim Brake",
+        label2Hours: "2 Jam",
+        label6Hours: "6 Jam",
+        labelFullDay: "Full Day",
         price2Hours: 50000,
         price6Hours: 95000,
         priceFullDay: 150000,
@@ -360,6 +403,9 @@ const DEFAULT_GOWES_BIKES = [
         frameSize: "All Size (Adjustable)",
         gears: "8 Speed Shimano Tourney",
         brakes: "Mechanical Disc Brake",
+        label2Hours: "2 Jam",
+        label6Hours: "6 Jam",
+        labelFullDay: "Full Day",
         price2Hours: 35000,
         price6Hours: 60000,
         priceFullDay: 90000,
@@ -377,6 +423,9 @@ const DEFAULT_GOWES_BIKES = [
         frameSize: "L (175-185 cm)",
         gears: "1x12 Speed SRAM SX Eagle",
         brakes: "Hydraulic Disc Brake",
+        label2Hours: "2 Jam",
+        label6Hours: "6 Jam",
+        labelFullDay: "Full Day",
         price2Hours: 45000,
         price6Hours: 85000,
         priceFullDay: 135000,
@@ -404,6 +453,7 @@ function getLocalFallbackDB() {
         musicLibrary: [],
         gowesBikes: [...DEFAULT_GOWES_BIKES],
         gowesRentals: [],
+        gowesShelters: DEFAULT_GOWES_SHELTERS.map(s => Object.assign({}, s)),
         gowesShelter: Object.assign({}, DEFAULT_GOWES_SHELTER),
         gowesBanners: [...DEFAULT_GOWES_BANNERS],
         gowesCategories: [...DEFAULT_GOWES_CATEGORIES],
@@ -1011,7 +1061,14 @@ function applyPublicDb(data) {
 
     if (data.gowesPublic && typeof data.gowesPublic === "object") {
         if (Array.isArray(data.gowesPublic.bikes)) db.gowesBikes = data.gowesPublic.bikes;
-        if (data.gowesPublic.shelterLocation) db.gowesShelter = data.gowesPublic.shelterLocation;
+        if (Array.isArray(data.gowesPublic.shelters) && data.gowesPublic.shelters.length) {
+            db.gowesShelters = data.gowesPublic.shelters;
+            db.gowesShelter = data.gowesPublic.shelters[0];
+        } else if (data.gowesPublic.shelterLocation) {
+            db.gowesShelter = data.gowesPublic.shelterLocation;
+            if (!Array.isArray(db.gowesShelters) || !db.gowesShelters.length) db.gowesShelters = [Object.assign({ id: "sh_smd_1", city: "Samarinda" }, db.gowesShelter)];
+        }
+        if (Array.isArray(data.gowesPublic.todayBookings)) db.gowesTodayBookings = data.gowesPublic.todayBookings;
         if (Array.isArray(data.gowesPublic.banners)) db.gowesBanners = data.gowesPublic.banners;
         if (Array.isArray(data.gowesPublic.categories)) db.gowesCategories = data.gowesPublic.categories;
     }
@@ -1034,7 +1091,14 @@ function applyServerDb(data) {
         if (Array.isArray(data.gowesData.rentals)) db.gowesRentals = data.gowesData.rentals;
         else if (Array.isArray(data.gowesData.myRentals)) db.gowesRentals = data.gowesData.myRentals;
 
-        if (data.gowesData.shelterLocation) db.gowesShelter = data.gowesData.shelterLocation;
+        if (Array.isArray(data.gowesData.shelters) && data.gowesData.shelters.length) {
+            db.gowesShelters = data.gowesData.shelters;
+            db.gowesShelter = data.gowesData.shelters[0];
+        } else if (data.gowesData.shelterLocation) {
+            db.gowesShelter = data.gowesData.shelterLocation;
+            if (!Array.isArray(db.gowesShelters) || !db.gowesShelters.length) db.gowesShelters = [Object.assign({ id: "sh_smd_1", city: "Samarinda" }, db.gowesShelter)];
+        }
+        if (Array.isArray(data.gowesData.todayBookings)) db.gowesTodayBookings = data.gowesData.todayBookings;
         if (Array.isArray(data.gowesData.banners)) db.gowesBanners = data.gowesData.banners;
         if (Array.isArray(data.gowesData.categories)) db.gowesCategories = data.gowesData.categories;
         if (data.gowesData.analytics) db.gowesAnalytics = data.gowesData.analytics;

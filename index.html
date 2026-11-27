@@ -522,31 +522,8 @@
                     </div>
                 </div>
 
-                <!-- 5. INFORMASI POS SHELTER & PETA GARASI -->
-                <div id="sec-gowes-shelter" class="app-card border rounded-3xl p-4 sm:p-5 shadow-sm space-y-3">
-                    <div class="flex flex-wrap items-center justify-between gap-3">
-                        <div class="flex items-center gap-3">
-                            <div class="w-11 h-11 rounded-2xl bg-emerald-500/15 border border-emerald-500/35 text-emerald-600 flex items-center justify-center text-lg shrink-0">
-                                <i class="fa-solid fa-location-dot"></i>
-                            </div>
-                            <div class="min-w-0">
-                                <span class="gowes-brand-tag">POS UTAMA GARASI</span>
-                                <h3 id="gowes-shelter-name" class="font-extrabold text-sm sm:text-base mt-0.5 truncate">Titik Gowes Shelter Utama</h3>
-                                <p id="gowes-shelter-address" class="text-[11px] app-muted truncate">Jl. Mulawarman No. 88, Samarinda (Dekat Taman Kota)</p>
-                            </div>
-                        </div>
-                        <div class="flex gap-2">
-                            <a id="gowes-shelter-map-btn" href="https://maps.google.com/?q=-0.502,117.153" target="_blank" rel="noopener noreferrer" class="gowes-pill-btn px-3.5 py-2 rounded-xl text-xs flex items-center gap-1.5 shadow">
-                                <i class="fa-solid fa-diamond-turn-right"></i> Rute Maps
-                            </a>
-                        </div>
-                    </div>
-                    <div class="grid grid-cols-2 sm:grid-cols-3 gap-2 pt-2 border-t gold-border text-[11px]">
-                        <div class="flex items-center gap-1.5"><i class="fa-regular fa-clock text-emerald-600"></i><span id="gowes-hours-lbl" class="app-muted font-medium">Buka: 05.30 - 20.00 WITA</span></div>
-                        <div class="flex items-center gap-1.5"><i class="fa-solid fa-shield-halved text-emerald-600"></i><span class="app-muted font-medium">Jaminan: KTP / SIM Asli</span></div>
-                        <div class="flex items-center gap-1.5"><i class="fa-solid fa-helmet-safety text-emerald-600"></i><span class="app-muted font-medium">Gratis Helm &amp; Kunci</span></div>
-                    </div>
-                </div>
+                <!-- 5. INFORMASI POS SHELTER MULTI-CABANG & PETA GOOGLE MAPS ELEGAN -->
+                <div id="sec-gowes-shelter" class="app-card border rounded-3xl p-4 sm:p-5 shadow-sm space-y-3.5"></div>
 
                 <footer class="app-card border rounded-3xl p-6 space-y-4 shadow-sm text-center">
                     <div class="flex items-center justify-center gap-2.5">
@@ -1143,7 +1120,7 @@
             </div>
 
             <div class="p-4 border-t gold-border text-center text-[10px] app-muted">
-                Versi V14.4 • Terintegrasi Penuh
+                Versi V14.6 • Terintegrasi Penuh
             </div>
         </div>
     </div>
@@ -1165,6 +1142,9 @@
             </div>
 
             <div class="p-5 overflow-y-auto space-y-4 flex-1">
+                <!-- Gerai Cabang Otomatis Sesuai Halaman Aktif -->
+                <div id="gw-book-branch-badge"></div>
+
                 <!-- 1. Identitas Pemesan -->
                 <div class="space-y-2.5">
                     <label class="app-label !mb-0 text-emerald-600 font-extrabold">1. Identitas Pemesan</label>
@@ -1224,21 +1204,21 @@
                             <label class="cursor-pointer">
                                 <input type="radio" name="gw_duration" value="2_hours" checked onchange="updateGowesBookingPriceCalc()" class="hide peer">
                                 <div class="app-card border rounded-2xl p-2.5 text-center peer-checked:border-emerald-500 peer-checked:bg-emerald-500/10 transition">
-                                    <span class="text-[10px] font-bold block app-muted">Paket 2 Jam</span>
+                                    <span id="gw-lbl-2h" class="text-[10px] font-bold block app-muted">Paket 2 Jam</span>
                                     <strong id="gw-rate-2h" class="text-xs font-extrabold text-emerald-600 block mt-0.5">Rp 40.000</strong>
                                 </div>
                             </label>
                             <label class="cursor-pointer">
                                 <input type="radio" name="gw_duration" value="6_hours" onchange="updateGowesBookingPriceCalc()" class="hide peer">
                                 <div class="app-card border rounded-2xl p-2.5 text-center peer-checked:border-emerald-500 peer-checked:bg-emerald-500/10 transition">
-                                    <span class="text-[10px] font-bold block app-muted">Paket 6 Jam</span>
+                                    <span id="gw-lbl-6h" class="text-[10px] font-bold block app-muted">Paket 6 Jam</span>
                                     <strong id="gw-rate-6h" class="text-xs font-extrabold text-emerald-600 block mt-0.5">Rp 75.000</strong>
                                 </div>
                             </label>
                             <label class="cursor-pointer">
                                 <input type="radio" name="gw_duration" value="full_day" onchange="updateGowesBookingPriceCalc()" class="hide peer">
                                 <div class="app-card border rounded-2xl p-2.5 text-center peer-checked:border-emerald-500 peer-checked:bg-emerald-500/10 transition">
-                                    <span class="text-[10px] font-bold block app-muted">Full Day</span>
+                                    <span id="gw-lbl-fullday" class="text-[10px] font-bold block app-muted">Full Day</span>
                                     <strong id="gw-rate-fullday" class="text-xs font-extrabold text-emerald-600 block mt-0.5">Rp 120.000</strong>
                                 </div>
                             </label>
@@ -1288,56 +1268,81 @@
     </div>
 
     <!-- ========================================================= -->
-    <!-- MODAL PENGATURAN STATUS OPERASIONAL GARASI (TOKO TUTUP)   -->
+    <!-- MODAL PENGATURAN GERAI CABANG & OPERASIONAL GARASI        -->
     <!-- ========================================================= -->
     <div id="modal-gowes-shelter-ops" class="hide fixed inset-0 z-[142] bg-black/85 backdrop-blur-sm flex items-center justify-center p-3 sm:p-4">
-        <form onsubmit="submitGowesShelterOps(event)" class="app-card border rounded-3xl max-w-md w-full p-6 space-y-4 shadow-2xl">
-            <div class="flex items-center justify-between border-b gold-border pb-3">
+        <form onsubmit="submitGowesShelterOps(event)" class="app-card border rounded-3xl max-w-md w-full max-h-[92vh] flex flex-col overflow-hidden shadow-2xl">
+            <div class="px-5 py-3.5 border-b gold-border flex items-center justify-between shrink-0">
                 <div class="flex items-center gap-2.5">
                     <span class="w-8 h-8 rounded-xl bg-emerald-500/15 text-emerald-600 flex items-center justify-center text-sm"><i class="fa-solid fa-store"></i></span>
                     <div>
-                        <h3 class="font-extrabold text-sm sm:text-base leading-tight">Operasional Garasi</h3>
+                        <h3 id="gso-modal-title" class="font-extrabold text-sm sm:text-base leading-tight">Atur Gerai &amp; Operasional</h3>
                         <p class="text-[10px] app-muted">Founder &amp; Tim Administrasi</p>
                     </div>
                 </div>
                 <button type="button" onclick="document.getElementById('modal-gowes-shelter-ops').classList.add('hide')" class="w-8 h-8 rounded-full app-btn-sec flex items-center justify-center text-xs"><i class="fa-solid fa-xmark"></i></button>
             </div>
 
-            <div class="app-card-soft border rounded-2xl p-4 space-y-3">
-                <div class="flex items-center justify-between gap-3">
+            <div class="p-5 overflow-y-auto space-y-3.5 flex-1 text-xs">
+                <input type="hidden" id="gso-id">
+
+                <div class="grid grid-cols-2 gap-2.5">
                     <div>
-                        <strong class="text-xs block">Status Operasional Shelter</strong>
-                        <span class="text-[10px] app-muted block">Jika ditutup, beranda Titik Gowes akan menampilkan pengumuman toko tutup sementara.</span>
+                        <label class="app-label">Daerah / Kota Cabang</label>
+                        <input type="text" id="gso-city" placeholder="Misal: Muara Jawa" class="app-input text-xs font-bold" required>
                     </div>
-                    <label class="lbk-switch">
-                        <input type="checkbox" id="gso-is-closed-toggle" onchange="toggleShelterClosedReasonField(this.checked)">
-                        <span class="lbk-switch-track"></span>
-                    </label>
+                    <div>
+                        <label class="app-label">No. WhatsApp CS</label>
+                        <input type="tel" id="gso-cs-phone" placeholder="08xxxxxxxxxx" class="app-input text-xs">
+                    </div>
                 </div>
-                <div id="gso-status-indicator" class="text-[11px] font-bold text-emerald-600 pt-1">
-                    ● Status: Garasi BUKA &amp; Melayani Rental
-                </div>
-            </div>
 
-            <div id="gso-reason-wrap" class="space-y-1.5">
-                <label class="app-label">Pesan / Alasan Toko Tutup Sementara</label>
-                <textarea id="gso-closed-reason" class="app-input h-24 text-xs" placeholder="Misal: Cuaca hujan lebat di rute kota / Garasi sedang istirahat. Buka kembali besok pukul 05.30 WITA..."></textarea>
-            </div>
-
-            <div class="grid grid-cols-2 gap-2.5">
                 <div>
-                    <label class="app-label">Jam Operasional</label>
-                    <input type="text" id="gso-hours" placeholder="05.30 - 20.00 WITA" class="app-input text-xs">
+                    <label class="app-label">Nama Gerai / Shelter</label>
+                    <input type="text" id="gso-name" placeholder="Misal: Titik Gowes Cabang Muara Jawa" class="app-input text-xs font-bold" required>
                 </div>
+
                 <div>
-                    <label class="app-label">No. WhatsApp CS Shelter</label>
-                    <input type="tel" id="gso-cs-phone" placeholder="08xxxxxxxxxx" class="app-input text-xs">
+                    <label class="app-label">Alamat Lengkap Gerai</label>
+                    <input type="text" id="gso-address" placeholder="Jl. Ahmad Yani No. 45, Muara Jawa..." class="app-input text-xs" required>
+                </div>
+
+                <div class="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
+                    <div>
+                        <label class="app-label">Link Google Maps</label>
+                        <input type="url" id="gso-maps-url" placeholder="https://maps.google.com/?q=..." class="app-input text-xs" required>
+                    </div>
+                    <div>
+                        <label class="app-label">Jam Operasional</label>
+                        <input type="text" id="gso-hours" placeholder="05.30 - 20.00 WITA" class="app-input text-xs">
+                    </div>
+                </div>
+
+                <div class="app-card-soft border rounded-2xl p-3.5 space-y-2.5">
+                    <div class="flex items-center justify-between gap-3">
+                        <div>
+                            <strong class="text-xs block">Tutup Sementara Gerai Ini</strong>
+                            <span class="text-[10px] app-muted block">Aktifkan jika cabang ini sedang libur/istirahat.</span>
+                        </div>
+                        <label class="lbk-switch">
+                            <input type="checkbox" id="gso-is-closed-toggle" onchange="toggleShelterClosedReasonField(this.checked)">
+                            <span class="lbk-switch-track"></span>
+                        </label>
+                    </div>
+                    <div id="gso-status-indicator" class="text-[11px] font-bold text-emerald-600">
+                        ● Status: Garasi BUKA &amp; Melayani Rental
+                    </div>
+                </div>
+
+                <div id="gso-reason-wrap" class="space-y-1">
+                    <label class="app-label">Pesan Saat Tutup Sementara</label>
+                    <textarea id="gso-closed-reason" class="app-input h-20 text-xs" placeholder="Misal: Cuaca hujan lebat / Garasi sedang istirahat. Buka kembali besok pagi..."></textarea>
                 </div>
             </div>
 
-            <div class="flex gap-2.5 pt-1">
+            <div class="px-5 py-3 border-t gold-border flex gap-2.5 shrink-0">
                 <button type="button" onclick="document.getElementById('modal-gowes-shelter-ops').classList.add('hide')" class="flex-1 py-2.5 rounded-xl app-btn-sec text-xs font-bold">Batal</button>
-                <button type="submit" id="btn-save-gso" class="flex-1 gowes-pill-btn py-2.5 rounded-xl text-xs uppercase shadow-lg">Simpan Status</button>
+                <button type="submit" id="btn-save-gso" class="flex-1 gowes-pill-btn py-2.5 rounded-xl text-xs uppercase shadow-lg">Simpan Gerai</button>
             </div>
         </form>
     </div>
@@ -1386,29 +1391,34 @@
 
                 <div class="grid grid-cols-2 gap-2.5">
                     <div>
-                        <label class="app-label">Ukuran Frame / Rekomendasi Tinggi</label>
-                        <input type="text" id="mgb-frame" placeholder="Misal: M (165-175 cm)" class="app-input">
+                        <label class="app-label">Ukuran Frame / Ban</label>
+                        <input type="text" id="mgb-frame" placeholder="Misal: 27.5 / M (165-175 cm)" class="app-input">
                     </div>
                     <div>
-                        <label class="app-label">Transmisi / Drivetrain Gear</label>
-                        <input type="text" id="mgb-gears" placeholder="Misal: 1x11 Speed Shimano" class="app-input">
+                        <label class="app-label">Transmisi / Speed Gear</label>
+                        <input type="text" id="mgb-gears" placeholder="Misal: 3x7 / 1x11 Speed" class="app-input">
                     </div>
                 </div>
 
-                <div class="space-y-1">
-                    <label class="app-label">Tarif Paket Sewa (Rupiah):</label>
+                <div>
+                    <label class="app-label">Sistem Rem / Spesifikasi Tambahan (Bisa Diedit Bebas)</label>
+                    <input type="text" id="mgb-brakes" placeholder="Misal: Hydraulic Disc Brake Shimano (kosongkan jika tidak perlu)" class="app-input">
+                </div>
+
+                <div class="space-y-1.5 app-card-soft border rounded-2xl p-3">
+                    <label class="app-label !mb-0 text-emerald-600">Paket Durasi &amp; Tarif Sewa (Label &amp; Harga Fleksibel):</label>
                     <div class="grid grid-cols-3 gap-2">
-                        <div>
-                            <span class="text-[9px] app-muted block">Paket 2 Jam</span>
-                            <input type="number" id="mgb-p2h" value="40000" step="5000" class="app-input !py-1.5 font-bold" required>
+                        <div class="space-y-1">
+                            <input type="text" id="mgb-l2h" value="2 Jam" placeholder="Label 1" class="app-input !py-1 text-[10px] font-bold text-center">
+                            <input type="number" id="mgb-p2h" value="40000" step="5000" class="app-input !py-1.5 font-bold text-center" required>
                         </div>
-                        <div>
-                            <span class="text-[9px] app-muted block">Paket 6 Jam</span>
-                            <input type="number" id="mgb-p6h" value="75000" step="5000" class="app-input !py-1.5 font-bold" required>
+                        <div class="space-y-1">
+                            <input type="text" id="mgb-l6h" value="6 Jam" placeholder="Label 2" class="app-input !py-1 text-[10px] font-bold text-center">
+                            <input type="number" id="mgb-p6h" value="75000" step="5000" class="app-input !py-1.5 font-bold text-center" required>
                         </div>
-                        <div>
-                            <span class="text-[9px] app-muted block">Full Day</span>
-                            <input type="number" id="mgb-pfullday" value="120000" step="5000" class="app-input !py-1.5 font-bold" required>
+                        <div class="space-y-1">
+                            <input type="text" id="mgb-lfullday" value="Full Day" placeholder="Label 3" class="app-input !py-1 text-[10px] font-bold text-center">
+                            <input type="number" id="mgb-pfullday" value="120000" step="5000" class="app-input !py-1.5 font-bold text-center" required>
                         </div>
                     </div>
                 </div>
@@ -1625,7 +1635,7 @@
                             </ul>
                             <div class="pt-3 border-t gold-border flex items-center justify-between text-[11px]">
                                 <span class="app-muted">Versi Aplikasi</span>
-                                <span class="px-2.5 py-0.5 rounded-full app-accent-bg app-accent font-extrabold">V14.4</span>
+                                <span class="px-2.5 py-0.5 rounded-full app-accent-bg app-accent font-extrabold">V14.6</span>
                             </div>
                         </div>
                     </div>
