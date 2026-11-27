@@ -461,17 +461,21 @@
         <!-- ========================================================= -->
         <!-- 2. BERANDA TITIK GOWES (SHOWCASE 3:4 & BANNER 16:5 BARU)  -->
         <!-- ========================================================= -->
-        <section id="view-gowes" class="hide space-y-5">
-            <!-- LAYAR TOKO TUTUP / GARASI ISTIRAHAT (DINAMIS SAKELAR) -->
-            <div id="gowes-closed-notice" class="hide gowes-closed-screen space-y-4">
+        <section id="view-gowes" class="hide">
+            <!-- LAYAR TOKO TUTUP / GARASI ISTIRAHAT (DINAMIS SAKELAR + PILIH CABANG LAIN) -->
+            <div id="gowes-closed-notice" class="hide gowes-closed-screen space-y-4 mt-4">
                 <div class="w-16 h-16 rounded-3xl bg-amber-500/20 text-amber-400 border border-amber-400/40 flex items-center justify-center text-3xl mx-auto shadow-lg">
                     <i class="fa-solid fa-store-slash"></i>
                 </div>
                 <div class="space-y-1.5 max-w-md mx-auto">
                     <span class="text-[10px] uppercase font-extrabold px-3 py-1 rounded-full bg-amber-400/20 text-amber-300 tracking-widest border border-amber-400/30">PEMBERITAHUAN OPERASIONAL</span>
-                    <h3 class="text-xl font-extrabold text-white pt-1">Garasi Titik Gowes Sedang Tutup</h3>
+                    <h3 id="gowes-closed-title" class="text-xl font-extrabold text-white pt-1">Garasi Titik Gowes Sedang Tutup</h3>
                     <p id="gowes-closed-desc" class="text-xs text-zinc-300 leading-relaxed"></p>
                 </div>
+
+                <!-- Pilihan Pindah ke Cabang Lain agar Tidak Stuck -->
+                <div id="gowes-closed-branch-switcher" class="max-w-sm mx-auto text-left pt-1"></div>
+
                 <div class="flex flex-col sm:flex-row items-center justify-center gap-2.5 pt-2 max-w-sm mx-auto">
                     <a id="gowes-closed-wa-btn" href="#" target="_blank" class="w-full py-2.5 rounded-2xl bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-bold shadow flex items-center justify-center gap-2">
                         <i class="fa-brands fa-whatsapp text-sm"></i> Chat Petugas Shelter
@@ -483,8 +487,8 @@
             </div>
 
             <!-- KONTEN BERANDA NORMAL SAAT GARASI BUKA -->
-            <div id="gowes-open-content" class="-mt-3 md:mt-0 space-y-4 sm:space-y-5">
-                <!-- 1. BANNER PROMOSI FULL MENTOK DI BAWAH HEADER (TANPA LENGKUNG DI MOBILE) -->
+            <div id="gowes-open-content" class="space-y-4 sm:space-y-5">
+                <!-- 1. BANNER PROMOSI FULL MENTOK 0px DI BAWAH HEADER (RASIO 16:7) -->
                 <div class="gowes-banner-16-5">
                     <div id="gowes-banner-track" class="w-full h-full flex transition-transform duration-700 ease-out"></div>
                 </div>
@@ -504,16 +508,7 @@
                     <div id="gowes-showcase-dots" class="flex items-center justify-center gap-1.5 pt-0.5"></div>
                 </div>
 
-                <!-- 3. TOMBOL TIPE SEPEDA (FILTER CEPAT) -->
-                <div class="space-y-2 pt-0.5">
-                    <div class="flex items-center justify-between px-0.5">
-                        <h4 class="text-xs font-extrabold uppercase app-muted tracking-wider">Kategori Unit Armada</h4>
-                        <span id="gowes-bike-count-badge" class="text-[10px] font-bold text-emerald-600"></span>
-                    </div>
-                    <div id="gowes-category-filters" class="flex gap-1.5 overflow-x-auto no-scrollbar pb-1 px-0.5"></div>
-                </div>
-
-                <!-- 5. INFORMASI POS SHELTER MULTI-CABANG & PETA GOOGLE MAPS ELEGAN -->
+                <!-- 3. INFORMASI POS SHELTER MULTI-CABANG & PETA GOOGLE MAPS ELEGAN -->
                 <div id="sec-gowes-shelter" class="app-card border rounded-3xl p-4 sm:p-5 shadow-sm space-y-3.5"></div>
 
                 <footer class="app-card border rounded-3xl p-6 space-y-4 shadow-sm text-center">
@@ -676,6 +671,7 @@
                     <p class="text-[11px] app-muted">Kelola akun di <strong>Followers</strong>, verifikasi order di <strong>Project</strong>, atau buka <strong>Pengaturan (⋮)</strong>.</p>
                 </div>
                 <div class="flex flex-wrap gap-2">
+                    <button type="button" onclick="openGowesOfflinePosModal()" class="gowes-pill-btn px-3.5 py-2 rounded-xl text-xs shadow-sm"><i class="fa-solid fa-cash-register mr-1.5"></i>Sewa Offline</button>
                     <button type="button" onclick="openMasterWorkspace('overview')" class="px-3.5 py-2 rounded-xl app-card-soft border gold-border app-accent text-xs font-bold"><i class="fa-solid fa-chart-line mr-1.5"></i>Analitik</button>
                     <button type="button" onclick="openFullChatOverlay()" class="gold-pill-btn px-3.5 py-2 rounded-xl text-xs"><i class="fa-solid fa-comments mr-1.5"></i>Live Chat</button>
                 </div>
@@ -696,6 +692,7 @@
                     </div>
                 </div>
                 <div class="flex gap-2">
+                    <button type="button" onclick="openGowesOfflinePosModal()" class="gowes-pill-btn px-4 py-2.5 rounded-xl text-xs shadow-sm"><i class="fa-solid fa-cash-register mr-1.5"></i>+ Sewa Offline (Kasir)</button>
                     <button type="button" onclick="openFullChatOverlay()" class="gold-pill-btn px-4 py-2.5 rounded-xl text-xs relative"><i class="fa-solid fa-comments mr-1.5"></i>Buka Live Chat <span id="staff-chat-pill-cnt" class="hide ml-1 px-1.5 py-0.2 rounded-full bg-red-600 text-white text-[10px]">0</span></button>
                 </div>
             </div>
@@ -1111,7 +1108,7 @@
             </div>
 
             <div class="p-4 border-t gold-border text-center text-[10px] app-muted">
-                Versi V14.7 • Terintegrasi Penuh
+                Versi V14.8 • Terintegrasi Penuh
             </div>
         </div>
     </div>
@@ -1161,11 +1158,11 @@
                     <div class="grid grid-cols-2 gap-2.5">
                         <div>
                             <label class="app-label">Tanggal Sewa</label>
-                            <input type="date" id="gw-book-date" onchange="updateGowesReturnEstimate()" class="app-input" required>
+                            <input type="date" id="gw-book-date" onchange="onGowesBookingScheduleChange()" class="app-input" required>
                         </div>
                         <div>
                             <label class="app-label">Jam Ambil</label>
-                            <input type="time" id="gw-book-time" onchange="updateGowesReturnEstimate()" class="app-input" required>
+                            <input type="time" id="gw-book-time" onchange="onGowesBookingScheduleChange()" class="app-input" required>
                         </div>
                     </div>
 
@@ -1188,6 +1185,7 @@
                 <div class="space-y-2.5 border-t gold-border pt-3">
                     <label class="app-label !mb-0 text-emerald-600 font-extrabold">3. Pilih Unit &amp; Durasi</label>
                     <div id="gw-book-bikes-container" class="space-y-2.5"></div>
+                    <div id="gw-book-conflict-alert" class="hide"></div>
 
                     <div class="space-y-1.5">
                         <label class="app-label">Paket Durasi Sewa:</label>
@@ -1380,6 +1378,13 @@
                     </div>
                 </div>
 
+                <div>
+                    <label class="app-label">Cabang Garasi Unit</label>
+                    <select id="mgb-branch-id" class="app-input font-bold">
+                        <option value="all">Semua Cabang (Tampil di Semua Lokasi)</option>
+                    </select>
+                </div>
+
                 <div class="grid grid-cols-2 gap-2.5">
                     <div>
                         <label class="app-label">Ukuran Frame / Ban</label>
@@ -1466,6 +1471,230 @@
             <div class="flex gap-2">
                 <button type="button" onclick="document.getElementById('modal-gowes-handover').classList.add('hide')" class="flex-1 py-2.5 rounded-xl app-btn-sec text-xs font-bold">Batal</button>
                 <button type="button" id="btn-save-mgh" onclick="submitGowesHandoverPhoto()" class="flex-1 gowes-pill-btn py-2.5 rounded-xl text-xs">Simpan Foto</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- ========================================================= -->
+    <!-- MODAL KASIR SEWA OFFLINE / WALK-IN (ADMINISTRASI & FOUNDER) -->
+    <!-- ========================================================= -->
+    <div id="modal-gowes-offline-pos" class="hide fixed inset-0 z-[143] bg-black/85 backdrop-blur-sm flex items-center justify-center p-3 sm:p-4">
+        <form onsubmit="submitGowesOfflineBooking(event)" class="app-card border rounded-3xl max-w-lg w-full max-h-[93vh] flex flex-col overflow-hidden shadow-2xl">
+            <div class="px-5 py-3.5 border-b gold-border flex items-center justify-between shrink-0">
+                <div class="flex items-center gap-2.5">
+                    <span class="w-8 h-8 rounded-xl bg-emerald-500/15 text-emerald-600 flex items-center justify-center text-sm"><i class="fa-solid fa-cash-register"></i></span>
+                    <div>
+                        <h3 class="font-extrabold text-sm sm:text-base leading-tight">Kasir Sewa Offline (Walk-in)</h3>
+                        <p class="text-[10px] app-muted">Pendaftaran langsung di toko • Pembayaran Cash atau QRIS</p>
+                    </div>
+                </div>
+                <button type="button" onclick="closeGowesOfflinePosModal()" class="w-8 h-8 rounded-full app-btn-sec flex items-center justify-center text-xs"><i class="fa-solid fa-xmark"></i></button>
+            </div>
+
+            <div class="p-5 overflow-y-auto space-y-4 flex-1">
+                <!-- Pilih Cabang Garasi -->
+                <div>
+                    <label class="app-label text-emerald-600 font-extrabold">Cabang Gerai</label>
+                    <select id="gw-pos-branch" onchange="onOfflinePosBranchChange()" class="app-input font-bold"></select>
+                </div>
+
+                <!-- 1. Identitas Pelanggan -->
+                <div class="space-y-2.5 border-t gold-border pt-3">
+                    <label class="app-label !mb-0 text-emerald-600 font-extrabold">1. Identitas Pelanggan</label>
+                    <div>
+                        <label class="app-label">Nama Lengkap Pelanggan</label>
+                        <input type="text" id="gw-pos-name" placeholder="Nama lengkap penyewa" class="app-input" required>
+                    </div>
+                    <div class="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
+                        <div>
+                            <label class="app-label">No. WhatsApp Pelanggan</label>
+                            <input type="tel" id="gw-pos-phone" placeholder="08xxxxxxxxxx (untuk struk WA)" class="app-input" required>
+                        </div>
+                        <div>
+                            <label class="app-label">Alamat Domisili</label>
+                            <input type="text" id="gw-pos-address" placeholder="Alamat / daerah asal" class="app-input">
+                        </div>
+                    </div>
+                </div>
+
+                <!-- 2. Jadwal & Jumlah Sepeda -->
+                <div class="space-y-2.5 border-t gold-border pt-3">
+                    <label class="app-label !mb-0 text-emerald-600 font-extrabold">2. Jadwal &amp; Jumlah Sepeda</label>
+                    <div class="grid grid-cols-2 gap-2.5">
+                        <div>
+                            <label class="app-label">Tanggal Sewa</label>
+                            <input type="date" id="gw-pos-date" onchange="onOfflinePosScheduleChange()" class="app-input" required>
+                        </div>
+                        <div>
+                            <label class="app-label">Jam Mulai</label>
+                            <input type="time" id="gw-pos-time" onchange="onOfflinePosScheduleChange()" class="app-input" required>
+                        </div>
+                    </div>
+                    <div class="flex items-center justify-between app-card-soft border rounded-2xl p-3">
+                        <div>
+                            <span class="text-xs font-bold block">Jumlah Sepeda</span>
+                            <span class="text-[10px] app-muted">Sewa 1 atau beberapa unit sekaligus</span>
+                        </div>
+                        <div class="flex items-center gap-3">
+                            <button type="button" onclick="changeOfflinePosBikeQty(-1)" class="gowes-stepper-btn" title="Kurangi">–</button>
+                            <span id="gw-pos-qty-lbl" class="font-extrabold text-base min-w-[24px] text-center text-emerald-600">1</span>
+                            <input type="hidden" id="gw-pos-qty" value="1">
+                            <button type="button" onclick="changeOfflinePosBikeQty(1)" class="gowes-stepper-btn" title="Tambah">+</button>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- 3. Pemilih Sepeda Bergambar & Durasi -->
+                <div class="space-y-2.5 border-t gold-border pt-3">
+                    <label class="app-label !mb-0 text-emerald-600 font-extrabold">3. Pilih Unit &amp; Durasi</label>
+                    <div id="gw-pos-bikes-container" class="space-y-2.5"></div>
+                    <div id="gw-pos-conflict-alert" class="hide"></div>
+
+                    <div class="space-y-1.5">
+                        <label class="app-label">Paket Durasi Sewa:</label>
+                        <div class="grid grid-cols-3 gap-2">
+                            <label class="cursor-pointer">
+                                <input type="radio" name="gw_pos_duration" value="2_hours" checked onchange="onOfflinePosScheduleChange()" class="hide peer">
+                                <div class="app-card border rounded-2xl p-2.5 text-center peer-checked:border-emerald-500 peer-checked:bg-emerald-500/10 transition">
+                                    <span id="gw-pos-lbl-2h" class="text-[10px] font-bold block app-muted">2 Jam</span>
+                                    <strong id="gw-pos-rate-2h" class="text-xs font-extrabold text-emerald-600 block mt-0.5">Rp 40.000</strong>
+                                </div>
+                            </label>
+                            <label class="cursor-pointer">
+                                <input type="radio" name="gw_pos_duration" value="6_hours" onchange="onOfflinePosScheduleChange()" class="hide peer">
+                                <div class="app-card border rounded-2xl p-2.5 text-center peer-checked:border-emerald-500 peer-checked:bg-emerald-500/10 transition">
+                                    <span id="gw-pos-lbl-6h" class="text-[10px] font-bold block app-muted">6 Jam</span>
+                                    <strong id="gw-pos-rate-6h" class="text-xs font-extrabold text-emerald-600 block mt-0.5">Rp 75.000</strong>
+                                </div>
+                            </label>
+                            <label class="cursor-pointer">
+                                <input type="radio" name="gw_pos_duration" value="full_day" onchange="onOfflinePosScheduleChange()" class="hide peer">
+                                <div class="app-card border rounded-2xl p-2.5 text-center peer-checked:border-emerald-500 peer-checked:bg-emerald-500/10 transition">
+                                    <span id="gw-pos-lbl-fullday" class="text-[10px] font-bold block app-muted">Full Day</span>
+                                    <strong id="gw-pos-rate-fullday" class="text-xs font-extrabold text-emerald-600 block mt-0.5">Rp 120.000</strong>
+                                </div>
+                            </label>
+                        </div>
+                    </div>
+
+                    <div class="text-[11px] text-emerald-700 bg-emerald-500/10 border border-emerald-500/30 rounded-xl p-2.5 font-semibold flex items-center gap-2">
+                        <i class="fa-regular fa-clock text-emerald-600"></i>
+                        <span id="gw-pos-return-estimate-text">Menghitung batas kembali...</span>
+                    </div>
+                </div>
+
+                <!-- 4. Jaminan KTP & Metode Pembayaran -->
+                <div class="space-y-3 border-t gold-border pt-3">
+                    <label class="app-label !mb-0 text-emerald-600 font-extrabold">4. Jaminan KTP &amp; Pembayaran</label>
+
+                    <label class="flex items-center justify-between gap-3 app-card-soft border rounded-2xl p-3 cursor-pointer">
+                        <div class="min-w-0">
+                            <strong class="text-xs block">KTP / SIM Asli Dititipkan di Kasir</strong>
+                            <span class="text-[10px] app-muted block">Matikan jika ingin mengambil foto KTP via kamera</span>
+                        </div>
+                        <label class="lbk-switch">
+                            <input type="checkbox" id="gw-pos-ktp-held" checked onchange="toggleOfflinePosKtpUpload(this.checked)">
+                            <span class="lbk-switch-track"></span>
+                        </label>
+                    </label>
+
+                    <div id="gw-pos-ktp-upload-wrap" class="hide space-y-2">
+                        <label class="block app-card-soft border border-emerald-500/40 py-2.5 rounded-xl text-center text-xs font-bold text-emerald-600 cursor-pointer">
+                            <i class="fa-solid fa-camera mr-1.5"></i>Foto / Pilih KTP Penjamin
+                            <input type="file" id="gw-pos-ktp-input" accept="image/*" class="hide" onchange="handleOfflinePosKtpPick(this)">
+                        </label>
+                        <img id="gw-pos-ktp-preview" class="hide w-full max-h-32 object-contain rounded-xl border border-emerald-500/40 bg-black/10 mx-auto">
+                    </div>
+
+                    <div class="space-y-1.5">
+                        <label class="app-label">Pilih Metode Pembayaran:</label>
+                        <div class="grid grid-cols-2 gap-2.5">
+                            <label class="cursor-pointer">
+                                <input type="radio" name="gw_pos_payment" value="cash" checked onchange="updateOfflinePosPriceCalc()" class="hide peer">
+                                <div class="app-card border-2 rounded-2xl p-3 text-center peer-checked:border-emerald-500 peer-checked:bg-emerald-500/12 transition space-y-1">
+                                    <i class="fa-solid fa-money-bill-wave text-lg text-emerald-600"></i>
+                                    <strong class="text-xs font-extrabold block">Cash (Tunai)</strong>
+                                    <span class="text-[9.5px] app-muted block">Langsung aktif &amp; cetak struk</span>
+                                </div>
+                            </label>
+                            <label class="cursor-pointer">
+                                <input type="radio" name="gw_pos_payment" value="qris" onchange="updateOfflinePosPriceCalc()" class="hide peer">
+                                <div class="app-card border-2 rounded-2xl p-3 text-center peer-checked:border-blue-500 peer-checked:bg-blue-500/12 transition space-y-1">
+                                    <i class="fa-solid fa-qrcode text-lg text-blue-600"></i>
+                                    <strong class="text-xs font-extrabold block">Bayar QRIS</strong>
+                                    <span class="text-[9.5px] app-muted block">Tampilkan QRIS di layar kasir</span>
+                                </div>
+                            </label>
+                        </div>
+                    </div>
+
+                    <div>
+                        <label class="app-label">Catatan Kasir (Opsional)</label>
+                        <input type="text" id="gw-pos-note" placeholder="Misal: Helm 2 pcs, kunci spiral..." class="app-input">
+                    </div>
+                </div>
+
+                <!-- Total Kasir -->
+                <div class="app-card-soft border-2 border-emerald-500/40 rounded-2xl p-3.5 flex items-center justify-between text-xs">
+                    <div>
+                        <span id="gw-pos-total-label" class="app-muted block text-[10px]">Total Tunai (Tanpa Kode Unik):</span>
+                        <strong id="gw-pos-total-calc" class="text-lg text-emerald-600 font-extrabold">Rp 40.000</strong>
+                    </div>
+                    <span id="gw-pos-pay-pill" class="px-2.5 py-1 rounded-full bg-emerald-500/15 text-emerald-700 text-[10px] font-extrabold uppercase">CASH</span>
+                </div>
+            </div>
+
+            <div class="px-5 py-3 border-t gold-border flex justify-end gap-2.5 shrink-0">
+                <button type="button" onclick="closeGowesOfflinePosModal()" class="px-5 py-2.5 rounded-xl app-btn-sec text-xs font-bold">Batal</button>
+                <button type="submit" id="btn-submit-gw-pos" class="gowes-pill-btn px-6 py-2.5 rounded-xl text-xs uppercase shadow-lg">Simpan &amp; Aktifkan (Cash)</button>
+            </div>
+        </form>
+    </div>
+
+    <!-- ========================================================= -->
+    <!-- MODAL QRIS KASIR OFFLINE (SCAN LANGSUNG DI TOKO)          -->
+    <!-- ========================================================= -->
+    <div id="modal-gowes-offline-qris" class="hide fixed inset-0 z-[146] bg-black/88 backdrop-blur-sm flex items-center justify-center p-4">
+        <div class="app-card border rounded-3xl max-w-sm w-full p-5 text-center space-y-4 shadow-2xl">
+            <div class="flex items-center justify-between border-b gold-border pb-2.5">
+                <span class="gowes-brand-tag"><i class="fa-solid fa-qrcode"></i> QRIS KASIR OFFLINE</span>
+                <button type="button" onclick="closeGowesOfflineQrisModal()" class="w-8 h-8 rounded-full app-btn-sec flex items-center justify-center text-xs"><i class="fa-solid fa-xmark"></i></button>
+            </div>
+            <div class="space-y-1">
+                <h3 id="gw-oq-title" class="font-extrabold text-sm">Scan QRIS untuk Pembayaran</h3>
+                <p id="gw-oq-sub" class="text-[11px] app-muted"></p>
+                <strong id="gw-oq-amount" class="text-2xl font-extrabold text-emerald-600 block pt-1">Rp 0</strong>
+                <span id="gw-oq-unique" class="text-[10px] app-muted block"></span>
+            </div>
+            <div class="bg-white p-3.5 rounded-2xl inline-flex flex-col items-center border-4 border-emerald-500 shadow-lg">
+                <div id="gw-oq-qr-wrap" class="w-52 h-52 flex items-center justify-center"></div>
+                <span id="gw-oq-mode-badge" class="text-[10px] mt-1.5 px-2.5 py-0.5 rounded-full bg-emerald-100 text-emerald-800 font-extrabold">QRIS Resmi Titik Gowes</span>
+            </div>
+            <div class="flex gap-2 pt-1">
+                <button type="button" onclick="closeGowesOfflineQrisModal()" class="px-4 py-2.5 rounded-xl app-btn-sec text-xs font-bold">Tutup</button>
+                <button type="button" id="btn-confirm-oq-paid" onclick="confirmGowesOfflineQrisPaid()" class="flex-1 gowes-pill-btn py-2.5 rounded-xl text-xs uppercase shadow-lg"><i class="fa-solid fa-circle-check mr-1"></i>Konfirmasi Lunas QRIS</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- ========================================================= -->
+    <!-- MODAL STRUK DIGITAL & KIRIM WA PELANGGAN                  -->
+    <!-- ========================================================= -->
+    <div id="modal-gowes-receipt" class="hide fixed inset-0 z-[147] bg-black/85 backdrop-blur-sm flex items-center justify-center p-4">
+        <div class="app-card border rounded-3xl max-w-sm w-full overflow-hidden shadow-2xl">
+            <div class="px-5 py-3.5 bg-emerald-600 text-white flex items-center justify-between">
+                <div class="flex items-center gap-2">
+                    <i class="fa-solid fa-receipt text-base"></i>
+                    <strong class="text-sm font-extrabold">Struk Sewa Titik Gowes</strong>
+                </div>
+                <button type="button" onclick="closeGowesReceiptModal()" class="w-7 h-7 rounded-full bg-white/20 text-white flex items-center justify-center text-xs"><i class="fa-solid fa-xmark"></i></button>
+            </div>
+            <div id="gw-receipt-body" class="p-5 space-y-3 text-xs"></div>
+            <div class="px-5 py-3.5 border-t gold-border flex gap-2">
+                <button type="button" onclick="closeGowesReceiptModal()" class="px-4 py-2.5 rounded-xl app-btn-sec text-xs font-bold">Selesai</button>
+                <button type="button" onclick="sendActiveGowesReceiptWA()" class="flex-1 bg-emerald-600 hover:bg-emerald-500 text-white py-2.5 rounded-xl text-xs font-extrabold shadow flex items-center justify-center gap-1.5">
+                    <i class="fa-brands fa-whatsapp text-sm"></i> Kirim Struk ke WA
+                </button>
             </div>
         </div>
     </div>
@@ -1626,7 +1855,7 @@
                             </ul>
                             <div class="pt-3 border-t gold-border flex items-center justify-between text-[11px]">
                                 <span class="app-muted">Versi Aplikasi</span>
-                                <span class="px-2.5 py-0.5 rounded-full app-accent-bg app-accent font-extrabold">V14.7</span>
+                                <span class="px-2.5 py-0.5 rounded-full app-accent-bg app-accent font-extrabold">V14.8</span>
                             </div>
                         </div>
                     </div>
@@ -2323,12 +2552,12 @@
         </div>
     </div>
 
-    <!-- TOMBOL FLOATING CHAT ADMIN DI KIRI BAWAH -->
-    <div id="floating-chat-wrap" class="fixed bottom-5 left-4 z-40">
-        <button onclick="openFullChatOverlay()" class="px-4 py-2.5 rounded-full gold-gradient shadow-2xl flex items-center gap-2 text-xs font-extrabold hover:scale-105 transition relative" title="Chat Admin">
-            <i class="fa-solid fa-headset text-sm"></i>
-            <span>Chat Admin</span>
-            <span id="floating-chat-badge" class="hide absolute -top-1.5 -right-1.5 min-w-[20px] h-5 px-1 rounded-full bg-red-600 text-white text-[10px] font-extrabold flex items-center justify-center border-2 border-white">0</span>
+    <!-- TOMBOL FLOATING CHAT ADMIN RINGKAS DI KANAN BAWAH (ANTI MENUTUPI HARGA & FOOTER) -->
+    <div id="floating-chat-wrap" class="fixed bottom-5 right-4 z-40">
+        <button onclick="openFullChatOverlay()" class="w-12 h-12 sm:w-auto sm:h-auto sm:px-4 sm:py-2.5 rounded-full gold-gradient shadow-2xl flex items-center justify-center gap-2 text-xs font-extrabold hover:scale-105 active:scale-95 transition relative" title="Chat Admin">
+            <i class="fa-solid fa-headset text-base sm:text-sm"></i>
+            <span class="hidden sm:inline">Chat Admin</span>
+            <span id="floating-chat-badge" class="hide absolute -top-1 -right-1 min-w-[20px] h-5 px-1 rounded-full bg-red-600 text-white text-[10px] font-extrabold flex items-center justify-center border-2 border-white">0</span>
         </button>
     </div>
 

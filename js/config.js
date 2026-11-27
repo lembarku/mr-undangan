@@ -1,6 +1,6 @@
 // =========================================================================
 // LEMBARKU & TITIK GOWES — CORE CONFIG, CATALOGS & SHARED ENGINE (js/config.js)
-// Versi: V14.7 (Banner Full Header, Dropdown Lokasi, Visual Bike Picker & Booking Sekarang)
+// Versi: V14.8 (Banner 16:7 Mentok Logo, Kasir Offline Cash/QRIS, Anti Bentrok 14 Hari & Cabang Unit)
 // =========================================================================
 const CLOUD_API_URL = "https://script.google.com/macros/s/AKfycbyHsITJ02tiA59p0QIXkOQaO3VnBFQmDBp-7iUHcUkmrYjlOtRVwxhlGZCzL4RLKKNW/exec";
 const FOUNDER_USERNAME = "kausar.af";
@@ -353,6 +353,7 @@ const DEFAULT_GOWES_CATEGORIES = [
 const DEFAULT_GOWES_BIKES = [
     {
         id: "bike_1",
+        branchId: "all",
         name: "Polygon Xtrada 6",
         type: "MTB (Gunung)",
         frameSize: "M (165-175 cm)",
@@ -373,6 +374,7 @@ const DEFAULT_GOWES_BIKES = [
     },
     {
         id: "bike_2",
+        branchId: "all",
         name: "United Milano Roadbike",
         type: "Roadbike (Balap)",
         frameSize: "S/M (160-172 cm)",
@@ -393,6 +395,7 @@ const DEFAULT_GOWES_BIKES = [
     },
     {
         id: "bike_3",
+        branchId: "all",
         name: "Pacific Noris Pro Lipat",
         type: "Sepeda Lipat (Folding)",
         frameSize: "All Size (Adjustable)",
@@ -413,6 +416,7 @@ const DEFAULT_GOWES_BIKES = [
     },
     {
         id: "bike_4",
+        branchId: "all",
         name: "Thrill Fervent T120",
         type: "MTB (Gunung)",
         frameSize: "L (175-185 cm)",
@@ -448,6 +452,7 @@ function getLocalFallbackDB() {
         musicLibrary: [],
         gowesBikes: [...DEFAULT_GOWES_BIKES],
         gowesRentals: [],
+        gowesUpcomingBookings: [],
         gowesShelters: DEFAULT_GOWES_SHELTERS.map(s => Object.assign({}, s)),
         gowesShelter: Object.assign({}, DEFAULT_GOWES_SHELTER),
         gowesBanners: [...DEFAULT_GOWES_BANNERS],
@@ -1064,6 +1069,7 @@ function applyPublicDb(data) {
             if (!Array.isArray(db.gowesShelters) || !db.gowesShelters.length) db.gowesShelters = [Object.assign({ id: "sh_smd_1", city: "Samarinda" }, db.gowesShelter)];
         }
         if (Array.isArray(data.gowesPublic.todayBookings)) db.gowesTodayBookings = data.gowesPublic.todayBookings;
+        if (Array.isArray(data.gowesPublic.upcomingBookings)) db.gowesUpcomingBookings = data.gowesPublic.upcomingBookings;
         if (Array.isArray(data.gowesPublic.banners)) db.gowesBanners = data.gowesPublic.banners;
         if (Array.isArray(data.gowesPublic.categories)) db.gowesCategories = data.gowesPublic.categories;
     }
@@ -1094,6 +1100,7 @@ function applyServerDb(data) {
             if (!Array.isArray(db.gowesShelters) || !db.gowesShelters.length) db.gowesShelters = [Object.assign({ id: "sh_smd_1", city: "Samarinda" }, db.gowesShelter)];
         }
         if (Array.isArray(data.gowesData.todayBookings)) db.gowesTodayBookings = data.gowesData.todayBookings;
+        if (Array.isArray(data.gowesData.upcomingBookings)) db.gowesUpcomingBookings = data.gowesData.upcomingBookings;
         if (Array.isArray(data.gowesData.banners)) db.gowesBanners = data.gowesData.banners;
         if (Array.isArray(data.gowesData.categories)) db.gowesCategories = data.gowesData.categories;
         if (data.gowesData.analytics) db.gowesAnalytics = data.gowesData.analytics;

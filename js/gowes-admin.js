@@ -1,15 +1,15 @@
 // =========================================================================
-// TITIK GOWES — ADMIN FLEET, MULTI-CABANG, BANNER & HANDOVER (js/gowes-admin.js)
-// Versi: V14.7 (CRUD Cabang Daerah + Google Maps, Rem & Label Tarif Fleksibel)
+// TITIK GOWES — ADMIN FLEET, CABANG UNIT, BANNER 16:7, OVERDUE & KASIR
+// File: js/gowes-admin.js (V14.8)
 // =========================================================================
 
 let mgbTempPhotoUrl = "";
 let mghTempPhotoUrl = "";
 let gwBannerTempImg = "";
-let _gowesFleetAdminTab = "bikes"; // 'bikes' | 'ops' | 'banners' | 'categories'
+let _gowesFleetAdminTab = "bikes"; // 'bikes' | 'ops' | 'banners'
 
 function switchGowesFleetAdminTab(tab) {
-    _gowesFleetAdminTab = tab || "bikes";
+    _gowesFleetAdminTab = (tab === "ops" || tab === "banners") ? tab : "bikes";
     if (typeof renderMasterWorkspaceContent === "function") {
         renderMasterWorkspaceContent();
     }
@@ -21,7 +21,13 @@ function _getAdminSheltersList() {
     return typeof DEFAULT_GOWES_SHELTERS !== "undefined" ? DEFAULT_GOWES_SHELTERS : [db.gowesShelter || DEFAULT_GOWES_SHELTER];
 }
 
-// ================= 0. PUSAT PENGATURAN LENGKAP TITIK GOWES (4 TAB) =================
+function _getBranchLabelById(branchId) {
+    if (!branchId || branchId === "all") return "Semua Cabang";
+    const found = _getAdminSheltersList().find(s => String(s.id) === String(branchId));
+    return found ? (found.city || found.name) : "Cabang Khusus";
+}
+
+// ================= 0. PUSAT PENGATURAN TITIK GOWES (3 TAB BERSIH: ARMADA, GERAI, BANNER) =================
 function renderGowesFleetWorkspaceHtml() {
     const curU = typeof getCurrentUserObj === "function" ? getCurrentUserObj() : null;
     const isMaster = !!(curU && curU.role === "master");
@@ -30,24 +36,25 @@ function renderGowesFleetWorkspaceHtml() {
     const isClosed = !!(activeSh && activeSh.isClosed);
     const bikes = (Array.isArray(db.gowesBikes) && db.gowesBikes.length ? db.gowesBikes : DEFAULT_GOWES_BIKES).filter(b => b && b.status !== "Dihapus");
     const banners = Array.isArray(db.gowesBanners) && db.gowesBanners.length ? db.gowesBanners : DEFAULT_GOWES_BANNERS;
-    const cats = Array.isArray(db.gowesCategories) && db.gowesCategories.length ? db.gowesCategories : DEFAULT_GOWES_CATEGORIES;
 
     const tabsHtml = `
-        <div class="flex gap-1.5 overflow-x-auto no-scrollbar pb-2 border-b gold-border">
-            <button type="button" onclick="switchGowesFleetAdminTab('bikes')" class="px-3.5 py-2 rounded-xl text-xs font-extrabold whitespace-nowrap transition ${_gowesFleetAdminTab === 'bikes' ? 'gowes-pill-btn shadow' : 'app-btn-sec'}">
-                <i class="fa-solid fa-bicycle mr-1"></i>Armada (${bikes.length})
-            </button>
-            <button type="button" onclick="switchGowesFleetAdminTab('ops')" class="px-3.5 py-2 rounded-xl text-xs font-extrabold whitespace-nowrap transition ${_gowesFleetAdminTab === 'ops' ? 'gowes-pill-btn shadow' : 'app-btn-sec'}">
-                <i class="fa-solid fa-store mr-1"></i>Gerai &amp; Cabang (${shelters.length})
-            </button>
-            ${isMaster ? `
-                <button type="button" onclick="switchGowesFleetAdminTab('banners')" class="px-3.5 py-2 rounded-xl text-xs font-extrabold whitespace-nowrap transition ${_gowesFleetAdminTab === 'banners' ? 'gowes-pill-btn shadow' : 'app-btn-sec'}">
-                    <i class="fa-solid fa-rectangle-ad mr-1"></i>Banner 16:5 (${banners.length})
+        <div class="flex items-center justify-between gap-2 pb-2 border-b gold-border flex-wrap">
+            <div class="flex gap-1.5 overflow-x-auto no-scrollbar">
+                <button type="button" onclick="switchGowesFleetAdminTab('bikes')" class="px-3.5 py-2 rounded-xl text-xs font-extrabold whitespace-nowrap transition ${_gowesFleetAdminTab === 'bikes' ? 'gowes-pill-btn shadow' : 'app-btn-sec'}">
+                    <i class="fa-solid fa-bicycle mr-1"></i>Armada (${bikes.length})
                 </button>
-                <button type="button" onclick="switchGowesFleetAdminTab('categories')" class="px-3.5 py-2 rounded-xl text-xs font-extrabold whitespace-nowrap transition ${_gowesFleetAdminTab === 'categories' ? 'gowes-pill-btn shadow' : 'app-btn-sec'}">
-                    <i class="fa-solid fa-tags mr-1"></i>Kategori (${cats.length})
+                <button type="button" onclick="switchGowesFleetAdminTab('ops')" class="px-3.5 py-2 rounded-xl text-xs font-extrabold whitespace-nowrap transition ${_gowesFleetAdminTab === 'ops' ? 'gowes-pill-btn shadow' : 'app-btn-sec'}">
+                    <i class="fa-solid fa-store mr-1"></i>Gerai &amp; Cabang (${shelters.length})
                 </button>
-            ` : ""}
+                ${isMaster ? `
+                    <button type="button" onclick="switchGowesFleetAdminTab('banners')" class="px-3.5 py-2 rounded-xl text-xs font-extrabold whitespace-nowrap transition ${_gowesFleetAdminTab === 'banners' ? 'gowes-pill-btn shadow' : 'app-btn-sec'}">
+                        <i class="fa-solid fa-rectangle-ad mr-1"></i>Banner 16:7 (${banners.length})
+                    </button>
+                ` : ""}
+            </div>
+            <button type="button" onclick="if(typeof openGowesOfflinePosModal==='function')openGowesOfflinePosModal()" class="px-3.5 py-2 rounded-xl bg-emerald-600/15 border border-emerald-500/35 text-emerald-700 text-xs font-extrabold shrink-0">
+                <i class="fa-solid fa-cash-register mr-1"></i>+ Kasir Offline
+            </button>
         </div>
     `;
 
@@ -111,15 +118,15 @@ function renderGowesFleetWorkspaceHtml() {
             <div class="grid md:grid-cols-2 gap-5">
                 <form onsubmit="saveGowesBannerForm(event)" class="app-card border rounded-3xl p-4 space-y-2.5 shadow-sm">
                     <div class="flex items-center justify-between">
-                        <h4 class="font-extrabold text-sm text-emerald-600">Tambah / Edit Banner 16:5</h4>
+                        <h4 class="font-extrabold text-sm text-emerald-600">Tambah / Edit Banner 16:7</h4>
                         <button type="button" onclick="resetGowesBannerForm()" class="text-[11px] app-muted hover:underline">Reset</button>
                     </div>
                     <input type="hidden" id="gwb-id">
-                    <div class="w-full rounded-xl overflow-hidden border gold-border bg-black" style="aspect-ratio:16/5;">
+                    <div class="w-full rounded-xl overflow-hidden border gold-border bg-black" style="aspect-ratio:16/7;">
                         <img id="gwb-preview-img" src="${(banners[0] && banners[0].img) || 'https://images.unsplash.com/photo-1541625602330-2277a4c46182?auto=format&fit=crop&w=1200&q=80'}" class="w-full h-full object-cover">
                     </div>
                     <label class="block gowes-pill-btn py-2 rounded-xl text-center cursor-pointer text-xs">
-                        <i class="fa-solid fa-crop-simple mr-1"></i>Pilih &amp; Crop Foto Banner (16 : 5)
+                        <i class="fa-solid fa-crop-simple mr-1"></i>Pilih &amp; Crop Foto Banner (16 : 7)
                         <input type="file" accept="image/*" class="hide" onchange="pickCroppedGowesBanner(this)">
                     </label>
                     <div class="grid grid-cols-2 gap-2">
@@ -141,36 +148,13 @@ function renderGowesFleetWorkspaceHtml() {
                     <h4 class="font-bold text-xs text-emerald-600 uppercase">Daftar Banner Aktif (${banners.length})</h4>
                     ${banners.map((b, i) => `
                         <div class="app-card border rounded-2xl p-2.5 flex items-center gap-3 shadow-sm">
-                            <img src="${b.img}" class="w-24 h-10 rounded-lg object-cover bg-black shrink-0">
+                            <img src="${b.img}" class="w-24 h-11 rounded-lg object-cover bg-black shrink-0">
                             <div class="flex-1 min-w-0">
                                 <strong class="text-xs block truncate">${escHtml(b.title)}</strong>
                                 <span class="text-[10px] app-muted block truncate">${escHtml(b.badge || "Promo")}</span>
                             </div>
                             <button type="button" onclick="editGowesBannerItem(${i})" class="px-2.5 py-1 rounded app-btn-sec text-[10px] font-bold">Edit</button>
                             <button type="button" onclick="deleteGowesBannerItem(${i})" class="px-2.5 py-1 rounded bg-red-600/15 text-[10px] text-red-500"><i class="fa-solid fa-trash"></i></button>
-                        </div>
-                    `).join("")}
-                </div>
-            </div>
-        `;
-    } else if (_gowesFleetAdminTab === "categories" && isMaster) {
-        paneHtml = `
-            <div class="app-card border rounded-3xl p-4 sm:p-5 space-y-4 shadow-sm">
-                <div>
-                    <h4 class="font-extrabold text-sm text-emerald-600">Kategori Filter Beranda Titik Gowes</h4>
-                    <p class="text-[11px] app-muted">Aktifkan atau sembunyikan kategori filter sepeda yang tampil di beranda.</p>
-                </div>
-                <div class="space-y-2">
-                    ${cats.map((c, idx) => `
-                        <div class="app-card-soft border rounded-2xl px-3.5 py-2.5 flex items-center justify-between gap-3">
-                            <div class="min-w-0">
-                                <strong class="text-xs block truncate">${escHtml(c.name)}</strong>
-                                <span class="text-[10px] app-muted">Kode: ${escHtml(c.id)}</span>
-                            </div>
-                            <label class="lbk-switch">
-                                <input type="checkbox" ${c.active !== false ? "checked" : ""} ${c.id === "all" ? "disabled" : ""} onchange="toggleGowesCategoryActive(${idx}, this.checked)">
-                                <span class="lbk-switch-track"></span>
-                            </label>
                         </div>
                     `).join("")}
                 </div>
@@ -208,19 +192,19 @@ function renderGowesFleetWorkspaceHtml() {
     return `<div class="space-y-4">${tabsHtml}${paneHtml}</div>`;
 }
 
-// ================= BANNER 16:5 & KATEGORI HANDLERS =================
+// ================= BANNER 16:7 HANDLERS =================
 function pickCroppedGowesBanner(inp) {
     const file = inp.files && inp.files[0];
     if (!file) return;
     inp.value = "";
     if (typeof openImageCropper === "function") {
-        openImageCropper(file, 16 / 5, "Crop Banner Titik Gowes (16 : 5)", 1280, 400, (dataUrl) => {
+        openImageCropper(file, 16 / 7, "Crop Banner Titik Gowes (16 : 7)", 1280, 560, (dataUrl) => {
             gwBannerTempImg = dataUrl;
             const prev = document.getElementById("gwb-preview-img");
             const urlInp = document.getElementById("gwb-img-url");
             if (prev) prev.src = dataUrl;
             if (urlInp) urlInp.value = dataUrl;
-            showToast("Foto banner siap disimpan!");
+            showToast("Foto banner (16:7) siap disimpan!");
         });
     }
 }
@@ -291,20 +275,6 @@ async function deleteGowesBannerItem(i) {
         if (typeof renderMasterWorkspaceContent === "function") renderMasterWorkspaceContent();
         if (typeof renderGowesBannerSlider === "function") renderGowesBannerSlider();
         showToast("Banner dihapus.", "info");
-    }
-}
-
-async function toggleGowesCategoryActive(idx, checked) {
-    const list = [...(Array.isArray(db.gowesCategories) && db.gowesCategories.length ? db.gowesCategories : DEFAULT_GOWES_CATEGORIES)].map(c => Object.assign({}, c));
-    if (!list[idx] || list[idx].id === "all") return;
-    list[idx].active = !!checked;
-    const res = await apiAction({ action: "gowes_update_categories", categories: list });
-    if (res && res.ok) {
-        db.gowesCategories = res.categories || list;
-        if (typeof renderGowesCategoryFilters === "function") renderGowesCategoryFilters();
-        showToast(`Kategori "${list[idx].name}" ${checked ? "diaktifkan" : "disembunyikan"}.`, "info");
-    } else {
-        showToast("Gagal memperbarui kategori.", "error");
     }
 }
 
@@ -438,7 +408,7 @@ async function deleteGowesShelterBranch(branchId) {
     showToast("Gerai cabang dihapus.", "info");
 }
 
-// ================= 2. KELOLA ARMADA SEPEDA (REM & LABEL TARIF FLEKSIBEL) =================
+// ================= 2. KELOLA ARMADA SEPEDA (CABANG GARASI, REM & LABEL TARIF FLEKSIBEL) =================
 function openMasterGowesBikeModal(bikeId = null) {
     const isEdit = !!bikeId;
     const bikes = Array.isArray(db.gowesBikes) && db.gowesBikes.length ? db.gowesBikes : DEFAULT_GOWES_BIKES;
@@ -448,6 +418,14 @@ function openMasterGowesBikeModal(bikeId = null) {
 
     const titleEl = document.getElementById("mgb-title");
     if (titleEl) titleEl.innerText = isEdit ? `Edit Unit: ${b.name}` : "Tambah Unit Sepeda Baru";
+
+    const brSel = document.getElementById("mgb-branch-id");
+    if (brSel) {
+        const shelters = _getAdminSheltersList();
+        const curBranchVal = isEdit ? (b.branchId || "all") : "all";
+        brSel.innerHTML = `<option value="all" ${curBranchVal === "all" ? "selected" : ""}>Semua Cabang (Tampil di Semua Lokasi)</option>` +
+            shelters.map(s => `<option value="${esc(s.id)}" ${String(curBranchVal) === String(s.id) ? "selected" : ""}>Khusus Cabang ${escHtml(s.city || s.name)}</option>`).join("");
+    }
 
     document.getElementById("mgb-id").value = isEdit ? b.id : "";
     document.getElementById("mgb-name").value = isEdit ? b.name : "";
@@ -513,6 +491,7 @@ async function submitMasterGowesBikeModal(e) {
     e.preventDefault();
 
     const bikeId = document.getElementById("mgb-id").value.trim();
+    const branchId = document.getElementById("mgb-branch-id")?.value || "all";
     const name = document.getElementById("mgb-name").value.trim();
     const type = document.getElementById("mgb-type").value;
     const frameSize = document.getElementById("mgb-frame").value.trim();
@@ -534,7 +513,7 @@ async function submitMasterGowesBikeModal(e) {
 
     const bikePayload = {
         id: bikeId || ("bike_" + Date.now()),
-        name, type, frameSize, gears, brakes,
+        branchId, name, type, frameSize, gears, brakes,
         label2Hours, label6Hours, labelFullDay,
         price2Hours, price6Hours, priceFullDay,
         status, freeAccessories, description, image: finalImage
@@ -637,6 +616,7 @@ function renderGowesBikesAdminList() {
         const isAvail = b.status === "Tersedia";
         const isInUse = b.status === "Sedang Disewa";
         const statusCls = isAvail ? "bg-emerald-500/15 text-emerald-600" : isInUse ? "bg-amber-500/15 text-amber-600" : "bg-zinc-500/15 text-zinc-400";
+        const brLbl = _getBranchLabelById(b.branchId);
 
         return `
             <div class="app-card border rounded-2xl p-3.5 flex flex-col sm:flex-row sm:items-center justify-between gap-3 shadow-sm">
@@ -645,6 +625,7 @@ function renderGowesBikesAdminList() {
                     <div class="min-w-0 space-y-0.5">
                         <div class="flex items-center gap-1.5 flex-wrap">
                             <span class="gowes-brand-tag !text-[8.5px]">${escHtml(b.type || "MTB")}</span>
+                            <span class="text-[8.5px] font-extrabold px-2 py-0.5 rounded-full bg-blue-500/12 text-blue-600"><i class="fa-solid fa-location-dot mr-0.5"></i>${escHtml(brLbl)}</span>
                             <span class="text-[9px] font-extrabold uppercase px-2 py-0.5 rounded-full ${statusCls}">● ${escHtml(b.status)}</span>
                         </div>
                         <h4 class="font-extrabold text-xs sm:text-sm truncate pt-0.5">${escHtml(b.name)}</h4>
@@ -695,8 +676,8 @@ function openGowesHandoverModal(rentalId, stage = "out") {
     if (titleEl) titleEl.innerText = stage === "out" ? `Foto Serah Terima: ${r.bikeName}` : `Foto Pengembalian: ${r.bikeName}`;
     if (subEl) {
         subEl.innerText = stage === "out"
-            ? `Ambil foto kondisi sepeda saat diserahkan ke @${r.customerUsername} (Mulai Gowes).`
-            : `Ambil foto kondisi sepeda saat dikembalikan oleh @${r.customerUsername} (Selesai).`;
+            ? `Ambil foto kondisi sepeda saat diserahkan ke ${r.customerName || r.customerUsername} (Mulai Gowes).`
+            : `Ambil foto kondisi sepeda saat dikembalikan oleh ${r.customerName || r.customerUsername} (Selesai).`;
     }
     if (prevImg) prevImg.src = mghTempPhotoUrl || r.bikeImage || "https://images.unsplash.com/photo-1485965120184-e220f721d03e?auto=format&fit=crop&w=800&q=75";
 
@@ -756,7 +737,49 @@ async function submitGowesHandoverPhoto() {
     showToast(`Foto serah terima ${stage === "out" ? "keluar" : "kembali"} tersimpan!`);
 }
 
-// ================= 4. KARTU ORDER SEWA SEPEDA DI MENU PROJECT ADMIN =================
+// ================= 4. DETEKSI LEWAT WAKTU (OVERDUE) & KARTU ORDER ADMIN =================
+function getGowesRentalOverdueInfo(rental) {
+    if (!rental || rental.status !== "Sedang Digunakan" || !rental.startDate || !rental.startTime) {
+        return { isOverdue: false, label: "", deadlineLabel: "" };
+    }
+    const allBikes = Array.isArray(db.gowesBikes) && db.gowesBikes.length ? db.gowesBikes : DEFAULT_GOWES_BIKES;
+    const refBike = allBikes.find(b => String(b.id) === String(rental.bikeId)) || null;
+    const iv = typeof getBookingIntervalMinutes === "function"
+        ? getBookingIntervalMinutes(rental.startTime, rental.durationKey, refBike, rental.durationLabel)
+        : { endMin: 20 * 60, endColon: "20:00", nextDay: false };
+
+    const dParts = String(rental.startDate).split("-");
+    if (dParts.length !== 3) return { isOverdue: false, label: "", deadlineLabel: iv.endColon };
+
+    const deadlineDate = new Date(
+        parseInt(dParts[0], 10),
+        parseInt(dParts[1], 10) - 1,
+        parseInt(dParts[2], 10),
+        0,
+        iv.endMin,
+        0
+    );
+    const diffMs = Date.now() - deadlineDate.getTime();
+    if (diffMs <= 60000) return { isOverdue: false, label: "", deadlineLabel: iv.endColon };
+
+    const overMins = Math.floor(diffMs / 60000);
+    const hrs = Math.floor(overMins / 60);
+    const mins = overMins % 60;
+    const label = hrs > 0 ? `LEWAT ${hrs} JAM ${mins} MNT` : `LEWAT ${mins} MENIT`;
+    return { isOverdue: true, label, deadlineLabel: iv.endColon };
+}
+
+function sendGowesOverdueReminderWA(rentalId) {
+    const r = (db.gowesRentals || []).find(x => String(x.id) === String(rentalId));
+    if (!r) return;
+    let digits = String(r.customerPhone || "").replace(/\D/g, "");
+    if (digits.startsWith("0")) digits = "62" + digits.slice(1);
+    else if (digits.startsWith("8")) digits = "62" + digits;
+    const od = getGowesRentalOverdueInfo(r);
+    const msg = `Halo Kak ${r.customerName || ""}, kami dari *${r.pickupLocation || "Titik Gowes"}*. Mengingatkan bahwa durasi sewa sepeda *${r.bikeName}* (${r.durationLabel}) sudah melewati batas waktu pengembalian (${od.deadlineLabel} WITA). Mohon konfirmasinya ya Kak, terima kasih!`;
+    window.open(`https://wa.me/${digits}?text=${encodeURIComponent(msg)}`, "_blank", "noopener,noreferrer");
+}
+
 function buildGowesOrderCardHtml(rental, options = {}) {
     const closeModalBeforeAction = !!options.closeModalBeforeAction;
     const preCloseJs = closeModalBeforeAction ? "closeSoloStatsModal();closeUserProfileModalCustom();" : "";
@@ -767,6 +790,8 @@ function buildGowesOrderCardHtml(rental, options = {}) {
     const isInUse = rental.status === "Sedang Digunakan";
     const isDone = rental.status === "Selesai";
     const isCanceled = rental.status === "Dibatalkan";
+
+    const overdue = getGowesRentalOverdueInfo(rental);
 
     const statusBadge = isDone
         ? `<span class="text-[9px] px-2 py-0.5 rounded-full bg-emerald-500/20 text-emerald-600 font-extrabold uppercase">● Selesai</span>`
@@ -780,42 +805,60 @@ function buildGowesOrderCardHtml(rental, options = {}) {
                         ? `<span class="text-[9px] px-2 py-0.5 rounded-full bg-zinc-500/20 text-zinc-400 font-extrabold uppercase">● Dibatalkan</span>`
                         : `<span class="text-[9px] px-2 py-0.5 rounded-full bg-red-500/20 text-red-500 font-extrabold uppercase">● Menunggu Bayar</span>`;
 
+    const offlineBadge = rental.isOffline
+        ? `<span class="text-[9px] px-2 py-0.5 rounded-full ${rental.paymentMethod === 'cash' ? 'bg-emerald-600 text-white' : 'bg-blue-600 text-white'} font-extrabold uppercase">${rental.paymentMethod === 'cash' ? 'OFFLINE • CASH' : 'OFFLINE • QRIS'}</span>`
+        : "";
+
+    const overdueBadgeHtml = overdue.isOverdue
+        ? `<span class="gowes-overdue-badge"><i class="fa-solid fa-clock mr-1"></i>${escHtml(overdue.label)}</span>`
+        : "";
+
     const qtyText = rental.quantity ? `${rental.quantity} Unit` : "1 Unit";
-    const priceInfo = `${fmtRp(rental.totalPrice)} (Kode unik: ${rental.uniqueCode || 0})`;
+    const priceInfo = rental.uniqueCode
+        ? `${fmtRp(rental.totalPrice)} (Kode unik: ${rental.uniqueCode})`
+        : `${fmtRp(rental.totalPrice)} (Tunai Pas)`;
     const multiSummaryHtml = (Array.isArray(rental.selectedBikes) && rental.selectedBikes.length > 1)
         ? `<p class="text-[10px] app-muted">${rental.selectedBikes.map((sb, i) => `#${i + 1} ${escHtml(sb.bikeName)}`).join(" • ")}</p>`
         : "";
 
+    const canChatApp = rental.customerUsername && rental.customerUsername !== "walkin_offline";
+
     return `
-        <div class="app-card border rounded-2xl p-4 flex flex-col md:flex-row md:items-center justify-between gap-3.5 shadow-sm border-l-4 border-l-emerald-500">
+        <div class="app-card border rounded-2xl p-4 flex flex-col md:flex-row md:items-center justify-between gap-3.5 shadow-sm border-l-4 ${overdue.isOverdue ? 'border-l-red-600' : 'border-l-emerald-500'}">
             <div class="min-w-0 space-y-1">
                 <div class="flex flex-wrap items-center gap-1.5">
-                    <span class="gowes-brand-tag !text-[8.5px]"><i class="fa-solid fa-bicycle"></i> RENTAL TITIK GOWES</span>
+                    <span class="gowes-brand-tag !text-[8.5px]"><i class="fa-solid fa-bicycle"></i> TITIK GOWES</span>
+                    ${offlineBadge}
                     ${rental.branchCity ? `<span class="text-[9px] px-2 py-0.5 rounded-full bg-emerald-500/15 text-emerald-700 font-extrabold uppercase">${escHtml(rental.branchCity)}</span>` : ""}
                     ${statusBadge}
+                    ${overdueBadgeHtml}
                 </div>
                 <h4 class="font-bold text-sm truncate">
                     ${escHtml(rental.bikeName)}
                     <span class="text-xs app-accent font-extrabold">(${qtyText})</span>
-                    <span class="text-xs app-muted font-normal">(@${escHtml(rental.customerUsername)} • ${escHtml(rental.customerPhone || "-")})</span>
+                    <span class="text-xs app-muted font-normal">(${escHtml(rental.customerName || rental.customerUsername)} • ${escHtml(rental.customerPhone || "-")})</span>
                 </h4>
                 ${multiSummaryHtml}
-                <p class="text-xs app-muted">Paket: <strong class="app-accent">${escHtml(rental.durationLabel)}</strong> • ${priceInfo}</p>
+                <p class="text-xs app-muted">Paket: <strong class="app-accent">${escHtml(rental.durationLabel)}</strong> • ${priceInfo}${rental.cashierName ? ` • Kasir: <strong>${escHtml(rental.cashierName)}</strong>` : ""}</p>
                 <div class="flex flex-wrap items-center gap-2 text-[10px] text-emerald-600 font-semibold pt-0.5">
                     <span><i class="fa-regular fa-calendar-check mr-1"></i>${escHtml(rental.startDate)} (${escHtml(rental.startTime)} WITA)</span>
                     <span>• Gerai: ${escHtml(rental.pickupLocation || "Shelter Utama")}</span>
+                    ${rental.ktpHeldAtShop ? `<span class="text-purple-600"><i class="fa-solid fa-id-card mr-0.5"></i>KTP di Kasir</span>` : ""}
                     ${rental.handoverOutPhoto ? `<span class="text-blue-500"><i class="fa-solid fa-camera mr-0.5"></i>Foto Keluar ✓</span>` : ""}
                     ${rental.handoverInPhoto ? `<span class="text-emerald-500"><i class="fa-solid fa-camera mr-0.5"></i>Foto Kembali ✓</span>` : ""}
                 </div>
             </div>
 
             <div class="flex flex-wrap items-center gap-1.5 self-start md:self-center shrink-0">
-                ${rental.customerUsername ? `<button type="button" onclick="${preCloseJs}openFullChatOverlay('${esc(rental.customerUsername)}')" class="px-3 py-1.5 rounded-xl bg-emerald-600/15 border border-emerald-500/35 text-emerald-600 text-xs font-bold"><i class="fa-solid fa-comments mr-1"></i>Chat</button>` : ""}
+                ${overdue.isOverdue ? `<button type="button" onclick="sendGowesOverdueReminderWA('${esc(rental.id)}')" class="px-3 py-1.5 rounded-xl bg-red-600 text-white text-xs font-bold shadow-sm"><i class="fa-brands fa-whatsapp mr-1"></i>WA Pengingat</button>` : ""}
+                ${canChatApp ? `<button type="button" onclick="${preCloseJs}openFullChatOverlay('${esc(rental.customerUsername)}')" class="px-3 py-1.5 rounded-xl bg-emerald-600/15 border border-emerald-500/35 text-emerald-600 text-xs font-bold"><i class="fa-solid fa-comments mr-1"></i>Chat</button>` : ""}
                 ${rental.ktpImage ? `<button type="button" onclick="viewGowesKtpModal('${esc(rental.ktpImage)}','${esc(rental.customerName || rental.customerUsername)}')" class="px-3 py-1.5 rounded-xl bg-purple-600/15 border border-purple-500/35 text-purple-600 text-xs font-bold"><i class="fa-solid fa-id-card mr-1"></i>KTP</button>` : ""}
                 ${rental.paymentProof ? `<button type="button" onclick="viewOrderProof('gowes_rental','${esc(rental.id)}')" class="px-3 py-1.5 rounded-xl bg-blue-600/15 border border-blue-500/35 text-blue-600 text-xs font-bold"><i class="fa-solid fa-receipt mr-1"></i>Bukti</button>` : ""}
-                ${isVerif || isPay ? `<button type="button" onclick="setGowesRentalStatus('${esc(rental.id)}','Terkonfirmasi',this)" class="gowes-pill-btn px-3.5 py-1.5 rounded-xl text-xs font-bold shadow-sm">✓ ACC Bayar</button>` : ""}
+                ${rental.isOffline && isPay && rental.paymentMethod === "qris" ? `<button type="button" onclick="openGowesOfflineQrisModal((db.gowesRentals||[]).find(x=>String(x.id)==='${esc(rental.id)}'))" class="px-3 py-1.5 rounded-xl bg-blue-600 text-white text-xs font-bold shadow-sm"><i class="fa-solid fa-qrcode mr-1"></i>Scan QRIS</button>` : ""}
+                ${(isVerif || (isPay && !rental.isOffline)) ? `<button type="button" onclick="setGowesRentalStatus('${esc(rental.id)}','Terkonfirmasi',this)" class="gowes-pill-btn px-3.5 py-1.5 rounded-xl text-xs font-bold shadow-sm">✓ ACC Bayar</button>` : ""}
                 ${isConfirmed ? `<button type="button" onclick="openGowesHandoverModal('${esc(rental.id)}','out')" class="px-3 py-1.5 rounded-xl app-card-soft border text-blue-600 text-xs font-bold"><i class="fa-solid fa-camera mr-1"></i>Foto Keluar</button><button type="button" onclick="setGowesRentalStatus('${esc(rental.id)}','Sedang Digunakan',this)" class="gowes-pill-btn px-3.5 py-1.5 rounded-xl text-xs font-bold shadow-sm"><i class="fa-solid fa-key mr-1"></i>Serahkan Unit</button>` : ""}
                 ${isInUse ? `<button type="button" onclick="openGowesHandoverModal('${esc(rental.id)}','in')" class="px-3 py-1.5 rounded-xl app-card-soft border text-emerald-600 text-xs font-bold"><i class="fa-solid fa-camera mr-1"></i>Foto Kembali</button><button type="button" onclick="setGowesRentalStatus('${esc(rental.id)}','Selesai',this)" class="px-3.5 py-1.5 rounded-xl bg-emerald-600 text-white text-xs font-bold shadow-sm">✓ Unit Selesai</button>` : ""}
+                ${!isCanceled ? `<button type="button" onclick="openGowesReceiptModal('${esc(rental.id)}')" class="px-3 py-1.5 rounded-xl app-card-soft border text-emerald-700 text-xs font-bold" title="Struk & Kirim WA"><i class="fa-solid fa-receipt mr-1"></i>Struk</button>` : ""}
                 ${!isDone && !isCanceled ? `<button type="button" onclick="setGowesRentalStatus('${esc(rental.id)}','Dibatalkan',this)" class="px-2.5 py-1.5 rounded-xl bg-red-600/15 text-red-500 text-xs font-bold" title="Batalkan Sewa"><i class="fa-solid fa-xmark"></i></button>` : ""}
                 <button type="button" onclick="openGowesRentalDetail('${esc(rental.id)}')" class="px-3 py-1.5 rounded-xl app-btn-sec text-xs font-bold">Detail</button>
             </div>
@@ -838,6 +881,10 @@ async function setGowesRentalStatus(rentalId, nextStatus, btnEl) {
         return showToast((res && res.message) || "Gagal mengubah status sewa sepeda.", "error");
     }
 
+    if (Array.isArray(res.upcomingBookings)) {
+        db.gowesUpcomingBookings = res.upcomingBookings;
+        db.gowesTodayBookings = res.upcomingBookings;
+    }
     if (!Array.isArray(db.gowesRentals)) db.gowesRentals = [];
     const idx = db.gowesRentals.findIndex(r => String(r.id) === String(rentalId));
     if (idx >= 0) db.gowesRentals[idx] = res.rental;
@@ -895,6 +942,8 @@ function buildGowesAnalyticsDashboardHtml() {
 
     const completedRentals = rentals.filter(r => r.status === "Selesai" || r.status === "Sedang Digunakan" || r.status === "Terkonfirmasi");
     const totalRevenue = completedRentals.reduce((sum, r) => sum + Number(r.totalPrice || 0), 0);
+    const offlineCashRev = completedRentals.filter(r => r.isOffline && r.paymentMethod === "cash").reduce((s, r) => s + Number(r.totalPrice || 0), 0);
+    const qrisRev = totalRevenue - offlineCashRev;
 
     const activeInUseCount = rentals.filter(r => r.status === "Sedang Digunakan").length;
     const readyBikesCount = bikes.filter(b => b.status === "Tersedia").length;
@@ -902,14 +951,14 @@ function buildGowesAnalyticsDashboardHtml() {
     const totalFleet = bikes.length;
     const occupancyRate = totalFleet > 0 ? Math.round((activeInUseCount / totalFleet) * 100) : 0;
 
-    const durationMap = { "2 Jam": 0, "6 Jam": 0, "Full Day": 0 };
+    const durationMap = { "Paket 1": 0, "Paket 2": 0, "Full Day": 0 };
     rentals.forEach(r => {
-        const d = String(r.durationLabel || r.durationKey || "");
-        if (d.includes("2 Jam") || d === "2_hours") durationMap["2 Jam"]++;
-        else if (d.includes("6 Jam") || d === "6_hours") durationMap["6 Jam"]++;
-        else if (d.includes("Full") || d === "full_day") durationMap["Full Day"]++;
+        const k = String(r.durationKey || "");
+        if (k === "6_hours") durationMap["Paket 2"]++;
+        else if (k === "full_day") durationMap["Full Day"]++;
+        else durationMap["Paket 1"]++;
     });
-    const maxDur = Math.max(1, durationMap["2 Jam"], durationMap["6 Jam"], durationMap["Full Day"]);
+    const maxDur = Math.max(1, durationMap["Paket 1"], durationMap["Paket 2"], durationMap["Full Day"]);
 
     const now = new Date();
     const months = [];
@@ -963,19 +1012,24 @@ function buildGowesAnalyticsDashboardHtml() {
                     </span>
                     <div>
                         <strong class="text-xs sm:text-sm block">${shelters.length} Gerai Cabang Terdaftar (${escHtml(activeSh.city || "Utama")}: ${isClosed ? '<span class="text-red-500 font-extrabold">TUTUP</span>' : '<span class="text-emerald-600 font-extrabold">BUKA</span>'})</strong>
-                        <span class="text-[10px] app-muted block">Kelola jam buka, alamat, Google Maps &amp; cabang baru</span>
+                        <span class="text-[10px] app-muted block">Cash Offline: ${fmtRp(offlineCashRev)} • QRIS: ${fmtRp(qrisRev)}</span>
                     </div>
                 </div>
-                <button type="button" onclick="openMasterWorkspace('gowes_fleet');switchGowesFleetAdminTab('ops');" class="px-4 py-2 rounded-xl app-card-soft border gold-border text-xs font-bold app-accent shadow-sm">
-                    <i class="fa-solid fa-sliders mr-1.5"></i>Kelola Gerai Cabang
-                </button>
+                <div class="flex gap-2">
+                    <button type="button" onclick="if(typeof openGowesOfflinePosModal==='function')openGowesOfflinePosModal()" class="gowes-pill-btn px-3.5 py-2 rounded-xl text-xs shadow-sm">
+                        <i class="fa-solid fa-cash-register mr-1"></i>Kasir Offline
+                    </button>
+                    <button type="button" onclick="openMasterWorkspace('gowes_fleet');switchGowesFleetAdminTab('ops');" class="px-3.5 py-2 rounded-xl app-card-soft border gold-border text-xs font-bold app-accent shadow-sm">
+                        <i class="fa-solid fa-sliders mr-1"></i>Gerai
+                    </button>
+                </div>
             </div>
 
             <div class="grid grid-cols-2 sm:grid-cols-4 gap-3">
                 <div class="app-card border rounded-2xl p-3.5 space-y-1 shadow-sm border-l-4 border-l-emerald-500">
                     <span class="text-[10px] app-muted font-bold uppercase block">Omzet Sewa Sepeda</span>
                     <strong class="text-base sm:text-lg font-extrabold text-emerald-600 block truncate">${fmtRp(totalRevenue)}</strong>
-                    <span class="text-[10px] app-muted">${completedRentals.length} transaksi selesai</span>
+                    <span class="text-[10px] app-muted">${completedRentals.length} transaksi aktif/selesai</span>
                 </div>
                 <div class="app-card border rounded-2xl p-3.5 space-y-1 shadow-sm">
                     <span class="text-[10px] app-muted font-bold uppercase block">Tingkat Okupansi</span>
@@ -990,7 +1044,7 @@ function buildGowesAnalyticsDashboardHtml() {
                 <div class="app-card border rounded-2xl p-3.5 space-y-1 shadow-sm">
                     <span class="text-[10px] app-muted font-bold uppercase block">Total Booking</span>
                     <strong class="text-base sm:text-lg font-extrabold text-amber-500 block truncate">${rentals.length} Booking</strong>
-                    <span class="text-[10px] app-muted">Riwayat sewa masuk</span>
+                    <span class="text-[10px] app-muted">Online &amp; Walk-in</span>
                 </div>
             </div>
 
@@ -1022,15 +1076,15 @@ function buildGowesAnalyticsDashboardHtml() {
                     </div>
                     <div class="space-y-2.5 text-xs">
                         <div>
-                            <div class="flex justify-between text-[11px] font-bold mb-1"><span>Paket 2 Jam (Short Ride)</span><span class="text-emerald-600">${durationMap["2 Jam"]}x</span></div>
-                            <div class="w-full h-2 rounded-full app-card-soft overflow-hidden"><div class="h-full bg-emerald-500 rounded-full" style="width:${Math.round((durationMap["2 Jam"] / maxDur) * 100)}%"></div></div>
+                            <div class="flex justify-between text-[11px] font-bold mb-1"><span>Paket Singkat (Tarif 1)</span><span class="text-emerald-600">${durationMap["Paket 1"]}x</span></div>
+                            <div class="w-full h-2 rounded-full app-card-soft overflow-hidden"><div class="h-full bg-emerald-500 rounded-full" style="width:${Math.round((durationMap["Paket 1"] / maxDur) * 100)}%"></div></div>
                         </div>
                         <div>
-                            <div class="flex justify-between text-[11px] font-bold mb-1"><span>Paket 6 Jam (Half Day)</span><span class="text-blue-500">${durationMap["6 Jam"]}x</span></div>
-                            <div class="w-full h-2 rounded-full app-card-soft overflow-hidden"><div class="h-full bg-blue-500 rounded-full" style="width:${Math.round((durationMap["6 Jam"] / maxDur) * 100)}%"></div></div>
+                            <div class="flex justify-between text-[11px] font-bold mb-1"><span>Paket Menengah (Tarif 2)</span><span class="text-blue-500">${durationMap["Paket 2"]}x</span></div>
+                            <div class="w-full h-2 rounded-full app-card-soft overflow-hidden"><div class="h-full bg-blue-500 rounded-full" style="width:${Math.round((durationMap["Paket 2"] / maxDur) * 100)}%"></div></div>
                         </div>
                         <div>
-                            <div class="flex justify-between text-[11px] font-bold mb-1"><span>Paket Full Day (Seharian Penuh)</span><span class="text-amber-500">${durationMap["Full Day"]}x</span></div>
+                            <div class="flex justify-between text-[11px] font-bold mb-1"><span>Paket Full Day (Tarif 3)</span><span class="text-amber-500">${durationMap["Full Day"]}x</span></div>
                             <div class="w-full h-2 rounded-full app-card-soft overflow-hidden"><div class="h-full bg-amber-500 rounded-full" style="width:${Math.round((durationMap["Full Day"] / maxDur) * 100)}%"></div></div>
                         </div>
                     </div>

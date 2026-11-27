@@ -368,7 +368,7 @@ function _mrHideStackableOverlaysOnly() {
     }
 
     // Modal Titik Gowes & Drawer Kiri
-    ["modal-gowes-booking", "modal-gowes-bike", "modal-gowes-handover", "modal-gowes-rental-detail", "modal-gowes-shelter-ops"].forEach(id => {
+    ["modal-gowes-booking", "modal-gowes-offline-pos", "modal-gowes-offline-qris", "modal-gowes-receipt", "modal-gowes-bike", "modal-gowes-handover", "modal-gowes-rental-detail", "modal-gowes-shelter-ops"].forEach(id => {
         document.getElementById(id)?.classList.add("hide");
     });
     if (typeof toggleEcosystemDrawer === "function") toggleEcosystemDrawer(false);
@@ -387,6 +387,21 @@ function _mrCloseTransientOverlayIfAny() {
         return "app-confirm-modal";
     }
     // Tangani Modal Titik Gowes
+    if (_isElVis("modal-gowes-receipt")) {
+        if (typeof closeGowesReceiptModal === "function") closeGowesReceiptModal();
+        else document.getElementById("modal-gowes-receipt")?.classList.add("hide");
+        return "modal-gowes-receipt";
+    }
+    if (_isElVis("modal-gowes-offline-qris")) {
+        if (typeof closeGowesOfflineQrisModal === "function") closeGowesOfflineQrisModal();
+        else document.getElementById("modal-gowes-offline-qris")?.classList.add("hide");
+        return "modal-gowes-offline-qris";
+    }
+    if (_isElVis("modal-gowes-offline-pos")) {
+        if (typeof closeGowesOfflinePosModal === "function") closeGowesOfflinePosModal();
+        else document.getElementById("modal-gowes-offline-pos")?.classList.add("hide");
+        return "modal-gowes-offline-pos";
+    }
     if (_isElVis("modal-gowes-booking")) {
         if (typeof closeGowesBookingModal === "function") closeGowesBookingModal();
         else document.getElementById("modal-gowes-booking")?.classList.add("hide");
@@ -1518,7 +1533,8 @@ function renderMainSlideMenuList() {
         html += menuRowItem("fa-right-to-bracket", "Masuk / Daftar Akun", "Buat undangan, CV & simpan favorit", "toggleSlideMenu(false);openAuthModal();");
     } else if (u.role === "master") {
         html += menuRowItem("fa-chart-line", "Grafik & Analitik Bisnis", "Omzet, tren pesanan, rental sepeda & data PWA", "toggleSlideMenu(false);if(typeof openMasterWorkspace==='function')openMasterWorkspace('overview');");
-        html += menuRowItem("fa-bicycle", "Kelola Armada Titik Gowes", "Unit sepeda, status garasi buka/tutup, banner 16:5 & kategori", "toggleSlideMenu(false);if(typeof openMasterWorkspace==='function')openMasterWorkspace('gowes_fleet');");
+        html += menuRowItem("fa-cash-register", "Kasir Sewa Offline (Walk-in)", "Daftarkan pelanggan datang langsung • Bayar Cash atau QRIS", "toggleSlideMenu(false);if(typeof openGowesOfflinePosModal==='function')openGowesOfflinePosModal();");
+        html += menuRowItem("fa-bicycle", "Kelola Armada Titik Gowes", "Unit sepeda, cabang garasi & banner promosi 16:7", "toggleSlideMenu(false);if(typeof openMasterWorkspace==='function')openMasterWorkspace('gowes_fleet');");
         html += menuRowItem("fa-palette", "Kelola Tema & Harga", "Foto template, nama contoh & harga CV/Lamaran", "toggleSlideMenu(false);if(typeof openMasterWorkspace==='function')openMasterWorkspace('themes');");
         html += menuRowItem("fa-rectangle-ad", "Edit Banner Promosi (12:4.4)", "Atur banner promosi utama beranda", "toggleSlideMenu(false);if(typeof openMasterWorkspace==='function')openMasterWorkspace('home_editor');");
         html += menuRowItem("fa-music", "Stok Musik & Testimoni", "Upload lagu dari perangkat & ulasan beranda", "toggleSlideMenu(false);if(typeof openMasterWorkspace==='function')openMasterWorkspace('media');");
@@ -1528,7 +1544,8 @@ function renderMainSlideMenuList() {
         html += menuRowItem("fa-user-pen", "Edit Profil Founder", "Foto profil, sampul & bio", "openSlideSub('profil')");
         html += menuRowItem("fa-shield-halved", "Keamanan Akun & Keluar", "Username, ganti password aman & logout", "openSlideSub('akun')");
     } else if (u.role === "administrasi") {
-        html += menuRowItem("fa-bicycle", "Kelola Armada & Garasi Gowes", "Atur unit sepeda, status servis & operasional garasi", "toggleSlideMenu(false);if(typeof openMasterWorkspace==='function')openMasterWorkspace('gowes_fleet');");
+        html += menuRowItem("fa-cash-register", "Kasir Sewa Offline (Walk-in)", "Daftarkan pelanggan datang langsung • Bayar Cash atau QRIS", "toggleSlideMenu(false);if(typeof openGowesOfflinePosModal==='function')openGowesOfflinePosModal();");
+        html += menuRowItem("fa-bicycle", "Kelola Armada & Garasi Gowes", "Atur unit sepeda, cabang garasi & status servis", "toggleSlideMenu(false);if(typeof openMasterWorkspace==='function')openMasterWorkspace('gowes_fleet');");
         html += menuRowItem("fa-store", "Status Garasi (Buka / Tutup)", "Aktifkan mode toko tutup sementara Titik Gowes", "toggleSlideMenu(false);if(typeof openGowesShelterOpsModal==='function')openGowesShelterOpsModal();");
         html += menuRowItem("fa-comments", "Live Chat Pelanggan", "Balas pesan & hubungi kontak user", "toggleSlideMenu(false);openFullChatOverlay();");
         html += menuRowItem("fa-user-shield", "Privasi & Blokir User", "Atur visibilitas profil, dokumen & akun diblokir", "openSlideSub('privacy')");

@@ -1,9 +1,8 @@
 // =========================================================================
-// TITIK GOWES — FRONTEND RENTAL, MULTI-CABANG & SHOWCASE CONTROLLER (js/gowes.js)
-// Versi: V14.7 (Banner Full, Dropdown Lokasi Memanjang & Pemilih Sepeda Bergambar)
+// TITIK GOWES — FRONTEND RENTAL, MULTI-CABANG, ANTI-BENTROK & KASIR OFFLINE
+// File: js/gowes.js (V14.8)
 // =========================================================================
 
-let gowesFilterType = "all";
 let activeBookingBike = null;
 let bookingSelectedBikeIds = [];
 let gowesKtpDraft = "";
@@ -13,6 +12,13 @@ let gowesBannerTimer = null;
 let gowesShowcaseTimer = null;
 let activeGowesShelterId = "";
 let openBookingBikePickerIdx = -1;
+
+// State Kasir Offline (Walk-in) & Struk
+let offlinePosSelectedBikeIds = [];
+let offlinePosOpenPickerIdx = -1;
+let offlinePosKtpDraft = "";
+let activeOfflineQrisRental = null;
+let activeGowesReceiptRental = null;
 
 // ================= 1. DETEKSI & MANAJEMEN CABANG AKTIF OTOMATIS =================
 function getGowesSheltersList() {
@@ -40,7 +46,6 @@ function resolveInitialGowesBranch() {
     const list = getGowesSheltersList();
     if (!list.length) return DEFAULT_GOWES_SHELTER;
 
-    // 1. Cek parameter URL (?branch=muara-jawa / ?cabang=samarinda / ?gerai=sanga-sanga)
     try {
         const q = new URLSearchParams(window.location.search);
         const qBranch = q.get("branch") || q.get("cabang") || q.get("gerai") || q.get("daerah") || "";
@@ -54,13 +59,11 @@ function resolveInitialGowesBranch() {
         }
     } catch {}
 
-    // 2. Cek pilihan cabang yang aktif saat ini
     if (activeGowesShelterId) {
         const foundCur = list.find(s => String(s.id) === String(activeGowesShelterId));
         if (foundCur) return foundCur;
     }
 
-    // 3. Cek simpanan localStorage terakhir di halaman/HP ini
     const savedId = localStorage.getItem(typeof GOWES_BRANCH_KEY !== "undefined" ? GOWES_BRANCH_KEY : "GOWES_ACTIVE_BRANCH_ID") || "";
     if (savedId) {
         const foundSaved = list.find(s => String(s.id) === String(savedId));
@@ -70,7 +73,6 @@ function resolveInitialGowesBranch() {
         }
     }
 
-    // 4. Cek alamat profil pengguna yang sedang login (auto-match Muara Jawa / Sanga-Sanga / Samarinda)
     const curU = typeof getCurrentUserObj === "function" ? getCurrentUserObj() : null;
     if (curU && curU.address) {
         const matchedAddr = _matchBranchByKeyword(curU.address);
@@ -93,12 +95,68 @@ function switchGowesActiveBranch(branchId) {
     const target = list.find(s => String(s.id) === String(branchId));
     if (!target) return;
     activeGowesShelterId = target.id;
+    gowesShowcaseIdx = 0;
     localStorage.setItem(typeof GOWES_BRANCH_KEY !== "undefined" ? GOWES_BRANCH_KEY : "GOWES_ACTIVE_BRANCH_ID", target.id);
     renderGowesLandingPage();
     showToast(`Cabang aktif: ${target.city || target.name}`, "info");
 }
 
 // ================= 2. INISIALISASI & BERANDA TITIK GOWES =================
+function toggleClosedBranchDropdown(forceState = null) {
+    const menu = document.getElementById("gowes-closed-dd-menu");
+    const chev = document.getElementById("gowes-closed-dd-chev");
+    if (!menu) return;
+    const willOpen = forceState !== null ? !!forceState : menu.classList.contains("hide");
+    menu.classList.toggle("hide", !willOpen);
+    if (chev) chev.style.transform = willOpen ? "rotate(180deg)" : "rotate(0deg)";
+}
+
+function renderClosedBranchSwitcher(currentShelter) {
+    const box = document.getElementById("gowes-closed-branch-switcher");
+    if (!box) return;
+    const shelters = getGowesSheltersList();
+    if (shelters.length <= 1) {
+        box.innerHTML = "";
+        return;
+    }
+
+    const openBranches = shelters.filter(s => !s.isClosed);
+    const itemsHtml = shelters.map(s => {
+        const isSel = String(s.id) === String(currentShelter.id);
+        const isOpen = !s.isClosed;
+        return `
+            <button type="button" onclick="toggleClosedBranchDropdown(false);switchGowesActiveBranch('${esc(s.id)}')" class="w-full px-3.5 py-2.5 flex items-center justify-between gap-2.5 text-left transition ${isSel ? 'bg-emerald-500/20' : 'hover:bg-white/10'}">
+                <div class="min-w-0 flex-1">
+                    <div class="flex items-center gap-1.5">
+                        <strong class="text-xs font-extrabold text-white truncate">${escHtml(s.city || s.name)}</strong>
+                        <span class="text-[8.5px] px-1.5 py-0.5 rounded-full font-extrabold uppercase shrink-0 ${isOpen ? 'bg-emerald-400/25 text-emerald-300' : 'bg-red-500/25 text-red-300'}">${isOpen ? '● BUKA' : '● TUTUP'}</span>
+                    </div>
+                    <p class="text-[10px] text-zinc-300/85 truncate">${escHtml(s.name)}</p>
+                </div>
+                ${isSel ? `<i class="fa-solid fa-circle-check text-emerald-400 text-sm shrink-0"></i>` : `<i class="fa-solid fa-arrow-right text-xs text-white/60 shrink-0"></i>`}
+            </button>
+        `;
+    }).join("");
+
+    box.innerHTML = `
+        <div class="space-y-2">
+            <button type="button" onclick="toggleClosedBranchDropdown()" class="w-full px-4 py-3 rounded-2xl bg-white/12 hover:bg-white/18 border border-emerald-400/45 text-white flex items-center justify-between gap-3 transition shadow">
+                <span class="flex items-center gap-2.5 min-w-0">
+                    <span class="w-8 h-8 rounded-xl bg-emerald-500 text-white flex items-center justify-center text-xs shrink-0"><i class="fa-solid fa-location-dot"></i></span>
+                    <span class="min-w-0 text-left">
+                        <span class="block text-[9.5px] uppercase tracking-wider text-emerald-300 font-extrabold">Pindah ke Cabang Lain</span>
+                        <strong class="block text-xs font-bold truncate">${openBranches.length ? `${openBranches.length} cabang lain sedang BUKA` : `Lihat daftar cabang (${shelters.length})`}</strong>
+                    </span>
+                </span>
+                <i id="gowes-closed-dd-chev" class="fa-solid fa-chevron-down text-xs text-emerald-300 transition-transform duration-200 shrink-0"></i>
+            </button>
+            <div id="gowes-closed-dd-menu" class="hide rounded-2xl bg-black/55 backdrop-blur-md border border-white/15 divide-y divide-white/10 overflow-hidden">
+                ${itemsHtml}
+            </div>
+        </div>
+    `;
+}
+
 function renderGowesLandingPage() {
     const vGws = document.getElementById("view-gowes");
     if (!vGws || vGws.classList.contains("hide")) return;
@@ -108,15 +166,20 @@ function renderGowesLandingPage() {
 
     const closedNotice = document.getElementById("gowes-closed-notice");
     const openContent = document.getElementById("gowes-open-content");
+    const closedTitle = document.getElementById("gowes-closed-title");
     const closedDesc = document.getElementById("gowes-closed-desc");
     const closedWaBtn = document.getElementById("gowes-closed-wa-btn");
 
     if (isClosed) {
         if (closedNotice) closedNotice.classList.remove("hide");
         if (openContent) openContent.classList.add("hide");
-        if (closedDesc) {
-            closedDesc.innerText = shelter.closedReason || `Garasi ${shelter.name} sedang istirahat / tutup sementara. Kami siap melayani kembali pada jadwal operasional berikutnya.`;
+        if (closedTitle) {
+            closedTitle.innerText = `Garasi ${shelter.city || "Titik Gowes"} Sedang Tutup`;
         }
+        if (closedDesc) {
+            closedDesc.innerText = shelter.closedReason || `Garasi ${shelter.name} sedang istirahat / tutup sementara. Anda bisa memilih cabang lain yang sedang buka di bawah ini.`;
+        }
+        renderClosedBranchSwitcher(shelter);
         if (closedWaBtn) {
             const rawPhone = String(shelter.csPhone || "085117488828").replace(/\D/g, "");
             closedWaBtn.href = `https://wa.me/${rawPhone}?text=${encodeURIComponent("Halo Admin " + (shelter.name || "Titik Gowes") + ", saya ingin menanyakan jadwal buka rental sepeda.")}`;
@@ -128,13 +191,12 @@ function renderGowesLandingPage() {
     if (openContent) openContent.classList.remove("hide");
 
     renderGowesBannerSlider();
-    renderGowesCategoryFilters();
     renderGowesShowcaseTrack();
     renderGowesShelterSection();
     startGowesAutoSlides();
 }
 
-// ================= 3. PETA GOOGLE MAPS ELEGAN & PILIHAN GERAI DAERAH =================
+// ================= 3. PETA GOOGLE MAPS ELEGAN & DROPDOWN GERAI DAERAH =================
 function _buildGoogleMapsEmbedUrl(shelter) {
     if (!shelter) return "https://maps.google.com/maps?q=Samarinda&t=&z=14&ie=UTF8&iwloc=&output=embed";
     let q = String(shelter.mapsQuery || "").trim();
@@ -187,7 +249,9 @@ function renderGowesShelterSection() {
                     <div class="min-w-0">
                         <div class="flex items-center gap-1.5">
                             <strong class="text-xs sm:text-sm font-extrabold truncate">${escHtml(s.city || s.name)}</strong>
-                            ${s.isClosed ? `<span class="text-[8.5px] px-1.5 py-0.5 rounded-full bg-red-500/15 text-red-500 font-extrabold uppercase shrink-0">Tutup</span>` : ""}
+                            ${s.isClosed
+                                ? `<span class="text-[8.5px] px-1.5 py-0.5 rounded-full bg-red-500/15 text-red-500 font-extrabold uppercase shrink-0">Tutup</span>`
+                                : `<span class="text-[8.5px] px-1.5 py-0.5 rounded-full bg-emerald-500/15 text-emerald-600 font-extrabold uppercase shrink-0">Buka</span>`}
                         </div>
                         <p class="text-[10px] app-muted truncate">${escHtml(s.address || s.name)}</p>
                     </div>
@@ -232,36 +296,28 @@ function renderGowesShelterSection() {
                 </div>
             </div>
 
-            <div class="flex flex-wrap items-center justify-between gap-3 pt-1">
-                <div class="flex items-center gap-3 min-w-0 flex-1">
+            <div class="flex items-start justify-between gap-3 pt-1">
+                <div class="flex items-start gap-3 min-w-0 flex-1">
                     <div class="w-11 h-11 rounded-2xl bg-emerald-500/15 border border-emerald-500/35 text-emerald-600 flex items-center justify-center text-lg shrink-0">
                         <i class="fa-solid fa-store"></i>
                     </div>
                     <div class="min-w-0">
-                        <h3 id="gowes-shelter-name" class="font-extrabold text-sm sm:text-base truncate">${escHtml(current.name)}</h3>
-                        <p id="gowes-shelter-address" class="text-[11px] app-muted line-clamp-2">${escHtml(current.address)}</p>
+                        <h3 id="gowes-shelter-name" class="font-extrabold text-sm sm:text-base leading-snug line-clamp-2">${escHtml(current.name)}</h3>
+                        <p id="gowes-shelter-address" class="text-[11px] app-muted line-clamp-2 mt-0.5">${escHtml(current.address)}</p>
                     </div>
                 </div>
-                <a id="gowes-shelter-map-btn" href="${esc(mapsHref)}" target="_blank" rel="noopener noreferrer" class="gowes-pill-btn px-3.5 py-2 rounded-xl text-xs flex items-center gap-1.5 shadow shrink-0">
-                    <i class="fa-solid fa-diamond-turn-right"></i> Rute Maps
+                <a id="gowes-shelter-map-btn" href="${esc(mapsHref)}" target="_blank" rel="noopener noreferrer" class="gowes-pill-btn px-3.5 py-2 rounded-xl text-xs flex items-center gap-1.5 shadow shrink-0 mt-0.5">
+                    <i class="fa-solid fa-diamond-turn-right"></i> Rute
                 </a>
             </div>
 
-            <!-- Tampilan Maps Elegan Mengacu Google Maps (Klik untuk Navigasi Langsung) -->
+            <!-- Tampilan Maps Bersih (Tombol Buka Maps di Kanan Atas, Tanpa Menimpa Watermark Google) -->
             <div class="gowes-map-card-frame shadow-sm">
                 <iframe src="${esc(embedUrl)}" loading="lazy" referrerpolicy="no-referrer-when-downgrade" title="Peta ${escHtml(current.name)}"></iframe>
                 <a href="${esc(mapsHref)}" target="_blank" rel="noopener noreferrer" class="gowes-map-click-overlay" title="Buka rute di Google Maps">
-                    <div class="flex items-center justify-between gap-2">
-                        <div class="min-w-0 text-white">
-                            <span class="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-emerald-500 text-white text-[9px] font-extrabold uppercase shadow">
-                                <i class="fa-solid fa-map-pin text-[8px]"></i> ${escHtml(current.city || "Lokasi Resmi")}
-                            </span>
-                            <p class="text-xs font-extrabold truncate mt-1 drop-shadow">${escHtml(current.name)}</p>
-                        </div>
-                        <span class="px-3 py-1.5 rounded-xl bg-white/95 text-zinc-900 text-[10px] font-extrabold shadow shrink-0 flex items-center gap-1">
-                            <i class="fa-solid fa-location-arrow text-emerald-600"></i> Buka Maps
-                        </span>
-                    </div>
+                    <span class="px-3 py-1.5 rounded-xl bg-white/95 text-zinc-900 text-[10px] font-extrabold shadow-md flex items-center gap-1.5 border border-black/10">
+                        <i class="fa-solid fa-location-arrow text-emerald-600"></i> Buka Maps
+                    </span>
                 </a>
             </div>
 
@@ -274,7 +330,6 @@ function renderGowesShelterSection() {
     `;
 }
 
-// Tutup dropdown lokasi jika klik di luar area dropdown
 if (!window.__gowesBranchOutsideBound) {
     window.__gowesBranchOutsideBound = true;
     document.addEventListener("click", (ev) => {
@@ -285,7 +340,7 @@ if (!window.__gowesBranchOutsideBound) {
     });
 }
 
-// ================= 4. BANNER PROMOSI RAMPING 16 : 5 (GAYA REALISTIS) =================
+// ================= 4. BANNER PROMOSI FULL MENTOK HEADER (RASIO 16 : 7) =================
 function _getGowesBannersList() {
     if (Array.isArray(db.gowesBanners) && db.gowesBanners.length) return db.gowesBanners;
     return DEFAULT_GOWES_BANNERS;
@@ -303,11 +358,11 @@ function renderGowesBannerSlider() {
         return `
             <div onclick="handleGowesBannerClick(${idx})" class="min-w-full h-full relative flex items-center px-5 sm:px-8 cursor-pointer select-none overflow-hidden" style="background:linear-gradient(135deg,#064e3b 0%,#0f172a 55%,#09090b 100%);">
                 <img src="${esc(primaryImg)}" alt="" onerror="if(this.dataset.tried!=='1'){this.dataset.tried='1';this.src='${safeDefaultImg}';}else{this.style.display='none';}" class="absolute inset-0 w-full h-full object-cover object-center">
-                <div class="absolute inset-0 bg-gradient-to-r from-black/78 via-black/38 to-black/15"></div>
-                <div class="relative z-10 max-w-[74%] sm:max-w-md space-y-1 text-white">
+                <div class="absolute inset-0 bg-gradient-to-r from-black/88 via-black/52 to-black/15"></div>
+                <div class="relative z-10 max-w-[78%] sm:max-w-md space-y-1.5 text-white">
                     <h3 class="gowes-banner-headline text-base sm:text-2xl leading-[1.12] text-white">${escHtml(s.title || "SEHAT & BAHAGIA DENGAN BERSEPEDA!")}</h3>
-                    <p class="text-[10.5px] sm:text-xs text-white/90 font-semibold italic line-clamp-2 drop-shadow">${escHtml(s.subtitle || "RASAKAN MANFAATNYA!")}</p>
-                    ${s.ctaText ? `<span class="inline-block mt-1 px-3 py-1 rounded-lg bg-emerald-500/90 text-[10px] font-extrabold text-white shadow">${escHtml(s.ctaText)} <i class="fa-solid fa-arrow-right ml-1 text-[8px]"></i></span>` : ""}
+                    <p class="text-[10.5px] sm:text-xs text-white/95 font-semibold italic line-clamp-2 drop-shadow">${escHtml(s.subtitle || "RASAKAN MANFAATNYA!")}</p>
+                    ${s.ctaText ? `<span class="inline-block mt-1 px-3 py-1 rounded-lg bg-emerald-500/95 text-[10px] font-extrabold text-white shadow">${escHtml(s.ctaText)} <i class="fa-solid fa-arrow-right ml-1 text-[8px]"></i></span>` : ""}
                 </div>
             </div>
         `;
@@ -333,59 +388,134 @@ function handleGowesBannerClick(idx) {
     else openGowesBookingModal();
 }
 
-// ================= 5. STATUS KETERSEDIAAN HARI INI & JADWAL BOOKED RINGKAS =================
-function _formatBookingSlotRange(startTime, durationKey) {
-    const cleanTime = String(startTime || "08:00").trim();
-    const parts = cleanTime.split(":");
+// ================= 5. DURASI DINAMIS, JADWAL 14 HARI & DETEKSI BENTROK =================
+function parseGowesDurationHours(bike, durationKey, durationLabelFallback = "") {
+    if (durationKey === "full_day") {
+        const lblF = String((bike && bike.labelFullDay) || durationLabelFallback || "");
+        const mF = lblF.match(/(\d+(?:\.\d+)?)\s*jam/i);
+        return mF ? Math.max(1, parseFloat(mF[1])) : 0; // 0 = sampai 20:00 WITA
+    }
+    const lbl = durationKey === "6_hours"
+        ? String((bike && bike.label6Hours) || durationLabelFallback || "6 Jam")
+        : String((bike && bike.label2Hours) || durationLabelFallback || "2 Jam");
+    const m = lbl.match(/(\d+(?:\.\d+)?)\s*jam/i);
+    if (m) return Math.max(1, parseFloat(m[1]));
+    return durationKey === "6_hours" ? 6 : 2;
+}
+
+function getBookingIntervalMinutes(startTime, durationKey, bike = null, durationLabelFallback = "") {
+    const parts = String(startTime || "08:00").trim().split(":");
     let hh = parseInt(parts[0], 10);
     let mm = parseInt(parts[1], 10);
     if (isNaN(hh)) hh = 8;
     if (isNaN(mm)) mm = 0;
 
-    let endHh = hh + 2;
-    if (durationKey === "6_hours") endHh = hh + 6;
-    else if (durationKey === "full_day") endHh = 20;
-    if (endHh > 20 && durationKey === "full_day") endHh = 20;
-    endHh = endHh % 24;
+    const startMin = hh * 60 + mm;
+    const hrs = parseGowesDurationHours(bike, durationKey, durationLabelFallback);
+    let endMin;
+    if (durationKey === "full_day" && hrs === 0) {
+        endMin = Math.max(startMin + 120, 20 * 60);
+    } else {
+        endMin = startMin + Math.round(hrs * 60);
+    }
 
-    const startLbl = `${String(hh).padStart(2, "0")}.${String(mm).padStart(2, "0")}`;
-    const endLbl = `${String(endHh).padStart(2, "0")}.${String(mm).padStart(2, "0")}`;
-    return `${startLbl}-${endLbl}`;
+    const endH = Math.floor((endMin % 1440) / 60);
+    const endM = endMin % 60;
+    const nextDay = endMin >= 1440;
+    const pad2 = (n) => String(n).padStart(2, "0");
+
+    return {
+        startMin,
+        endMin,
+        durationHours: hrs,
+        nextDay,
+        startDot: `${pad2(hh)}.${pad2(mm)}`,
+        endDot: `${pad2(endH)}.${pad2(endM)}`,
+        endColon: `${pad2(endH)}:${pad2(endM)}`,
+        rangeText: `${pad2(hh)}.${pad2(mm)}-${pad2(endH)}.${pad2(endM)}`
+    };
+}
+
+function _getAllActiveGowesBookings() {
+    const sources = [];
+    if (Array.isArray(db.gowesUpcomingBookings)) sources.push(...db.gowesUpcomingBookings);
+    if (Array.isArray(db.gowesTodayBookings)) sources.push(...db.gowesTodayBookings);
+    if (Array.isArray(db.gowesRentals)) sources.push(...db.gowesRentals);
+
+    const seen = new Set();
+    const out = [];
+    sources.forEach(r => {
+        if (!r) return;
+        const st = String(r.status || "");
+        if (st === "Dibatalkan" || st === "Selesai") return;
+        const rid = String(r.id || `${r.bikeId}_${r.startDate}_${r.startTime}`);
+        if (seen.has(rid)) return;
+        seen.add(rid);
+        out.push(r);
+    });
+    return out;
+}
+
+function getBikeBookingsForDate(bikeId, dateStr) {
+    if (!dateStr) return [];
+    const allBikes = Array.isArray(db.gowesBikes) && db.gowesBikes.length ? db.gowesBikes : DEFAULT_GOWES_BIKES;
+    const bikeObj = allBikes.find(b => String(b.id) === String(bikeId)) || null;
+
+    const list = _getAllActiveGowesBookings().filter(r => {
+        if (String(r.startDate || "") !== String(dateStr)) return false;
+        return (Array.isArray(r.selectedBikes) && r.selectedBikes.length)
+            ? r.selectedBikes.some(sb => String(sb.bikeId) === String(bikeId))
+            : String(r.bikeId) === String(bikeId);
+    }).map(r => {
+        const iv = getBookingIntervalMinutes(r.startTime, r.durationKey, bikeObj, r.durationLabel);
+        return {
+            id: r.id,
+            startTime: r.startTime || "08:00",
+            startMin: iv.startMin,
+            endMin: iv.endMin,
+            rangeText: iv.rangeText
+        };
+    });
+
+    list.sort((a, b) => a.startMin - b.startMin);
+    return list;
 }
 
 function getBikeTodayBookingSlots(bikeId) {
     const todayStr = new Date().toISOString().split("T")[0];
-    const sources = [];
-    if (Array.isArray(db.gowesTodayBookings)) sources.push(...db.gowesTodayBookings);
-    if (Array.isArray(db.gowesRentals)) sources.push(...db.gowesRentals);
+    const items = getBikeBookingsForDate(bikeId, todayStr);
+    return Array.from(new Set(items.map(x => x.rangeText)));
+}
 
-    const seenIds = new Set();
-    const slots = [];
+function findBikeScheduleConflict(bikeId, dateStr, startTime, durationKey, bikeObj = null) {
+    if (!bikeId || !dateStr || !startTime) return null;
+    const reqIv = getBookingIntervalMinutes(startTime, durationKey, bikeObj, "");
+    const existing = getBikeBookingsForDate(bikeId, dateStr);
+    for (let i = 0; i < existing.length; i++) {
+        const ex = existing[i];
+        if (reqIv.startMin < ex.endMin && ex.startMin < reqIv.endMin) {
+            return ex;
+        }
+    }
+    return null;
+}
 
-    sources.forEach(r => {
-        if (!r) return;
-        const rid = String(r.id || `${r.bikeId}_${r.startDate}_${r.startTime}`);
-        if (seenIds.has(rid)) return;
-        seenIds.add(rid);
-
-        const st = String(r.status || "");
-        if (st === "Dibatalkan" || st === "Selesai") return;
-        if (String(r.startDate || "") !== todayStr) return;
-
-        const matchesBike = (Array.isArray(r.selectedBikes) && r.selectedBikes.length)
-            ? r.selectedBikes.some(sb => String(sb.bikeId) === String(bikeId))
-            : String(r.bikeId) === String(bikeId);
-
-        if (matchesBike) {
-            slots.push({
-                startTime: r.startTime || "08:00",
-                rangeText: _formatBookingSlotRange(r.startTime, r.durationKey)
+function validateBookingListConflicts(bikeObjs, dateStr, startTime, durationKey) {
+    const conflicts = [];
+    for (let i = 0; i < bikeObjs.length; i++) {
+        const b = bikeObjs[i];
+        if (!b) continue;
+        const c = findBikeScheduleConflict(b.id, dateStr, startTime, durationKey, b);
+        if (c) {
+            conflicts.push({
+                bikeId: b.id,
+                bikeName: b.name,
+                rangeText: c.rangeText,
+                message: `Unit ${b.name} di jam ini sudah di booking, silahkan pilih unit lain.`
             });
         }
-    });
-
-    slots.sort((a, b) => String(a.startTime).localeCompare(String(b.startTime)));
-    return Array.from(new Set(slots.map(x => x.rangeText)));
+    }
+    return conflicts;
 }
 
 function buildBikeStatusBadgesHtml(bike) {
@@ -413,34 +543,16 @@ function buildBikeStatusBadgesHtml(bike) {
     return `<span class="px-2.5 py-0.5 rounded-full bg-emerald-500/90 backdrop-blur-md text-white font-extrabold text-[9px] uppercase tracking-wider shadow">● Ready Hari Ini</span>`;
 }
 
-// ================= 6. FILTER TIPE & SHOWCASE PILIHAN SEPEDA (4:3 ELEGAN) =================
-function renderGowesCategoryFilters() {
-    const box = document.getElementById("gowes-category-filters");
-    if (!box) return;
-
-    const cats = (Array.isArray(db.gowesCategories) && db.gowesCategories.length)
-        ? db.gowesCategories.filter(c => c && c.active !== false)
-        : DEFAULT_GOWES_CATEGORIES;
-
-    box.innerHTML = cats.map(c => `
-        <button type="button" onclick="filterGowesBikes('${esc(c.id)}')" data-gt="${esc(c.id)}" class="gowes-filter-btn ${gowesFilterType === c.id ? 'active' : ''}">
-            ${escHtml(c.name)}
-        </button>
-    `).join("");
-}
-
-function filterGowesBikes(typeId) {
-    gowesFilterType = typeId || "all";
-    gowesShowcaseIdx = 0;
-    document.querySelectorAll(".gowes-filter-btn").forEach(btn => {
-        btn.classList.toggle("active", btn.dataset.gt === gowesFilterType);
-    });
-    renderGowesShowcaseTrack();
-}
-
-function getAvailableGowesBikes() {
+// ================= 6. SHOWCASE PILIHAN SEPEDA PER CABANG (4:3 ELEGAN) =================
+function getAvailableGowesBikes(branchIdOverride = null) {
     const list = Array.isArray(db.gowesBikes) && db.gowesBikes.length ? db.gowesBikes : DEFAULT_GOWES_BIKES;
-    return list.filter(b => b && b.status !== "Dihapus");
+    const activeBranch = branchIdOverride || (getActiveShelterObject() && getActiveShelterObject().id) || "";
+    const filtered = list.filter(b => {
+        if (!b || b.status === "Dihapus") return false;
+        if (!activeBranch || !b.branchId || b.branchId === "all") return true;
+        return String(b.branchId) === String(activeBranch);
+    });
+    return filtered;
 }
 
 function renderGowesShowcaseDots(count) {
@@ -469,25 +581,17 @@ function jumpToGowesShowcaseSlide(idx) {
 
 function renderGowesShowcaseTrack() {
     const track = document.getElementById("gowes-showcase-track");
-    const countBadge = document.getElementById("gowes-bike-count-badge");
     if (!track) return;
 
-    let bikes = getAvailableGowesBikes();
-    if (gowesFilterType !== "all") {
-        bikes = bikes.filter(b => String(b.type || "").toLowerCase().includes(gowesFilterType.toLowerCase()));
-    }
-
-    if (countBadge) {
-        const readyCnt = bikes.filter(b => b.status !== "Servis").length;
-        countBadge.innerText = `${readyCnt} Unit Ready`;
-    }
+    const bikes = getAvailableGowesBikes();
+    const currentBranch = getActiveShelterObject();
 
     if (!bikes.length) {
         track.innerHTML = `
             <div class="w-full py-14 px-4 text-center app-card border border-dashed rounded-3xl space-y-2">
                 <i class="fa-solid fa-bicycle text-4xl text-emerald-600/60"></i>
-                <h4 class="font-extrabold text-sm">Tidak Ada Unit di Kategori Ini</h4>
-                <p class="text-xs app-muted">Silakan pilih kategori sepeda lain atau hubungi petugas kami via Live Chat.</p>
+                <h4 class="font-extrabold text-sm">Belum Ada Unit di Cabang ${escHtml((currentBranch && currentBranch.city) || "Ini")}</h4>
+                <p class="text-xs app-muted">Silakan pilih cabang daerah lain di bawah atau hubungi petugas kami via Live Chat.</p>
             </div>
         `;
         renderGowesShowcaseDots(0);
@@ -606,64 +710,52 @@ function startGowesAutoSlides() {
     }, 6500);
 }
 
-// ================= 7. FORMULIR SEWA MULTI-SEPEDA & CABANG OTOMATIS =================
-function getSelectedBookingBikesObjects() {
-    const bikes = getAvailableGowesBikes();
-    if (!bikes.length) return [];
-    const fallbackBike = bikes.find(b => b.status !== "Servis") || bikes[0];
-    return bookingSelectedBikeIds.map(id => {
-        return bikes.find(b => String(b.id) === String(id)) || fallbackBike;
-    });
-}
-
-function toggleBookingBikePicker(slotIdx) {
-    openBookingBikePickerIdx = (openBookingBikePickerIdx === slotIdx) ? -1 : slotIdx;
-    renderBookingBikeSelectors();
-}
-
-function pickBookingBikeVisual(slotIdx, bikeId) {
-    openBookingBikePickerIdx = -1;
-    onBookingBikeSlotChange(slotIdx, bikeId);
-    renderBookingBikeSelectors();
-}
-
-function renderBookingBikeSelectors() {
-    const box = document.getElementById("gw-book-bikes-container");
-    if (!box) return;
-    const bikes = getAvailableGowesBikes();
+// ================= 7. KOMPONEN PEMILIH SEPEDA BERGAMBAR (ANTI DUPLIKAT & ANTI BENTROK) =================
+function _buildVisualBikePickerHtml({ bikes, selectedIds, openIdx, dateStr, startTime, durationKey, toggleFnName, pickFnName, idPrefix }) {
     const fallbackImg = "https://images.unsplash.com/photo-1485965120184-e220f721d03e?auto=format&fit=crop&w=800&q=75";
+    const totalUnits = selectedIds.length || 1;
 
-    if (!bikes.length) {
-        box.innerHTML = `<p class="text-xs text-red-500 font-bold">Belum ada unit sepeda tersedia.</p>`;
-        return;
-    }
-
-    const totalUnits = bookingSelectedBikeIds.length || 1;
-    box.innerHTML = bookingSelectedBikeIds.map((selId, idx) => {
+    return selectedIds.map((selId, idx) => {
         const labelTxt = totalUnits > 1 ? `Pilih Unit Sepeda #${idx + 1}` : "Pilih Unit Sepeda";
         const selBike = bikes.find(b => String(b.id) === String(selId)) || bikes.find(b => b.status !== "Servis") || bikes[0];
-        const isOpen = openBookingBikePickerIdx === idx;
-        const selSlots = getBikeTodayBookingSlots(selBike.id);
+        if (!selBike) return "";
+
+        const isOpen = openIdx === idx;
+        const selConflict = findBikeScheduleConflict(selBike.id, dateStr, startTime, durationKey, selBike);
+        const selDateSlots = getBikeBookingsForDate(selBike.id, dateStr);
+
         const selBadgeHtml = selBike.status === "Servis"
             ? `<span class="inline-block px-1.5 py-0.5 rounded-md bg-zinc-600/20 text-zinc-500 text-[9px] font-extrabold">Masa Servis</span>`
-            : selSlots.length
-                ? `<span class="inline-block px-1.5 py-0.5 rounded-md bg-amber-400/25 text-amber-700 text-[9px] font-extrabold">Booked ${escHtml(selSlots[0])}</span>`
-                : `<span class="inline-block px-1.5 py-0.5 rounded-md bg-emerald-500/15 text-emerald-700 text-[9px] font-extrabold">● Ready Hari Ini</span>`;
+            : selConflict
+                ? `<span class="inline-block px-1.5 py-0.5 rounded-md bg-red-500/20 text-red-600 text-[9px] font-extrabold"><i class="fa-solid fa-triangle-exclamation mr-0.5"></i>Bentrok (${escHtml(selConflict.rangeText)})</span>`
+                : selDateSlots.length
+                    ? `<span class="inline-block px-1.5 py-0.5 rounded-md bg-amber-400/25 text-amber-700 text-[9px] font-extrabold">Booked ${escHtml(selDateSlots[0].rangeText)}</span>`
+                    : `<span class="inline-block px-1.5 py-0.5 rounded-md bg-emerald-500/15 text-emerald-700 text-[9px] font-extrabold">● Ready</span>`;
 
         const listItemsHtml = bikes.map(b => {
             const isSel = String(b.id) === String(selBike.id);
             const isMaint = b.status === "Servis";
-            const slots = getBikeTodayBookingSlots(b.id);
-            const statusPill = isMaint
-                ? `<span class="px-1.5 py-0.5 rounded bg-zinc-500/20 text-zinc-500 text-[8.5px] font-extrabold uppercase">Servis</span>`
-                : slots.length
-                    ? `<span class="px-1.5 py-0.5 rounded bg-amber-400/30 text-amber-800 text-[8.5px] font-extrabold">Booked ${escHtml(slots[0])}</span>`
-                    : `<span class="px-1.5 py-0.5 rounded bg-emerald-500/15 text-emerald-700 text-[8.5px] font-extrabold">● Ready</span>`;
+            const pickedOtherIdx = selectedIds.findIndex((oid, oIdx) => oIdx !== idx && String(oid) === String(b.id));
+            const isUsedElsewhere = pickedOtherIdx >= 0;
+            const conflictObj = findBikeScheduleConflict(b.id, dateStr, startTime, durationKey, b);
+            const dateSlots = getBikeBookingsForDate(b.id, dateStr);
+            const isDisabled = isMaint || isUsedElsewhere;
+
+            let statusPill = `<span class="px-1.5 py-0.5 rounded bg-emerald-500/15 text-emerald-700 text-[8.5px] font-extrabold">● Ready</span>`;
+            if (isMaint) {
+                statusPill = `<span class="px-1.5 py-0.5 rounded bg-zinc-500/20 text-zinc-500 text-[8.5px] font-extrabold uppercase">Servis</span>`;
+            } else if (isUsedElsewhere) {
+                statusPill = `<span class="px-1.5 py-0.5 rounded bg-blue-500/15 text-blue-600 text-[8.5px] font-extrabold">Dipilih di Unit #${pickedOtherIdx + 1}</span>`;
+            } else if (conflictObj) {
+                statusPill = `<span class="px-1.5 py-0.5 rounded bg-red-500/20 text-red-600 text-[8.5px] font-extrabold">Sudah Dibooking (${escHtml(conflictObj.rangeText)})</span>`;
+            } else if (dateSlots.length) {
+                statusPill = `<span class="px-1.5 py-0.5 rounded bg-amber-400/30 text-amber-800 text-[8.5px] font-extrabold">Booked ${escHtml(dateSlots[0].rangeText)}</span>`;
+            }
 
             const specsLine = [b.type, b.frameSize, b.gears].filter(Boolean).join(" • ");
 
             return `
-                <button type="button" ${isMaint ? "disabled" : `onclick="pickBookingBikeVisual(${idx},'${esc(b.id)}')"`} class="w-full p-2.5 flex items-center gap-3 text-left transition ${isSel ? 'bg-emerald-500/12' : 'hover:bg-black/5'} ${isMaint ? 'opacity-45 cursor-not-allowed' : 'cursor-pointer'}">
+                <button type="button" ${isDisabled ? "disabled" : `onclick="${pickFnName}(${idx},'${esc(b.id)}')"`} class="w-full p-2.5 flex items-center gap-3 text-left transition ${isSel ? 'bg-emerald-500/12' : 'hover:bg-black/5'} ${isDisabled ? 'opacity-45 cursor-not-allowed' : conflictObj ? 'bg-red-500/5 cursor-pointer' : 'cursor-pointer'}">
                     <img src="${esc(b.image || fallbackImg)}" alt="${escHtml(b.name)}" onerror="this.src='${fallbackImg}'" class="w-16 h-12 rounded-xl object-cover bg-black border gold-border shrink-0">
                     <div class="min-w-0 flex-1 space-y-0.5">
                         <div class="flex items-center gap-1.5 flex-wrap">
@@ -676,7 +768,11 @@ function renderBookingBikeSelectors() {
                     <span class="shrink-0 pr-1">
                         ${isSel
                             ? `<i class="fa-solid fa-circle-check text-emerald-600 text-base"></i>`
-                            : `<i class="fa-regular fa-circle app-muted text-base opacity-45"></i>`}
+                            : isUsedElsewhere
+                                ? `<i class="fa-solid fa-lock text-blue-500 text-sm"></i>`
+                                : conflictObj
+                                    ? `<i class="fa-solid fa-triangle-exclamation text-red-500 text-sm"></i>`
+                                    : `<i class="fa-regular fa-circle app-muted text-base opacity-45"></i>`}
                     </span>
                 </button>
             `;
@@ -685,8 +781,8 @@ function renderBookingBikeSelectors() {
         return `
             <div class="space-y-1">
                 <label class="app-label">${labelTxt}</label>
-                <input type="hidden" id="gw-book-bike-select-${idx}" value="${esc(selBike.id)}">
-                <button type="button" id="gw-bike-picker-btn-${idx}" onclick="toggleBookingBikePicker(${idx})" class="gowes-bike-picker-trigger ${isOpen ? 'is-open' : ''}">
+                <input type="hidden" id="${idPrefix}-select-${idx}" value="${esc(selBike.id)}">
+                <button type="button" id="${idPrefix}-btn-${idx}" onclick="${toggleFnName}(${idx})" class="gowes-bike-picker-trigger ${isOpen ? 'is-open' : ''} ${selConflict ? '!border-red-500' : ''}">
                     <img src="${esc(selBike.image || fallbackImg)}" alt="${escHtml(selBike.name)}" onerror="this.src='${fallbackImg}'" class="w-16 h-12 rounded-xl object-cover bg-black border gold-border shrink-0">
                     <div class="min-w-0 flex-1 space-y-0.5">
                         <strong class="text-xs sm:text-sm font-extrabold block truncate leading-tight">${escHtml(selBike.name)}</strong>
@@ -698,12 +794,93 @@ function renderBookingBikeSelectors() {
                         <i class="fa-solid fa-chevron-down text-xs text-emerald-600 transition-transform duration-200" style="transform:${isOpen ? 'rotate(180deg)' : 'rotate(0deg)'}"></i>
                     </div>
                 </button>
-                <div id="gw-bike-picker-list-${idx}" class="${isOpen ? '' : 'hide'} gowes-bike-picker-list divide-y divide-black/10">
+                <div id="${idPrefix}-list-${idx}" class="${isOpen ? '' : 'hide'} gowes-bike-picker-list divide-y divide-black/10">
                     ${listItemsHtml}
                 </div>
             </div>
         `;
     }).join("");
+}
+
+function _renderConflictBannerInto(alertElId, submitBtnId, conflicts) {
+    const alertEl = document.getElementById(alertElId);
+    const submitBtn = document.getElementById(submitBtnId);
+    if (alertEl) {
+        if (conflicts && conflicts.length) {
+            alertEl.className = "gowes-conflict-alert";
+            alertEl.innerHTML = `
+                <i class="fa-solid fa-triangle-exclamation text-base shrink-0 mt-0.5"></i>
+                <div class="space-y-1 flex-1">
+                    ${conflicts.map(c => `<p>${escHtml(c.message)}</p>`).join("")}
+                </div>
+            `;
+        } else {
+            alertEl.className = "hide";
+            alertEl.innerHTML = "";
+        }
+    }
+    if (submitBtn) {
+        submitBtn.disabled = !!(conflicts && conflicts.length);
+        submitBtn.classList.toggle("opacity-50", !!(conflicts && conflicts.length));
+        submitBtn.classList.toggle("cursor-not-allowed", !!(conflicts && conflicts.length));
+    }
+}
+
+// ================= 8. FORMULIR SEWA ONLINE PELANGGAN =================
+function getSelectedBookingBikesObjects() {
+    const bikes = getAvailableGowesBikes();
+    if (!bikes.length) return [];
+    const fallbackBike = bikes.find(b => b.status !== "Servis") || bikes[0];
+    return bookingSelectedBikeIds.map(id => bikes.find(b => String(b.id) === String(id)) || fallbackBike);
+}
+
+function toggleBookingBikePicker(slotIdx) {
+    openBookingBikePickerIdx = (openBookingBikePickerIdx === slotIdx) ? -1 : slotIdx;
+    renderBookingBikeSelectors();
+}
+
+function pickBookingBikeVisual(slotIdx, bikeId) {
+    if (bookingSelectedBikeIds.some((oid, i) => i !== slotIdx && String(oid) === String(bikeId))) {
+        return showToast("Unit sepeda ini sudah dipilih di slot lain.", "info");
+    }
+    openBookingBikePickerIdx = -1;
+    onBookingBikeSlotChange(slotIdx, bikeId);
+    renderBookingBikeSelectors();
+}
+
+function onGowesBookingScheduleChange() {
+    renderBookingBikeSelectors();
+    updateGowesBookingPriceCalc();
+}
+
+function renderBookingBikeSelectors() {
+    const box = document.getElementById("gw-book-bikes-container");
+    if (!box) return;
+    const bikes = getAvailableGowesBikes();
+    if (!bikes.length) {
+        box.innerHTML = `<p class="text-xs text-red-500 font-bold">Belum ada unit sepeda tersedia di cabang ini.</p>`;
+        return;
+    }
+
+    const dateStr = document.getElementById("gw-book-date")?.value || new Date().toISOString().split("T")[0];
+    const startTime = document.getElementById("gw-book-time")?.value || "08:00";
+    const durRadio = document.querySelector('input[name="gw_duration"]:checked');
+    const durationKey = durRadio ? durRadio.value : "2_hours";
+
+    box.innerHTML = _buildVisualBikePickerHtml({
+        bikes,
+        selectedIds: bookingSelectedBikeIds,
+        openIdx: openBookingBikePickerIdx,
+        dateStr,
+        startTime,
+        durationKey,
+        toggleFnName: "toggleBookingBikePicker",
+        pickFnName: "pickBookingBikeVisual",
+        idPrefix: "gw-book-bike"
+    });
+
+    const conflicts = validateBookingListConflicts(getSelectedBookingBikesObjects(), dateStr, startTime, durationKey);
+    _renderConflictBannerInto("gw-book-conflict-alert", "btn-submit-gw-booking", conflicts);
 }
 
 function onBookingBikeSlotChange(slotIdx, bikeId) {
@@ -741,23 +918,37 @@ function changeBookingBikeQty(delta) {
     const lbl = document.getElementById("gw-book-qty-lbl");
     if (!inp || !lbl) return;
 
-    const bikes = getAvailableGowesBikes();
-    const readyBikes = bikes.filter(b => b.status !== "Servis");
-    const pool = readyBikes.length ? readyBikes : bikes;
+    const bikes = getAvailableGowesBikes().filter(b => b.status !== "Servis");
+    if (!bikes.length) return;
+    const maxAllowed = Math.max(1, Math.min(10, bikes.length));
 
     let cur = parseInt(inp.value, 10) || 1;
-    cur = Math.max(1, Math.min(10, cur + delta));
-    inp.value = cur;
-    lbl.innerText = String(cur);
-
-    while (bookingSelectedBikeIds.length < cur) {
-        const nextCandidate = pool[bookingSelectedBikeIds.length % pool.length] || pool[0];
-        bookingSelectedBikeIds.push(nextCandidate ? nextCandidate.id : "");
-    }
-    if (bookingSelectedBikeIds.length > cur) {
-        bookingSelectedBikeIds = bookingSelectedBikeIds.slice(0, cur);
+    const nextQty = Math.max(1, Math.min(maxAllowed, cur + delta));
+    if (delta > 0 && cur >= maxAllowed) {
+        showToast(`Maksimal ${maxAllowed} unit sepeda berbeda tersedia di cabang ini.`, "info");
+        return;
     }
 
+    inp.value = nextQty;
+    lbl.innerText = String(nextQty);
+
+    const dateStr = document.getElementById("gw-book-date")?.value || new Date().toISOString().split("T")[0];
+    const startTime = document.getElementById("gw-book-time")?.value || "08:00";
+    const durVal = document.querySelector('input[name="gw_duration"]:checked')?.value || "2_hours";
+
+    while (bookingSelectedBikeIds.length < nextQty) {
+        const unusedFree = bikes.find(b =>
+            !bookingSelectedBikeIds.includes(b.id) &&
+            !findBikeScheduleConflict(b.id, dateStr, startTime, durVal, b)
+        ) || bikes.find(b => !bookingSelectedBikeIds.includes(b.id));
+        if (!unusedFree) break;
+        bookingSelectedBikeIds.push(unusedFree.id);
+    }
+    if (bookingSelectedBikeIds.length > nextQty) {
+        bookingSelectedBikeIds = bookingSelectedBikeIds.slice(0, nextQty);
+    }
+
+    openBookingBikePickerIdx = -1;
     renderBookingBikeSelectors();
     updateGowesBookingPriceCalc();
 }
@@ -771,33 +962,22 @@ function updateGowesReturnEstimate() {
     const timeVal = timeInp ? timeInp.value : "";
     const durVal = durRadio ? durRadio.value : "2_hours";
     const firstBike = getSelectedBookingBikesObjects()[0];
-    const lbl2 = (firstBike && firstBike.label2Hours) || "2 Jam";
-    const lbl6 = (firstBike && firstBike.label6Hours) || "6 Jam";
-    const lblFull = (firstBike && firstBike.labelFullDay) || "Full Day";
+    const lbl = durVal === "6_hours"
+        ? ((firstBike && firstBike.label6Hours) || "6 Jam")
+        : durVal === "full_day"
+            ? ((firstBike && firstBike.labelFullDay) || "Full Day")
+            : ((firstBike && firstBike.label2Hours) || "2 Jam");
 
     if (!timeVal) {
         textEl.innerText = "Pilih jam ambil untuk melihat perkiraan batas kembali";
         return;
     }
 
-    const [hhStr, mmStr] = timeVal.split(":");
-    let hh = parseInt(hhStr, 10);
-    let mm = parseInt(mmStr, 10);
-    if (isNaN(hh)) hh = 6;
-    if (isNaN(mm)) mm = 0;
-
-    if (durVal === "2_hours") {
-        let returnHh = hh + 2;
-        let dayNote = "";
-        if (returnHh >= 24) { returnHh %= 24; dayNote = " (Besok)"; }
-        textEl.innerHTML = `Batas kembali: <strong>Pukul ${String(returnHh).padStart(2, "0")}:${String(mm).padStart(2, "0")} WITA${dayNote}</strong> (${escHtml(lbl2)})`;
-    } else if (durVal === "6_hours") {
-        let returnHh = hh + 6;
-        let dayNote = "";
-        if (returnHh >= 24) { returnHh %= 24; dayNote = " (Besok)"; }
-        textEl.innerHTML = `Batas kembali: <strong>Pukul ${String(returnHh).padStart(2, "0")}:${String(mm).padStart(2, "0")} WITA${dayNote}</strong> (${escHtml(lbl6)})`;
+    const iv = getBookingIntervalMinutes(timeVal, durVal, firstBike, lbl);
+    if (durVal === "full_day" && iv.durationHours === 0) {
+        textEl.innerHTML = `Batas kembali: <strong>Pukul 20:00 WITA</strong> hari yang sama (${escHtml(lbl)})`;
     } else {
-        textEl.innerHTML = `Batas kembali: <strong>Pukul 20.00 WITA</strong> hari yang sama (${escHtml(lblFull)})`;
+        textEl.innerHTML = `Batas kembali: <strong>Pukul ${iv.endColon} WITA${iv.nextDay ? " (Besok)" : ""}</strong> (${escHtml(lbl)})`;
     }
 }
 
@@ -832,6 +1012,11 @@ function updateGowesBookingPriceCalc() {
     if (calcEl) calcEl.innerText = `${fmtRp(total)} (${selectedObjs.length} Sepeda)`;
 
     updateGowesReturnEstimate();
+
+    const dateStr = document.getElementById("gw-book-date")?.value || new Date().toISOString().split("T")[0];
+    const startTime = document.getElementById("gw-book-time")?.value || "08:00";
+    const conflicts = validateBookingListConflicts(selectedObjs, dateStr, startTime, durVal);
+    _renderConflictBannerInto("gw-book-conflict-alert", "btn-submit-gw-booking", conflicts);
 }
 
 function openGowesBookingModal(bikeId = null) {
@@ -842,7 +1027,7 @@ function openGowesBookingModal(bikeId = null) {
     }
 
     const bikes = getAvailableGowesBikes();
-    if (!bikes.length) return showToast("Belum ada unit sepeda yang tersedia.", "info");
+    if (!bikes.length) return showToast("Belum ada unit sepeda yang tersedia di cabang ini.", "info");
 
     const curU = typeof getCurrentUserObj === "function" ? getCurrentUserObj() : null;
     const currentBranch = getActiveShelterObject();
@@ -852,24 +1037,7 @@ function openGowesBookingModal(bikeId = null) {
     openBookingBikePickerIdx = -1;
     gowesKtpDraft = "";
 
-    // Otomatis menampilkan formulir cabang sesuai daerah aktif (tanpa dropdown manual)
-    const branchBadge = document.getElementById("gw-book-branch-badge");
-    if (branchBadge) {
-        const bookedToday = getBikeTodayBookingSlots(activeBookingBike.id);
-        const bookedHint = bookedToday.length
-            ? `<span class="block text-[10px] text-amber-600 font-bold mt-1"><i class="fa-regular fa-clock mr-1"></i>Info hari ini: unit #1 terbooking jam ${escHtml(bookedToday.join(" & "))} WITA — pilih jam lain yang kosong.</span>`
-            : "";
-        branchBadge.innerHTML = `
-            <div class="rounded-2xl p-3 bg-emerald-500/10 border border-emerald-500/35 space-y-0.5">
-                <div class="flex items-center justify-between gap-2 text-xs">
-                    <strong class="text-emerald-700 truncate"><i class="fa-solid fa-location-dot mr-1.5"></i>Form Cabang ${escHtml(currentBranch.city || "Utama")}</strong>
-                    <span class="text-[9.5px] px-2 py-0.5 rounded-full bg-emerald-500 text-white font-extrabold shrink-0">OTOMATIS</span>
-                </div>
-                <p class="text-[10.5px] app-muted truncate">${escHtml(currentBranch.name)} • ${escHtml(currentBranch.address)}</p>
-                ${bookedHint}
-            </div>
-        `;
-    }
+    _refreshBookingBranchBadge();
 
     const nameInp = document.getElementById("gw-book-name");
     const phInp = document.getElementById("gw-book-phone");
@@ -969,6 +1137,13 @@ async function submitGowesRentalBooking(e) {
     if (!customerPhone) return showToast("Nomor WhatsApp wajib diisi.", "error");
     if (!customerAddress) return showToast("Alamat domisili wajib diisi.", "error");
     if (!startDate || !startTime) return showToast("Tentukan tanggal dan jam sewa.", "error");
+
+    const conflicts = validateBookingListConflicts(selectedObjs, startDate, startTime, durationKey);
+    if (conflicts.length) {
+        _renderConflictBannerInto("gw-book-conflict-alert", "btn-submit-gw-booking", conflicts);
+        return showToast(conflicts[0].message, "error");
+    }
+
     if (!gowesKtpDraft) return showToast("Silakan unggah foto KTP/SIM penjamin.", "error");
 
     const uniqueNames = Array.from(new Set(selectedObjs.map(b => b.name)));
@@ -1008,6 +1183,10 @@ async function submitGowesRentalBooking(e) {
         return showToast((res && res.message) || "Gagal membuat pesanan sewa sepeda.", "error");
     }
 
+    if (Array.isArray(res.upcomingBookings)) {
+        db.gowesUpcomingBookings = res.upcomingBookings;
+        db.gowesTodayBookings = res.upcomingBookings;
+    }
     if (!Array.isArray(db.gowesRentals)) db.gowesRentals = [];
     const existingIdx = db.gowesRentals.findIndex(r => String(r.id) === String(res.rental.id));
     if (existingIdx >= 0) db.gowesRentals[existingIdx] = res.rental;
@@ -1018,7 +1197,547 @@ async function submitGowesRentalBooking(e) {
     openGowesRentalPayment(res.rental.id);
 }
 
-// ================= 8. PEMBAYARAN QRIS TERPADU TITIK GOWES =================
+// ================= 9. KASIR SEWA OFFLINE / WALK-IN (ADMINISTRASI & FOUNDER) =================
+function _getOfflinePosBranchObj() {
+    const shelters = getGowesSheltersList();
+    const selId = document.getElementById("gw-pos-branch")?.value || "";
+    return shelters.find(s => String(s.id) === String(selId)) || getActiveShelterObject() || shelters[0];
+}
+
+function _getOfflinePosBikesPool() {
+    const br = _getOfflinePosBranchObj();
+    return getAvailableGowesBikes(br ? br.id : null);
+}
+
+function _getOfflinePosSelectedObjs() {
+    const pool = _getOfflinePosBikesPool();
+    if (!pool.length) return [];
+    const fb = pool.find(b => b.status !== "Servis") || pool[0];
+    return offlinePosSelectedBikeIds.map(id => pool.find(b => String(b.id) === String(id)) || fb);
+}
+
+function openGowesOfflinePosModal() {
+    const curU = typeof getCurrentUserObj === "function" ? getCurrentUserObj() : null;
+    if (!curU || (curU.role !== "master" && curU.role !== "administrasi")) {
+        return showToast("Fitur Kasir Offline khusus untuk Tim Administrasi dan Founder.", "error");
+    }
+
+    const shelters = getGowesSheltersList();
+    const activeSh = getActiveShelterObject();
+    const brSel = document.getElementById("gw-pos-branch");
+    if (brSel) {
+        brSel.innerHTML = shelters.map(s =>
+            `<option value="${esc(s.id)}" ${String(s.id) === String(activeSh.id) ? "selected" : ""}>${escHtml(s.city || s.name)} — ${escHtml(s.name)}</option>`
+        ).join("");
+    }
+
+    ["gw-pos-name", "gw-pos-phone", "gw-pos-address", "gw-pos-note"].forEach(id => {
+        const el = document.getElementById(id);
+        if (el) el.value = "";
+    });
+
+    const now = new Date();
+    const todayStr = now.toISOString().split("T")[0];
+    const hh = String(now.getHours()).padStart(2, "0");
+    const mm = String(now.getMinutes()).padStart(2, "0");
+
+    const dateInp = document.getElementById("gw-pos-date");
+    const timeInp = document.getElementById("gw-pos-time");
+    if (dateInp) dateInp.value = todayStr;
+    if (timeInp) timeInp.value = `${hh}:${mm}`;
+
+    const qtyInp = document.getElementById("gw-pos-qty");
+    const qtyLbl = document.getElementById("gw-pos-qty-lbl");
+    if (qtyInp) qtyInp.value = "1";
+    if (qtyLbl) qtyLbl.innerText = "1";
+
+    const dur2 = document.querySelector('input[name="gw_pos_duration"][value="2_hours"]');
+    if (dur2) dur2.checked = true;
+    const payCash = document.querySelector('input[name="gw_pos_payment"][value="cash"]');
+    if (payCash) payCash.checked = true;
+
+    const ktpHeld = document.getElementById("gw-pos-ktp-held");
+    if (ktpHeld) ktpHeld.checked = true;
+    toggleOfflinePosKtpUpload(true);
+    offlinePosKtpDraft = "";
+    const ktpPrev = document.getElementById("gw-pos-ktp-preview");
+    if (ktpPrev) { ktpPrev.src = ""; ktpPrev.classList.add("hide"); }
+
+    const pool = _getOfflinePosBikesPool();
+    const readyFirst = pool.find(b => b.status !== "Servis" && !findBikeScheduleConflict(b.id, todayStr, `${hh}:${mm}`, "2_hours", b))
+        || pool.find(b => b.status !== "Servis")
+        || pool[0];
+    offlinePosSelectedBikeIds = readyFirst ? [readyFirst.id] : [];
+    offlinePosOpenPickerIdx = -1;
+
+    renderOfflinePosBikeSelectors();
+    updateOfflinePosPriceCalc();
+
+    document.getElementById("modal-gowes-offline-pos")?.classList.remove("hide");
+    if (typeof mrNavPush === "function") mrNavPush({ type: "modal", id: "modal-gowes-offline-pos" });
+}
+
+function closeGowesOfflinePosModal() {
+    offlinePosOpenPickerIdx = -1;
+    offlinePosKtpDraft = "";
+    document.getElementById("modal-gowes-offline-pos")?.classList.add("hide");
+    if (typeof _mrDropTopModalById === "function") _mrDropTopModalById("modal-gowes-offline-pos");
+}
+
+function onOfflinePosBranchChange() {
+    const pool = _getOfflinePosBikesPool().filter(b => b.status !== "Servis");
+    offlinePosSelectedBikeIds = pool.length ? [pool[0].id] : [];
+    offlinePosOpenPickerIdx = -1;
+    const qtyInp = document.getElementById("gw-pos-qty");
+    const qtyLbl = document.getElementById("gw-pos-qty-lbl");
+    if (qtyInp) qtyInp.value = String(offlinePosSelectedBikeIds.length || 1);
+    if (qtyLbl) qtyLbl.innerText = String(offlinePosSelectedBikeIds.length || 1);
+    renderOfflinePosBikeSelectors();
+    updateOfflinePosPriceCalc();
+}
+
+function onOfflinePosScheduleChange() {
+    renderOfflinePosBikeSelectors();
+    updateOfflinePosPriceCalc();
+}
+
+function toggleOfflinePosBikePicker(slotIdx) {
+    offlinePosOpenPickerIdx = (offlinePosOpenPickerIdx === slotIdx) ? -1 : slotIdx;
+    renderOfflinePosBikeSelectors();
+}
+
+function pickOfflinePosBikeVisual(slotIdx, bikeId) {
+    if (offlinePosSelectedBikeIds.some((oid, i) => i !== slotIdx && String(oid) === String(bikeId))) {
+        return showToast("Unit sepeda ini sudah dipilih di slot lain.", "info");
+    }
+    offlinePosSelectedBikeIds[slotIdx] = bikeId;
+    offlinePosOpenPickerIdx = -1;
+    renderOfflinePosBikeSelectors();
+    updateOfflinePosPriceCalc();
+}
+
+function changeOfflinePosBikeQty(delta) {
+    const inp = document.getElementById("gw-pos-qty");
+    const lbl = document.getElementById("gw-pos-qty-lbl");
+    if (!inp || !lbl) return;
+
+    const bikes = _getOfflinePosBikesPool().filter(b => b.status !== "Servis");
+    if (!bikes.length) return;
+    const maxAllowed = Math.max(1, Math.min(10, bikes.length));
+
+    let cur = parseInt(inp.value, 10) || 1;
+    const nextQty = Math.max(1, Math.min(maxAllowed, cur + delta));
+    if (delta > 0 && cur >= maxAllowed) {
+        showToast(`Maksimal ${maxAllowed} unit sepeda berbeda di cabang ini.`, "info");
+        return;
+    }
+
+    inp.value = nextQty;
+    lbl.innerText = String(nextQty);
+
+    const dateStr = document.getElementById("gw-pos-date")?.value || new Date().toISOString().split("T")[0];
+    const startTime = document.getElementById("gw-pos-time")?.value || "08:00";
+    const durVal = document.querySelector('input[name="gw_pos_duration"]:checked')?.value || "2_hours";
+
+    while (offlinePosSelectedBikeIds.length < nextQty) {
+        const nextBike = bikes.find(b =>
+            !offlinePosSelectedBikeIds.includes(b.id) &&
+            !findBikeScheduleConflict(b.id, dateStr, startTime, durVal, b)
+        ) || bikes.find(b => !offlinePosSelectedBikeIds.includes(b.id));
+        if (!nextBike) break;
+        offlinePosSelectedBikeIds.push(nextBike.id);
+    }
+    if (offlinePosSelectedBikeIds.length > nextQty) {
+        offlinePosSelectedBikeIds = offlinePosSelectedBikeIds.slice(0, nextQty);
+    }
+
+    offlinePosOpenPickerIdx = -1;
+    renderOfflinePosBikeSelectors();
+    updateOfflinePosPriceCalc();
+}
+
+function renderOfflinePosBikeSelectors() {
+    const box = document.getElementById("gw-pos-bikes-container");
+    if (!box) return;
+    const bikes = _getOfflinePosBikesPool();
+    if (!bikes.length) {
+        box.innerHTML = `<p class="text-xs text-red-500 font-bold">Belum ada unit sepeda tersedia di cabang ini.</p>`;
+        return;
+    }
+    const dateStr = document.getElementById("gw-pos-date")?.value || new Date().toISOString().split("T")[0];
+    const startTime = document.getElementById("gw-pos-time")?.value || "08:00";
+    const durVal = document.querySelector('input[name="gw_pos_duration"]:checked')?.value || "2_hours";
+
+    box.innerHTML = _buildVisualBikePickerHtml({
+        bikes,
+        selectedIds: offlinePosSelectedBikeIds,
+        openIdx: offlinePosOpenPickerIdx,
+        dateStr,
+        startTime,
+        durationKey: durVal,
+        toggleFnName: "toggleOfflinePosBikePicker",
+        pickFnName: "pickOfflinePosBikeVisual",
+        idPrefix: "gw-pos-bike"
+    });
+
+    const conflicts = validateBookingListConflicts(_getOfflinePosSelectedObjs(), dateStr, startTime, durVal);
+    _renderConflictBannerInto("gw-pos-conflict-alert", "btn-submit-gw-pos", conflicts);
+}
+
+function toggleOfflinePosKtpUpload(isHeld) {
+    document.getElementById("gw-pos-ktp-upload-wrap")?.classList.toggle("hide", !!isHeld);
+}
+
+function handleOfflinePosKtpPick(inp) {
+    const file = inp.files && inp.files[0];
+    if (!file) return;
+    inp.value = "";
+    if (typeof openImageCropper === "function") {
+        openImageCropper(file, 1.6, "Potong Foto KTP Penjamin", 800, 500, (dataUrl) => {
+            offlinePosKtpDraft = dataUrl;
+            const prev = document.getElementById("gw-pos-ktp-preview");
+            if (prev) { prev.src = dataUrl; prev.classList.remove("hide"); }
+            showToast("Foto KTP siap dilampirkan.");
+        });
+    } else {
+        const r = new FileReader();
+        r.onload = (e) => {
+            offlinePosKtpDraft = e.target.result;
+            const prev = document.getElementById("gw-pos-ktp-preview");
+            if (prev) { prev.src = offlinePosKtpDraft; prev.classList.remove("hide"); }
+        };
+        r.readAsDataURL(file);
+    }
+}
+
+function updateOfflinePosPriceCalc() {
+    const selectedObjs = _getOfflinePosSelectedObjs();
+    if (!selectedObjs.length) return;
+    const first = selectedObjs[0];
+
+    const sum2h = selectedObjs.reduce((s, b) => s + Number(b.price2Hours || 40000), 0);
+    const sum6h = selectedObjs.reduce((s, b) => s + Number(b.price6Hours || 75000), 0);
+    const sumFull = selectedObjs.reduce((s, b) => s + Number(b.priceFullDay || 120000), 0);
+
+    const setTxt = (id, v) => { const el = document.getElementById(id); if (el) el.innerText = v; };
+    setTxt("gw-pos-lbl-2h", first.label2Hours || "2 Jam");
+    setTxt("gw-pos-lbl-6h", first.label6Hours || "6 Jam");
+    setTxt("gw-pos-lbl-fullday", first.labelFullDay || "Full Day");
+    setTxt("gw-pos-rate-2h", fmtRp(sum2h));
+    setTxt("gw-pos-rate-6h", fmtRp(sum6h));
+    setTxt("gw-pos-rate-fullday", fmtRp(sumFull));
+
+    const durVal = document.querySelector('input[name="gw_pos_duration"]:checked')?.value || "2_hours";
+    const payMethod = document.querySelector('input[name="gw_pos_payment"]:checked')?.value || "cash";
+    const total = durVal === "6_hours" ? sum6h : durVal === "full_day" ? sumFull : sum2h;
+
+    setTxt("gw-pos-total-label", payMethod === "cash" ? "Total Tunai (Tanpa Kode Unik):" : "Subtotal QRIS (+ Kode Unik Otomatis):");
+    setTxt("gw-pos-total-calc", `${fmtRp(total)} (${selectedObjs.length} Sepeda)`);
+
+    const pill = document.getElementById("gw-pos-pay-pill");
+    if (pill) {
+        pill.innerText = payMethod === "cash" ? "CASH" : "QRIS";
+        pill.className = payMethod === "cash"
+            ? "px-2.5 py-1 rounded-full bg-emerald-500/15 text-emerald-700 text-[10px] font-extrabold uppercase"
+            : "px-2.5 py-1 rounded-full bg-blue-500/15 text-blue-600 text-[10px] font-extrabold uppercase";
+    }
+
+    const btn = document.getElementById("btn-submit-gw-pos");
+    if (btn && !btn.dataset.origHtml) {
+        btn.innerText = payMethod === "cash" ? "Simpan & Aktifkan (Cash)" : "Buat & Tampilkan QRIS";
+    }
+
+    const timeVal = document.getElementById("gw-pos-time")?.value || "08:00";
+    const dateStr = document.getElementById("gw-pos-date")?.value || new Date().toISOString().split("T")[0];
+    const lbl = durVal === "6_hours" ? (first.label6Hours || "6 Jam") : durVal === "full_day" ? (first.labelFullDay || "Full Day") : (first.label2Hours || "2 Jam");
+    const iv = getBookingIntervalMinutes(timeVal, durVal, first, lbl);
+    const estEl = document.getElementById("gw-pos-return-estimate-text");
+    if (estEl) {
+        estEl.innerHTML = (durVal === "full_day" && iv.durationHours === 0)
+            ? `Batas kembali: <strong>Pukul 20:00 WITA</strong> hari yang sama (${escHtml(lbl)})`
+            : `Batas kembali: <strong>Pukul ${iv.endColon} WITA${iv.nextDay ? " (Besok)" : ""}</strong> (${escHtml(lbl)})`;
+    }
+
+    const conflicts = validateBookingListConflicts(selectedObjs, dateStr, timeVal, durVal);
+    _renderConflictBannerInto("gw-pos-conflict-alert", "btn-submit-gw-pos", conflicts);
+}
+
+async function submitGowesOfflineBooking(e) {
+    e.preventDefault();
+    const selectedObjs = _getOfflinePosSelectedObjs();
+    if (!selectedObjs.length) return showToast("Pilih minimal 1 unit sepeda.", "error");
+
+    const firstBike = selectedObjs[0];
+    const durVal = document.querySelector('input[name="gw_pos_duration"]:checked')?.value || "2_hours";
+    const payMethod = document.querySelector('input[name="gw_pos_payment"]:checked')?.value || "cash";
+    const durLabel = durVal === "6_hours"
+        ? (firstBike.label6Hours || "6 Jam")
+        : durVal === "full_day"
+            ? (firstBike.labelFullDay || "Full Day")
+            : (firstBike.label2Hours || "2 Jam");
+
+    const branch = _getOfflinePosBranchObj();
+    const customerName = document.getElementById("gw-pos-name")?.value.trim() || "";
+    const customerPhone = document.getElementById("gw-pos-phone")?.value.trim() || "";
+    const customerAddress = document.getElementById("gw-pos-address")?.value.trim() || branch.city || "";
+    const startDate = document.getElementById("gw-pos-date")?.value.trim() || "";
+    const startTime = document.getElementById("gw-pos-time")?.value.trim() || "";
+    const ktpHeldAtShop = !!document.getElementById("gw-pos-ktp-held")?.checked;
+    const note = document.getElementById("gw-pos-note")?.value.trim() || "";
+
+    if (!customerName || !customerPhone) return showToast("Nama dan nomor WhatsApp pelanggan wajib diisi.", "error");
+    if (!ktpHeldAtShop && !offlinePosKtpDraft) return showToast("Foto KTP penjamin atau aktifkan opsi KTP dititipkan di kasir.", "error");
+
+    const conflicts = validateBookingListConflicts(selectedObjs, startDate, startTime, durVal);
+    if (conflicts.length) {
+        _renderConflictBannerInto("gw-pos-conflict-alert", "btn-submit-gw-pos", conflicts);
+        return showToast(conflicts[0].message, "error");
+    }
+
+    setBtnLoading("btn-submit-gw-pos", true, "Memproses Kasir...");
+    const res = await apiAction({
+        action: "gowes_create_offline_booking",
+        booking: {
+            bikeId: firstBike.id,
+            selectedBikes: selectedObjs.map(b => ({ bikeId: b.id, bikeName: b.name, bikeType: b.type || "", bikeImage: b.image || "" })),
+            durationKey: durVal,
+            durationLabel: durLabel,
+            quantity: selectedObjs.length,
+            paymentMethod: payMethod,
+            ktpHeldAtShop,
+            ktpImage: ktpHeldAtShop ? "" : offlinePosKtpDraft,
+            customerName,
+            customerPhone,
+            customerAddress,
+            startDate,
+            startTime,
+            branchId: branch.id,
+            branchCity: branch.city || "",
+            pickupLocation: branch.name || "",
+            note
+        }
+    });
+    setBtnLoading("btn-submit-gw-pos", false);
+
+    if (!res || !res.ok || !res.rental) {
+        return showToast((res && res.message) || "Gagal menyimpan transaksi kasir offline.", "error");
+    }
+
+    if (Array.isArray(res.upcomingBookings)) {
+        db.gowesUpcomingBookings = res.upcomingBookings;
+        db.gowesTodayBookings = res.upcomingBookings;
+    }
+    if (!Array.isArray(db.gowesRentals)) db.gowesRentals = [];
+    db.gowesRentals.unshift(res.rental);
+
+    if (payMethod === "cash" && Array.isArray(db.gowesBikes)) {
+        const ids = selectedObjs.map(b => String(b.id));
+        db.gowesBikes.forEach(b => { if (ids.includes(String(b.id))) b.status = "Sedang Disewa"; });
+    }
+
+    closeGowesOfflinePosModal();
+    if (typeof refreshAfterAdminOrderAction === "function") {
+        refreshAfterAdminOrderAction(payMethod === "cash" ? "Sewa Offline (Cash) langsung aktif!" : "Pesanan QRIS Kasir dibuat!");
+    }
+
+    if (payMethod === "qris") {
+        openGowesOfflineQrisModal(res.rental);
+    } else {
+        openGowesReceiptModal(res.rental);
+    }
+}
+
+async function openGowesOfflineQrisModal(rental) {
+    if (!rental) return;
+    activeOfflineQrisRental = rental;
+    const setTxt = (id, v) => { const el = document.getElementById(id); if (el) el.innerText = v; };
+    setTxt("gw-oq-title", `${rental.customerName || "Pelanggan"} — ${rental.bikeName}`);
+    setTxt("gw-oq-sub", `${rental.quantity || 1} Unit • ${rental.durationLabel} • ${rental.branchCity || ""}`);
+    setTxt("gw-oq-amount", fmtRp(rental.totalPrice || 0));
+    setTxt("gw-oq-unique", rental.uniqueCode ? `Termasuk kode unik Rp ${rental.uniqueCode}` : "");
+
+    const wrap = document.getElementById("gw-oq-qr-wrap");
+    const badge = document.getElementById("gw-oq-mode-badge");
+    const ms = db.masterSettings || {};
+    const totalPay = Number(rental.totalPrice || 0);
+    const isDynamic = ms.qrisMode === "dynamic" && ms.qrisDynamicString && ms.qrisDynamicString.startsWith("000201");
+
+    if (wrap) {
+        wrap.innerHTML = `<span class="text-xs text-zinc-500"><i class="fa-solid fa-circle-notch fa-spin mr-1"></i>Membuat QRIS...</span>`;
+    }
+    document.getElementById("modal-gowes-offline-qris")?.classList.remove("hide");
+    if (typeof mrNavPush === "function") mrNavPush({ type: "modal", id: "modal-gowes-offline-qris" });
+
+    if (isDynamic && typeof buildDynamicQrisString === "function") {
+        try {
+            await loadScriptOnce("https://cdn.jsdelivr.net/npm/qrcode@1.5.3/build/qrcode.min.js");
+            const dynStr = buildDynamicQrisString(ms.qrisDynamicString, totalPay);
+            const dataUrl = await window.QRCode.toDataURL(dynStr, { width: 420, margin: 2, color: { dark: "#09090b", light: "#ffffff" } });
+            if (wrap) wrap.innerHTML = `<img src="${dataUrl}" class="w-52 h-52 object-contain" alt="QRIS Dinamis">`;
+            if (badge) badge.innerText = `QRIS Dinamis • ${fmtRp(totalPay)}`;
+            return;
+        } catch {}
+    }
+
+    const fallbackQris = ms.qrisImage || `https://api.qrserver.com/v1/create-qr-code/?size=320x320&data=TITIKGOWES-${totalPay}`;
+    if (wrap) wrap.innerHTML = `<img src="${fallbackQris}" class="w-52 h-52 object-contain" alt="QRIS">`;
+    if (badge) badge.innerText = "QRIS Resmi Titik Gowes";
+}
+
+function closeGowesOfflineQrisModal() {
+    activeOfflineQrisRental = null;
+    document.getElementById("modal-gowes-offline-qris")?.classList.add("hide");
+    if (typeof _mrDropTopModalById === "function") _mrDropTopModalById("modal-gowes-offline-qris");
+}
+
+async function confirmGowesOfflineQrisPaid() {
+    if (!activeOfflineQrisRental) return;
+    const rentalId = activeOfflineQrisRental.id;
+    setBtnLoading("btn-confirm-oq-paid", true, "Mengaktifkan...");
+    const res = await apiAction({ action: "gowes_confirm_offline_qris", rentalId });
+    setBtnLoading("btn-confirm-oq-paid", false);
+
+    if (!res || !res.ok || !res.rental) {
+        return showToast((res && res.message) || "Gagal mengonfirmasi pembayaran QRIS.", "error");
+    }
+
+    if (Array.isArray(res.upcomingBookings)) {
+        db.gowesUpcomingBookings = res.upcomingBookings;
+        db.gowesTodayBookings = res.upcomingBookings;
+    }
+    const idx = (db.gowesRentals || []).findIndex(r => String(r.id) === String(rentalId));
+    if (idx >= 0) db.gowesRentals[idx] = res.rental;
+
+    const affectedIds = (Array.isArray(res.rental.selectedBikes) && res.rental.selectedBikes.length)
+        ? res.rental.selectedBikes.map(sb => String(sb.bikeId))
+        : [String(res.rental.bikeId)];
+    if (Array.isArray(db.gowesBikes)) {
+        db.gowesBikes.forEach(b => { if (affectedIds.includes(String(b.id))) b.status = "Sedang Disewa"; });
+    }
+
+    closeGowesOfflineQrisModal();
+    if (typeof refreshAfterAdminOrderAction === "function") {
+        refreshAfterAdminOrderAction("Pembayaran QRIS lunas! Unit langsung aktif.");
+    }
+    openGowesReceiptModal(res.rental);
+}
+
+// ================= 10. STRUK DIGITAL & KIRIM WA PELANGGAN =================
+function _normalizeWaPhoneID(phone) {
+    let digits = String(phone || "").replace(/\D/g, "");
+    if (!digits) return "";
+    if (digits.startsWith("0")) digits = "62" + digits.slice(1);
+    else if (digits.startsWith("8")) digits = "62" + digits;
+    return digits;
+}
+
+function openGowesReceiptModal(rentalOrId) {
+    const r = (typeof rentalOrId === "object" && rentalOrId)
+        ? rentalOrId
+        : (db.gowesRentals || []).find(x => String(x.id) === String(rentalOrId));
+    if (!r) return showToast("Data transaksi tidak ditemukan.", "error");
+
+    activeGowesReceiptRental = r;
+    const allBikes = Array.isArray(db.gowesBikes) && db.gowesBikes.length ? db.gowesBikes : DEFAULT_GOWES_BIKES;
+    const refBike = allBikes.find(b => String(b.id) === String(r.bikeId)) || null;
+    const iv = getBookingIntervalMinutes(r.startTime, r.durationKey, refBike, r.durationLabel);
+    const returnText = (r.durationKey === "full_day" && iv.durationHours === 0)
+        ? "20:00 WITA"
+        : `${iv.endColon} WITA${iv.nextDay ? " (Besok)" : ""}`;
+
+    const payBadge = r.isOffline
+        ? (r.paymentMethod === "cash" ? "OFFLINE • CASH (LUNAS)" : "OFFLINE • QRIS")
+        : "ONLINE • QRIS";
+
+    const unitLines = (Array.isArray(r.selectedBikes) && r.selectedBikes.length)
+        ? r.selectedBikes.map((sb, i) => `<div>${i + 1}. <strong>${escHtml(sb.bikeName)}</strong></div>`).join("")
+        : `<div>1. <strong>${escHtml(r.bikeName)}</strong></div>`;
+
+    const body = document.getElementById("gw-receipt-body");
+    if (body) {
+        body.innerHTML = `
+            <div class="text-center border-b border-dashed gold-border pb-3 space-y-0.5">
+                <strong class="text-sm font-extrabold block">TITIK GOWES RENTAL</strong>
+                <span class="text-[10px] app-muted block">${escHtml(r.pickupLocation || r.branchCity || "Shelter Resmi")}</span>
+                <span class="inline-block mt-1 px-2.5 py-0.5 rounded-full bg-emerald-500/15 text-emerald-700 text-[9.5px] font-extrabold uppercase">${escHtml(payBadge)}</span>
+            </div>
+            <div class="space-y-1.5 border-b border-dashed gold-border pb-3">
+                <div class="flex justify-between gap-2"><span class="app-muted">No. Nota</span><strong class="font-mono">${escHtml(r.id)}</strong></div>
+                <div class="flex justify-between gap-2"><span class="app-muted">Penyewa</span><strong>${escHtml(r.customerName || "-")}</strong></div>
+                <div class="flex justify-between gap-2"><span class="app-muted">WhatsApp</span><strong>${escHtml(r.customerPhone || "-")}</strong></div>
+                <div class="flex justify-between gap-2"><span class="app-muted">Tanggal</span><strong>${escHtml(r.startDate || "-")}</strong></div>
+                <div class="flex justify-between gap-2"><span class="app-muted">Jam Mulai</span><strong>${escHtml(r.startTime || "-")} WITA</strong></div>
+                <div class="flex justify-between gap-2"><span class="app-muted">Batas Kembali</span><strong class="text-emerald-600">${escHtml(returnText)}</strong></div>
+                ${r.cashierName ? `<div class="flex justify-between gap-2"><span class="app-muted">Petugas Kasir</span><strong>${escHtml(r.cashierName)}</strong></div>` : ""}
+                <div class="flex justify-between gap-2"><span class="app-muted">Jaminan</span><strong>${r.ktpHeldAtShop ? "KTP Asli di Kasir" : "Foto KTP Terlampir"}</strong></div>
+            </div>
+            <div class="space-y-1 border-b border-dashed gold-border pb-3">
+                <span class="text-[10px] uppercase font-bold app-muted block">Unit Sepeda (${r.quantity || 1} Unit • ${escHtml(r.durationLabel)}):</span>
+                ${unitLines}
+            </div>
+            <div class="flex items-center justify-between pt-0.5">
+                <span class="font-bold text-xs">Total Bayar</span>
+                <strong class="text-lg font-extrabold text-emerald-600">${fmtRp(r.totalPrice || 0)}</strong>
+            </div>
+        `;
+    }
+
+    document.getElementById("modal-gowes-receipt")?.classList.remove("hide");
+    if (typeof mrNavPush === "function") mrNavPush({ type: "modal", id: "modal-gowes-receipt" });
+}
+
+function closeGowesReceiptModal() {
+    activeGowesReceiptRental = null;
+    document.getElementById("modal-gowes-receipt")?.classList.add("hide");
+    if (typeof _mrDropTopModalById === "function") _mrDropTopModalById("modal-gowes-receipt");
+}
+
+function sendActiveGowesReceiptWA() {
+    const r = activeGowesReceiptRental;
+    if (!r) return;
+    const waNum = _normalizeWaPhoneID(r.customerPhone);
+    const allBikes = Array.isArray(db.gowesBikes) && db.gowesBikes.length ? db.gowesBikes : DEFAULT_GOWES_BIKES;
+    const refBike = allBikes.find(b => String(b.id) === String(r.bikeId)) || null;
+    const iv = getBookingIntervalMinutes(r.startTime, r.durationKey, refBike, r.durationLabel);
+    const returnText = (r.durationKey === "full_day" && iv.durationHours === 0)
+        ? "20:00 WITA"
+        : `${iv.endColon} WITA${iv.nextDay ? " (Besok)" : ""}`;
+
+    const unitsStr = (Array.isArray(r.selectedBikes) && r.selectedBikes.length)
+        ? r.selectedBikes.map((sb, i) => `${i + 1}. ${sb.bikeName}`).join("\n")
+        : `1. ${r.bikeName}`;
+
+    const payText = r.isOffline
+        ? (r.paymentMethod === "cash" ? "Cash / Tunai (Lunas)" : "QRIS Kasir")
+        : "QRIS Online";
+
+    const msg =
+`*STRUK SEWA SEPEDA — TITIK GOWES*
+Gerai: ${r.pickupLocation || r.branchCity || "Titik Gowes"}
+No. Nota: ${r.id}
+
+Nama: *${r.customerName || "-"}*
+Tanggal: ${r.startDate}
+Jam Mulai: *${r.startTime} WITA*
+Batas Kembali: *${returnText}*
+Paket: ${r.durationLabel} (${r.quantity || 1} Unit)
+
+*Unit Sepeda:*
+${unitsStr}
+
+Total Bayar: *${fmtRp(r.totalPrice || 0)}*
+Pembayaran: ${payText}
+Status: ${r.status}
+
+Selamat bersepeda & utamakan keselamatan di jalan! 🚴‍♂️`;
+
+    const url = waNum
+        ? `https://wa.me/${waNum}?text=${encodeURIComponent(msg)}`
+        : `https://wa.me/?text=${encodeURIComponent(msg)}`;
+    window.open(url, "_blank", "noopener,noreferrer");
+}
+
+// ================= 11. PEMBAYARAN QRIS ONLINE PELANGGAN =================
 async function openGowesRentalPayment(rentalId) {
     const list = Array.isArray(db.gowesRentals) ? db.gowesRentals : [];
     const rental = list.find(r => String(r.id) === String(rentalId));
@@ -1133,7 +1852,7 @@ async function submitGowesPaymentProof(rentalId) {
     if (typeof routeDashboard === "function") routeDashboard();
 }
 
-// ================= 9. KARTU RIWAYAT SEWA PELANGGAN & DETAIL =================
+// ================= 12. KARTU RIWAYAT SEWA PELANGGAN & DETAIL =================
 function buildUserRentalCardHtml(rental) {
     const isPay = rental.status === "Menunggu Pembayaran";
     const isVerif = rental.status === "Menunggu Verifikasi";
@@ -1216,22 +1935,25 @@ function openGowesRentalDetail(rentalId) {
                     <div class="min-w-0 flex-1 space-y-0.5">
                         <strong class="font-extrabold text-sm block truncate">${escHtml(r.bikeName)}</strong>
                         <span class="text-[10px] app-muted block">${escHtml(r.durationLabel)} • ${r.quantity || 1} Unit</span>
-                        <span class="text-xs font-bold text-emerald-600 block">${fmtRp(r.totalPrice)}</span>
+                        <span class="text-xs font-bold text-emerald-600 block">${fmtRp(r.totalPrice)} ${r.isOffline ? `(${r.paymentMethod === "cash" ? "Cash" : "QRIS Kasir"})` : ""}</span>
                     </div>
                 </div>
                 ${bikesListHtml}
                 <div class="app-card-soft border rounded-2xl p-3 space-y-1.5">
-                    <div class="flex justify-between"><span class="app-muted">Penyewa:</span><strong class="font-bold">${escHtml(r.customerName || r.customerUsername)} (@${escHtml(r.customerUsername)})</strong></div>
+                    <div class="flex justify-between"><span class="app-muted">Penyewa:</span><strong class="font-bold">${escHtml(r.customerName || r.customerUsername)}${r.isOffline ? " (Walk-in)" : ` (@${escHtml(r.customerUsername)})`}</strong></div>
                     <div class="flex justify-between"><span class="app-muted">WhatsApp:</span><strong class="font-bold">${escHtml(r.customerPhone || "-")}</strong></div>
                     <div class="flex justify-between"><span class="app-muted">Jadwal:</span><strong class="font-bold text-emerald-600">${escHtml(r.startDate)} pukul ${escHtml(r.startTime)} WITA</strong></div>
                     <div class="flex justify-between"><span class="app-muted">Gerai Cabang:</span><strong class="font-bold">${escHtml(r.pickupLocation || "Shelter Utama")}</strong></div>
+                    <div class="flex justify-between"><span class="app-muted">Jaminan:</span><strong class="font-bold">${r.ktpHeldAtShop ? "KTP Asli di Kasir" : "Foto KTP Terlampir"}</strong></div>
+                    ${r.cashierName ? `<div class="flex justify-between"><span class="app-muted">Kasir Input:</span><strong class="font-bold">${escHtml(r.cashierName)}</strong></div>` : ""}
                     <div class="flex justify-between"><span class="app-muted">Status:</span><span class="font-extrabold text-emerald-600">${escHtml(r.status)}</span></div>
                 </div>
                 ${r.handoverOutPhoto ? `<div class="space-y-1"><span class="text-[10px] font-bold uppercase app-muted block">Foto Fisik Sepeda Saat Diambil:</span><img src="${r.handoverOutPhoto}" class="w-full h-36 object-contain rounded-xl bg-black border gold-border"></div>` : ""}
                 ${r.handoverInPhoto ? `<div class="space-y-1"><span class="text-[10px] font-bold uppercase app-muted block">Foto Fisik Sepeda Saat Kembali:</span><img src="${r.handoverInPhoto}" class="w-full h-36 object-contain rounded-xl bg-black border gold-border"></div>` : ""}
                 ${r.paymentProof ? `<div class="space-y-1"><span class="text-[10px] font-bold uppercase app-muted block">Bukti Pembayaran QRIS:</span><img src="${r.paymentProof}" class="w-full max-h-48 object-contain rounded-xl bg-black border gold-border"></div>` : ""}
             </div>
-            <div class="px-5 py-3 border-t gold-border flex justify-end shrink-0">
+            <div class="px-5 py-3 border-t gold-border flex justify-between gap-2 shrink-0">
+                <button type="button" onclick="document.getElementById('modal-gowes-rental-detail').classList.add('hide');openGowesReceiptModal('${esc(r.id)}');" class="px-4 py-2 rounded-xl bg-emerald-600/15 text-emerald-700 text-xs font-bold"><i class="fa-solid fa-receipt mr-1"></i>Struk / WA</button>
                 <button type="button" onclick="document.getElementById('modal-gowes-rental-detail').classList.add('hide')" class="gowes-pill-btn px-6 py-2 rounded-xl text-xs">Tutup</button>
             </div>
         </div>
