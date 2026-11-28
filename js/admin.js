@@ -1470,7 +1470,7 @@ function _renderSoloAccountCard(uItem, isFounderOwner = false) {
     return `
         <div onclick="_openUserFromStatsList('${esc(uItem.username)}')" class="app-card border rounded-3xl p-3.5 shadow-sm cursor-pointer hover:brightness-95 active:scale-[0.99] transition">
             <div class="flex items-center gap-3">
-                <img src="${uItem.avatar || defAv}" class="w-11 h-11 rounded-full object-cover border gold-border bg-zinc-800 shrink-0">
+                <div class="relative shrink-0"><img src="${uItem.avatar || defAv}" class="w-11 h-11 rounded-full object-cover border gold-border bg-zinc-800">${typeof buildOnlineDotHtml === "function" ? buildOnlineDotHtml(uItem, "sm") : ""}</div>
                 <div class="flex-1 min-w-0">
                     <div class="flex items-center gap-1.5 min-w-0">
                         <strong class="text-xs sm:text-sm font-bold truncate">${escHtml(uItem.name || uItem.username)}</strong>
@@ -1955,11 +1955,10 @@ function viewUserProfileModal(username, fromNav = false) {
         ? _getProjectsForUser(u).length
         : 0;
 
-    const canFollowThis = !isSelf && curU && !isBlocked && !isBlockedByTarget && (
-        isMasterProfile
-            ? (curU.role === "user" || curU.role === "administrasi")
-            : true
-    );
+    const isMasterViewer = !!(curU && curU.role === "master");
+    const isLockedMasterView = isMasterProfile && !isSelf;
+
+    const canFollowThis = !isSelf && curU && !isBlocked && !isBlockedByTarget;
     const curFollowingList = (curU && typeof _getFollowingListForUser === "function")
         ? _getFollowingListForUser(curU)
         : (curU && Array.isArray(curU.following) ? curU.following.map(_normAdminUserKey) : []);
@@ -1976,9 +1975,15 @@ function viewUserProfileModal(username, fromNav = false) {
                 ? `<span class="text-[9px] px-2 py-0.5 rounded-full bg-blue-500/20 text-blue-600 font-extrabold uppercase">CABANG</span>`
                 : "";
 
+    const onlineDotProfile = typeof buildOnlineDotHtml === "function" ? buildOnlineDotHtml(u, "lg") : "";
+    const presenceText = typeof getUserPresenceText === "function" ? getUserPresenceText(u) : "";
+    const presenceBadgeHtml = presenceText
+        ? `<div class="pt-0.5"><span class="inline-flex items-center gap-1 text-[10px] font-bold px-2 py-0.5 rounded-full ${presenceText === "Online" ? "bg-emerald-500/15 text-emerald-600" : "app-card-soft app-muted border"}">${presenceText === "Online" ? '<span class="w-1.5 h-1.5 rounded-full bg-emerald-500"></span>Online' : escHtml(presenceText)}</span></div>`
+        : "";
+
     const priv = typeof getUserPrivacy === "function" ? getUserPrivacy(u) : { showContact: false, allowDirectChat: true };
 
-    const contactHtml = (priv.showContact && (u.phone || u.address)) ? `
+    const contactHtml = (!isLockedMasterView && priv.showContact && (u.phone || u.address)) ? `
         <div class="flex flex-wrap gap-3 text-xs app-muted pt-1">
             ${u.phone ? `<span><i class="fa-solid fa-phone app-accent mr-1"></i>${escHtml(u.phone)}</span>` : ""}
             ${u.address ? `<span><i class="fa-solid fa-location-dot app-accent mr-1"></i>${escHtml(u.address)}</span>` : ""}
@@ -1994,42 +1999,107 @@ function viewUserProfileModal(username, fromNav = false) {
         : "";
 
     const canSeeProfileHandle = typeof canSeeUserHandle !== "function" || canSeeUserHandle(u);
-    const coinColHtml = isCabangProfile
-        ? `<button type="button" onclick="if(typeof openCabangCoinInfoModal==='function')openCabangCoinInfoModal('${esc(cleanU)}')" class="py-2 px-1 text-center rounded-xl hover:bg-amber-500/10 active:scale-98 transition">
-            <span class="inline-flex items-center justify-center gap-1.5 text-sm sm:text-base font-extrabold tracking-tight text-amber-600">${typeof buildGoldLembarkuCoinHtml === "function" ? buildGoldLembarkuCoinHtml("sm") : ""}${escHtml(String(u.quota || 0))}</span>
-            <span class="block text-[11px] app-muted font-semibold mt-0.5">Coin <i class="fa-solid fa-circle-info text-[9px] text-amber-500 ml-0.5"></i></span>
-        </button>`
-        : "";
 
-    const followersColHtml = isCabangProfile
-        ? coinColHtml
-        : `<button type="button" onclick="openSoloFollowersModal('${esc(cleanU)}')" class="py-2 px-1 text-center rounded-xl hover:bg-black/5 active:scale-98 transition">
+    let followersColHtml = "", followingColHtml = "", projectColHtml = "", gridColsClass = "grid-cols-3";
+    if (isLockedMasterView) {
+        // Profil Master saat dilihat orang lain: hanya lihat angka & Follow (semua tombol lain dikunci)
+        followersColHtml = `<div class="py-2 px-1 text-center select-none">
             <span class="block text-sm sm:text-base font-extrabold tracking-tight">${escHtml(String(followersCount))}</span>
             <span class="block text-[11px] app-muted font-medium">Followers</span>
-        </button>`;
-
-    const followingColHtml = isCabangProfile
-        ? ""
-        : `<button type="button" onclick="openSoloFollowingModal('${esc(cleanU)}')" class="py-2 px-1 text-center rounded-xl hover:bg-black/5 active:scale-98 transition">
+        </div>`;
+        followingColHtml = `<div class="py-2 px-1 text-center select-none">
             <span class="block text-sm sm:text-base font-extrabold tracking-tight">${escHtml(_formatInstagramMetric(followingCount))}</span>
             <span class="block text-[11px] app-muted font-medium">Following</span>
+        </div>`;
+        projectColHtml = `<div class="py-2 px-1 text-center select-none">
+            <span class="block text-sm sm:text-base font-extrabold tracking-tight">${escHtml(_formatInstagramMetric(projectCount))}</span>
+            <span class="block text-[11px] app-muted font-medium">Project</span>
+        </div>`;
+        gridColsClass = "grid-cols-3";
+    } else {
+        const coinColHtml = isCabangProfile
+            ? `<button type="button" onclick="if(typeof openCabangCoinInfoModal==='function')openCabangCoinInfoModal('${esc(cleanU)}')" class="py-2 px-1 text-center rounded-xl hover:bg-amber-500/10 active:scale-98 transition">
+                <span class="inline-flex items-center justify-center gap-1.5 text-sm sm:text-base font-extrabold tracking-tight text-amber-600">${typeof buildGoldLembarkuCoinHtml === "function" ? buildGoldLembarkuCoinHtml("sm") : ""}${escHtml(String(u.quota || 0))}</span>
+                <span class="block text-[11px] app-muted font-semibold mt-0.5">Coin <i class="fa-solid fa-circle-info text-[9px] text-amber-500 ml-0.5"></i></span>
+            </button>`
+            : "";
+
+        followersColHtml = isCabangProfile
+            ? coinColHtml
+            : `<button type="button" onclick="openSoloFollowersModal('${esc(cleanU)}')" class="py-2 px-1 text-center rounded-xl hover:bg-black/5 active:scale-98 transition">
+                <span class="block text-sm sm:text-base font-extrabold tracking-tight">${escHtml(String(followersCount))}</span>
+                <span class="block text-[11px] app-muted font-medium">Followers</span>
+            </button>`;
+
+        followingColHtml = isCabangProfile
+            ? ""
+            : `<button type="button" onclick="openSoloFollowingModal('${esc(cleanU)}')" class="py-2 px-1 text-center rounded-xl hover:bg-black/5 active:scale-98 transition">
+                <span class="block text-sm sm:text-base font-extrabold tracking-tight">${escHtml(_formatInstagramMetric(followingCount))}</span>
+                <span class="block text-[11px] app-muted font-medium">Following</span>
+            </button>`;
+
+        projectColHtml = `<button type="button" onclick="openSoloProjectModal('${esc(cleanU)}')" class="py-2 px-1 text-center rounded-xl hover:bg-black/5 active:scale-98 transition">
+            <span class="block text-sm sm:text-base font-extrabold tracking-tight">${escHtml(_formatInstagramMetric(projectCount))}</span>
+            <span class="block text-[11px] app-muted font-medium">Project</span>
         </button>`;
+        gridColsClass = isCabangProfile ? "grid-cols-2" : "grid-cols-3";
+    }
 
-    const projectColHtml = `<button type="button" onclick="openSoloProjectModal('${esc(cleanU)}')" class="py-2 px-1 text-center rounded-xl hover:bg-black/5 active:scale-98 transition">
-        <span class="block text-sm sm:text-base font-extrabold tracking-tight">${escHtml(_formatInstagramMetric(projectCount))}</span>
-        <span class="block text-[11px] app-muted font-medium">Project</span>
-    </button>`;
+    // Panel Kirim Bonus Coin Langsung dari Founder (hanya untuk akun penerima Coin: User PRO & Admin Cabang)
+    let masterBonusCoinPanelHtml = "";
+    if (isMasterViewer && !isSelf) {
+        const canReceiveCoins = isCabangProfile || (u.role === "user" && !!u.isPro);
+        if (canReceiveCoins) {
+            const tierLabel = isCabangProfile ? "ADMIN CABANG" : "USER PRO";
+            masterBonusCoinPanelHtml = `
+                <div class="app-card border-2 border-amber-400/55 rounded-3xl p-4 space-y-3 shadow-sm bg-gradient-to-br from-amber-500/10 via-transparent to-transparent">
+                    <div class="flex items-center justify-between gap-2">
+                        <div class="flex items-center gap-2">
+                            ${typeof buildGoldLembarkuCoinHtml === "function" ? buildGoldLembarkuCoinHtml("md") : ""}
+                            <div>
+                                <span class="text-[9px] uppercase font-extrabold px-2 py-0.5 rounded-full bg-amber-400/25 text-amber-600">${tierLabel} • PENERIMA COIN</span>
+                                <h4 class="font-extrabold text-xs sm:text-sm mt-0.5">Kirim Bonus Coin dari Founder</h4>
+                            </div>
+                        </div>
+                        <div class="text-right shrink-0">
+                            <span class="text-[9.5px] app-muted block">Saldo Saat Ini</span>
+                            <strong class="text-sm font-extrabold text-amber-600">${Number(u.quota || 0)} Coin</strong>
+                        </div>
+                    </div>
+                    <div class="grid grid-cols-4 gap-1.5">
+                        <button type="button" onclick="sendFounderBonusCoinFromProfile('${esc(cleanU)}',5,this)" class="py-1.5 rounded-xl app-card-soft border border-amber-400/40 text-amber-600 text-xs font-extrabold hover:brightness-95">+5</button>
+                        <button type="button" onclick="sendFounderBonusCoinFromProfile('${esc(cleanU)}',10,this)" class="py-1.5 rounded-xl app-card-soft border border-amber-400/40 text-amber-600 text-xs font-extrabold hover:brightness-95">+10</button>
+                        <button type="button" onclick="sendFounderBonusCoinFromProfile('${esc(cleanU)}',20,this)" class="py-1.5 rounded-xl app-card-soft border border-amber-400/40 text-amber-600 text-xs font-extrabold hover:brightness-95">+20</button>
+                        <button type="button" onclick="sendFounderBonusCoinFromProfile('${esc(cleanU)}',50,this)" class="py-1.5 rounded-xl app-card-soft border border-amber-400/40 text-amber-600 text-xs font-extrabold hover:brightness-95">+50</button>
+                    </div>
+                    <div class="flex gap-2">
+                        <input type="number" id="mvp-bonus-coin-inp" min="1" step="1" placeholder="Jumlah Coin bebas..." class="app-input !py-2 text-xs font-bold flex-1">
+                        <button type="button" id="btn-mvp-send-bonus-coin" onclick="sendFounderBonusCoinFromProfile('${esc(cleanU)}',null,this)" class="gold-pill-btn px-4 py-2 rounded-xl text-xs shadow shrink-0"><i class="fa-solid fa-gift mr-1"></i>Kirim Coin</button>
+                    </div>
+                    <p class="text-[10px] app-muted">Tercatat otomatis di Riwayat Mutasi penerima sebagai <strong>"Bonus dari Founder"</strong> + notifikasi lonceng.</p>
+                </div>
+            `;
+        } else if (u.role === "user" && !u.isPro) {
+            masterBonusCoinPanelHtml = `
+                <div class="app-card border border-dashed rounded-3xl p-3.5 flex items-center justify-between gap-3">
+                    <div class="min-w-0">
+                        <strong class="text-xs block">Akun Belum PRO (Belum Menerima Coin)</strong>
+                        <span class="text-[10px] app-muted block">Aktifkan status PRO dulu agar akun ini dapat menerima Bonus Coin.</span>
+                    </div>
+                    <button type="button" onclick="toggleUserProQuick('${esc(cleanU)}',this,true)" class="px-3 py-1.5 rounded-xl bg-blue-600 text-white text-[11px] font-bold shrink-0">+ Aktifkan PRO</button>
+                </div>
+            `;
+        }
+    }
 
-    const gridColsClass = isCabangProfile ? "grid-cols-2" : "grid-cols-3";
-
-    const canBlock = !isSelf && curU && curU.role !== "cabang" && u.role !== "master";
+    const canBlock = !isSelf && !isLockedMasterView && curU && curU.role !== "cabang" && u.role !== "master";
     const blockBtnHtml = canBlock ? `
         <button type="button" onclick="toggleBlockTargetUser('${esc(cleanU)}')" class="w-full py-2 rounded-2xl text-xs font-bold transition border ${isBlocked ? "bg-red-600/15 text-red-500 border-red-500/40" : "app-btn-sec"}">
             <i class="fa-solid ${isBlocked ? "fa-unlock" : "fa-ban"} mr-1.5"></i>${isBlocked ? "Buka Blokir Pengguna" : "Blokir Pengguna"}
         </button>
     ` : "";
 
-    const canChat = !isSelf && curU && !isBlocked && !isBlockedByTarget && (curU.role === "master" || curU.role === "administrasi" || priv.allowDirectChat);
+    const canChat = !isSelf && !isLockedMasterView && curU && !isBlocked && !isBlockedByTarget && (curU.role === "master" || curU.role === "administrasi" || priv.allowDirectChat);
 
     const bodyEl = document.getElementById("mvp-body");
     if (bodyEl) {
@@ -2042,7 +2112,10 @@ function viewUserProfileModal(username, fromNav = false) {
                     </div>
                     <div class="px-5 pb-5 relative text-center md:text-left">
                         <div class="flex flex-col md:flex-row items-center md:items-end gap-3 -mt-11 relative z-10">
-                            <img src="${avatarSrc}" onclick="openExpandedAvatarLightbox('${esc(avatarSrc)}','${esc(u.name || u.username)}')" class="w-20 h-20 rounded-full object-cover border-4 border-[var(--app-card)] shadow-lg bg-zinc-800 cursor-pointer active:scale-95 transition" alt="Avatar">
+                            <div class="relative shrink-0">
+                                <img src="${avatarSrc}" onclick="openExpandedAvatarLightbox('${esc(avatarSrc)}','${esc(u.name || u.username)}')" class="w-20 h-20 rounded-full object-cover border-4 border-[var(--app-card)] shadow-lg bg-zinc-800 cursor-pointer active:scale-95 transition" alt="Avatar">
+                                ${onlineDotProfile}
+                            </div>
                             <div class="min-w-0">
                                 <h2 class="text-lg font-extrabold flex items-center justify-center md:justify-start gap-1.5 mt-1">
                                     <span>${escHtml(u.name || u.username)}</span>
@@ -2050,6 +2123,7 @@ function viewUserProfileModal(username, fromNav = false) {
                                     ${roleBadgeHtml}
                                 </h2>
                                 ${canSeeProfileHandle ? `<p class="text-xs app-accent font-semibold">@${escHtml(u.username)}</p>` : ""}
+                                ${presenceBadgeHtml}
                                 ${u.bio ? `<p class="text-xs app-muted mt-1 leading-relaxed max-w-md">${escHtml(u.bio)}</p>` : ""}
                                 ${contactHtml}
                             </div>
@@ -2065,6 +2139,8 @@ function viewUserProfileModal(username, fromNav = false) {
                     </div>
                     ${followBtnHtml}
                 </div>
+
+                ${masterBonusCoinPanelHtml}
 
                 ${canChat ? `<div class="pt-1">
                     <button type="button" onclick="closeUserProfileModalCustom();if(typeof openFullChatOverlay==='function')openFullChatOverlay('${esc(cleanU)}');" class="w-full py-3 rounded-2xl bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-bold transition shadow-sm flex items-center justify-center gap-2">
@@ -2199,6 +2275,50 @@ async function topUpCabangRealTime(uname, amt, btn, reopenModal = false) {
     if (window._soloStatsViewState && window._soloStatsViewState.open) renderSoloStatsModal();
     if (reopenModal) viewUserProfileModal(uname, true);
     showToast(`+${amt} Coin ditambahkan!`);
+}
+
+async function sendFounderBonusCoinFromProfile(uname, presetAmt = null, btnEl = null) {
+    const curU = typeof getCurrentUserObj === "function" ? getCurrentUserObj() : null;
+    if (!curU || curU.role !== "master") return showToast("Hanya Founder yang dapat mengirim Bonus Coin.", "error");
+
+    const cleanU = _normAdminUserKey(uname);
+    const targetU = (db.users || []).find(u => _normAdminUserKey(u.username) === cleanU);
+    if (!targetU) return showToast("Akun penerima tidak ditemukan.", "error");
+    if (targetU.role !== "cabang" && !(targetU.role === "user" && targetU.isPro)) {
+        return showToast("Hanya akun User PRO atau Admin Cabang yang dapat menerima Coin.", "error");
+    }
+
+    const inpEl = document.getElementById("mvp-bonus-coin-inp");
+    const amt = presetAmt !== null
+        ? Math.round(Number(presetAmt || 0))
+        : Math.round(Number((inpEl && inpEl.value) || 0));
+    if (!amt || amt <= 0) return showToast("Masukkan jumlah Coin yang valid (minimal 1).", "error");
+
+    const ok = await showConfirm(
+        "Kirim Bonus Coin",
+        `Kirim bonus +${amt} Coin ke ${targetU.name || targetU.username} (@${targetU.username})? Tercatat di riwayat transaksi sebagai "Bonus dari Founder".`,
+        "fa-solid fa-gift",
+        `Kirim +${amt} Coin`
+    );
+    if (!ok) return;
+
+    if (btnEl) setBtnLoading(btnEl, true, "Mengirim...");
+    const beforeBal = Number(targetU.quota || 0);
+    const afterBal = beforeBal + amt;
+    const updatedU = Object.assign({}, targetU, { quota: afterBal });
+    if (typeof recordCoinMutation === "function") {
+        recordCoinMutation(updatedU, amt, "Bonus dari Founder", "Bonus Coin langsung dari Founder", afterBal);
+    }
+
+    const res = await apiAction({ action: "upsert_user", oldUsername: targetU.username, user: updatedU });
+    if (btnEl) setBtnLoading(btnEl, false);
+    if (!res || !res.ok) return showToast((res && res.message) || "Gagal mengirim Bonus Coin.", "error");
+
+    if (typeof ensureUserInLocalDb === "function") ensureUserInLocalDb(updatedU);
+    if (inpEl) inpEl.value = "";
+    renderMasterHeaderStats();
+    viewUserProfileModal(cleanU, true);
+    showToast(`Bonus +${amt} Coin terkirim ke @${targetU.username}!`);
 }
 
 // ================= 7. BANNER PROMOSI & HARGA CV =================

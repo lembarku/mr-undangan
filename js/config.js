@@ -26,6 +26,7 @@ const DEFAULT_PRIVACY = {
     showFollowing: true,
     showUsername: true,
     allowSearchDiscovery: true,
+    showOnlineStatus: true,
     showContact: false,
     showInChatContacts: true,
     allowDirectChat: true
@@ -767,6 +768,7 @@ function getUserPrivacy(uObj) {
         showFollowing: raw.showFollowing !== false,
         showUsername: raw.showUsername !== false,
         allowSearchDiscovery: raw.allowSearchDiscovery !== false,
+        showOnlineStatus: raw.showOnlineStatus !== false,
         showContact: raw.showContact === true,
         showInChatContacts: raw.showInChatContacts !== false,
         allowDirectChat: raw.allowDirectChat !== false
@@ -790,6 +792,41 @@ function buildGoldLembarkuCoinHtml(size = "sm") {
     const szCls = size === "lg" ? "lbk-gold-coin-lg" : size === "md" ? "lbk-gold-coin-md" : "lbk-gold-coin-sm";
     const fbTxtCls = size === "lg" ? "text-3xl" : size === "md" ? "text-sm" : "text-[11px]";
     return `<span class="lbk-gold-coin ${szCls}" aria-hidden="true"><img src="./lembarku-logo.png" alt="Coin" class="lbk-gold-coin-logo" onerror="this.style.display='none';if(this.nextElementSibling)this.nextElementSibling.classList.remove('hide');"><span class="hide lbk-gold-coin-fallback ${fbTxtCls}">L</span></span>`;
+}
+
+function isUserOnlineNow(uObj) {
+    if (!uObj || !uObj.username) return false;
+    const priv = getUserPrivacy(uObj);
+    if (!priv.showOnlineStatus) return false;
+    const curU = typeof getCurrentUserObj === "function" ? getCurrentUserObj() : null;
+    if (curU && String(curU.username || "").trim().toLowerCase() === String(uObj.username || "").trim().toLowerCase()) {
+        return true;
+    }
+    const ls = Number(uObj.lastSeen || 0);
+    if (!ls) return false;
+    return (Date.now() - ls) <= 180000; // Aktif dalam 3 menit terakhir
+}
+
+function getUserPresenceText(uObj) {
+    if (!uObj || !uObj.username) return "";
+    const priv = getUserPrivacy(uObj);
+    if (!priv.showOnlineStatus) return "";
+    if (isUserOnlineNow(uObj)) return "Online";
+    const ls = Number(uObj.lastSeen || 0);
+    if (!ls) return "";
+    const diffMins = Math.max(1, Math.floor((Date.now() - ls) / 60000));
+    if (diffMins < 60) return `Aktif ${diffMins} mnt lalu`;
+    const diffHours = Math.floor(diffMins / 60);
+    if (diffHours < 24) return `Aktif ${diffHours} jam lalu`;
+    const d = new Date(ls);
+    if (isNaN(d.getTime())) return "";
+    return `Aktif ${d.toLocaleDateString("id-ID", { day: "2-digit", month: "short" })}`;
+}
+
+function buildOnlineDotHtml(uObj, size = "sm") {
+    if (!isUserOnlineNow(uObj)) return "";
+    const szCls = size === "lg" ? "lbk-online-dot-lg" : size === "md" ? "lbk-online-dot-md" : "lbk-online-dot-sm";
+    return `<span class="lbk-online-dot ${szCls}" title="Sedang Online"></span>`;
 }
 
 function getBlockedUsersList(uObj) {
@@ -1156,17 +1193,23 @@ function buildMiniCoverCardHtml(cat, tObj, showFavBtn = true) {
 }
 
 function buildPriceStripHtml(tObj, compact = true) {
+    const isPfObj = !!(tObj && tObj.id && (String(tObj.id).startsWith("cv_") || String(tObj.id).startsWith("lam_")));
     const pr = getThemePricing(tObj);
+    const resolvedCoin = isPfObj
+        ? getPortfolioCoinCost(String(tObj.id).startsWith("lam_") ? "lamaran" : "cv", tObj)
+        : pr.coinCost;
     const showInvMeta = !!(tObj && tObj.cat && tObj.name);
+    const coinBadgeHtml = `<span class="inline-flex items-center gap-1 px-1.5 py-0.5 rounded-full bg-amber-400/15 border border-amber-400/35 text-amber-300 text-[9.5px] font-extrabold whitespace-nowrap shrink-0" title="Beli lebih hemat dengan Coin">${buildGoldLembarkuCoinHtml("sm")}<span>${resolvedCoin} Coin</span></span>`;
+
     return `
-        <div class="px-2.5 py-2 bg-[#111115] text-white border-t border-white/10 space-y-1">
+        <div class="px-2.5 py-2 bg-[#111115] text-white border-t border-white/10 space-y-1.5">
             ${showInvMeta ? `<div class="flex items-center justify-between gap-1"><h4 class="font-bold text-[11px] text-white truncate">${escHtml(tObj.name)}</h4><span class="text-[7.5px] uppercase font-bold px-1.5 py-0.5 rounded bg-white/12 text-zinc-200 shrink-0">${escHtml(tObj.cat)}</span></div>` : ""}
-            <div class="flex items-center justify-between gap-1">
+            <div class="flex items-end justify-between gap-1.5">
                 <div class="leading-tight min-w-0">
-                    ${pr.hasDisc ? `<span class="block text-[9px] text-zinc-400 line-through">${fmtRp(pr.origPrice)}</span>` : ""}
-                    <strong class="text-xs text-amber-400 font-extrabold">${fmtRp(pr.price)}</strong>
+                    ${pr.hasDisc ? `<div class="flex items-center gap-1"><span class="text-[8.5px] text-zinc-400 line-through">${fmtRp(pr.origPrice)}</span><span class="text-[7.5px] px-1 py-0.2 rounded bg-red-600 text-white font-extrabold">-${pr.discPct}%</span></div>` : ""}
+                    <strong class="text-[11.5px] text-white font-extrabold block">${fmtRp(pr.price)}</strong>
                 </div>
-                ${pr.hasDisc ? `<span class="text-[8px] px-1.5 py-0.5 rounded bg-red-600 text-white font-extrabold shrink-0">-${pr.discPct}%</span>` : ""}
+                ${coinBadgeHtml}
             </div>
         </div>
     `;

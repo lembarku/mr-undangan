@@ -196,6 +196,7 @@ async function handleAuthSubmit(e) {
         showToast(`Halo, ${res.user.name}! Selamat datang kembali.`);
         routeDashboard();
         if (typeof scheduleAdaptivePoll === "function") scheduleAdaptivePoll();
+        if (typeof startUserOnlineHeartbeat === "function") startUserOnlineHeartbeat(true);
         return;
     }
     if (res && res.code === "NOT_FOUND") {
@@ -1261,6 +1262,27 @@ function buildNotificationsForCurrentUser() {
         }
     }
 
+    // 1B. Notifikasi Bonus Coin dari Founder (langsung buka Buku Kas Mutasi Coin)
+    if ((u.role === "cabang" || u.isPro) && typeof getCoinHistoryForUser === "function") {
+        getCoinHistoryForUser(u)
+            .filter(m => m && Number(m.delta || 0) > 0 && String(m.title || "").toLowerCase().includes("bonus dari founder"))
+            .slice(0, 5)
+            .forEach(m => {
+                const ts = Number(m.ts || 0);
+                items.push({
+                    id: `bonus_coin_${m.id || ts}`,
+                    ts,
+                    unread: ts > lastRead,
+                    priority: ts > lastRead,
+                    icon: "fa-solid fa-gift",
+                    accent: "text-amber-500",
+                    title: `Bonus dari Founder: +${m.delta} Coin`,
+                    desc: `Saldo Coin Anda bertambah +${m.delta} Coin (Sisa: ${m.balanceAfter} Coin). Ketuk untuk melihat riwayat mutasi.`,
+                    actionJs: `closeNotificationsFullscreen(true);openCabangCoinInfoModal('${esc(myKey)}','history');`
+                });
+            });
+    }
+
     // 2. Notifikasi Follower Baru (bisa langsung ketuk untuk Ikuti Balik / Follback)
     if (role !== "cabang") {
         const myFollowers = typeof _getFollowersListForUser === "function" ? _getFollowersListForUser(u) : [];
@@ -1501,8 +1523,8 @@ async function toggleFollowTargetUser(targetUname) {
     const tKey = _normKey(targetUname);
     const targetObj = (db.users || []).find(u => _normKey(u.username) === tKey);
     if (!targetObj) return;
-    if (targetObj.role === "master" && curU.role !== "user" && curU.role !== "administrasi") {
-        return showToast("Hanya User dan Admin yang dapat mengikuti akun Founder.", "info");
+    if (targetObj.role === "master" && curU.role === "master") {
+        return;
     }
     if (typeof isUserBlockedByMe === "function" && isUserBlockedByMe(tKey)) {
         return showToast("Buka blokir akun ini terlebih dahulu untuk mengikutinya.", "error");
@@ -1773,6 +1795,7 @@ function renderPrivacySubPanel() {
     setChk("priv-show-projects", priv.showProjects);
     setChk("priv-show-username", priv.showUsername);
     setChk("priv-allow-search", priv.allowSearchDiscovery);
+    setChk("priv-show-online", priv.showOnlineStatus);
     setChk("priv-show-followers", priv.showFollowers);
     setChk("priv-show-following", priv.showFollowing);
     setChk("priv-show-contact", priv.showContact);
@@ -1816,6 +1839,7 @@ async function savePrivacySettings() {
         showProjects: !!document.getElementById("priv-show-projects")?.checked,
         showUsername: !!document.getElementById("priv-show-username")?.checked,
         allowSearchDiscovery: !!document.getElementById("priv-allow-search")?.checked,
+        showOnlineStatus: !!document.getElementById("priv-show-online")?.checked,
         showFollowers: !!document.getElementById("priv-show-followers")?.checked,
         showFollowing: !!document.getElementById("priv-show-following")?.checked,
         showContact: !!document.getElementById("priv-show-contact")?.checked,
@@ -2747,6 +2771,7 @@ async function bootMrUndanganApp() {
         if (typeof updateChatBadges === "function") updateChatBadges();
         updateNotificationBellBadge();
         if (typeof scheduleAdaptivePoll === "function") scheduleAdaptivePoll();
+        if (typeof startUserOnlineHeartbeat === "function") startUserOnlineHeartbeat(true);
     } catch (err) {
         console.error("Boot error:", err);
         if (typeof hideHelloSplash === "function") hideHelloSplash();
@@ -3022,7 +3047,7 @@ function renderCoinMutationHistoryHtml(userObj) {
     }).join("");
 }
 
-function openCabangCoinInfoModal(targetUsername = "") {
+function openCabangCoinInfoModal(targetUsername = "", initialTab = "info") {
     const cleanKey = _normAppUserKey(targetUsername || currentSessionUser || "");
     const targetU = (db.users || []).find(u => _normAppUserKey(u.username) === cleanKey) || getCurrentUserObj();
     const curU = getCurrentUserObj();
@@ -3097,7 +3122,7 @@ function openCabangCoinInfoModal(targetUsername = "") {
 
     const histBox = document.getElementById("cci-history-list");
     if (histBox) histBox.innerHTML = renderCoinMutationHistoryHtml(targetU);
-    switchCoinModalTab("info");
+    switchCoinModalTab(initialTab === "history" ? "history" : "info");
 
     const modal = document.getElementById("modal-cabang-coin-info");
     if (modal) {
@@ -3229,7 +3254,7 @@ function _buildEcoSearchUserRowHtml(targetU, myU, myFollowing, myFollowers) {
 
     return `
         <div onclick="openUserFromEcoSearch('${esc(tKey)}')" class="app-card-soft border rounded-2xl p-2.5 flex items-center gap-2.5 cursor-pointer hover:brightness-95 transition">
-            <img src="${targetU.avatar || defAv}" class="w-9 h-9 rounded-full object-cover border gold-border bg-zinc-800 shrink-0">
+            <div class="relative shrink-0"><img src="${targetU.avatar || defAv}" class="w-9 h-9 rounded-full object-cover border gold-border bg-zinc-800">${typeof buildOnlineDotHtml === "function" ? buildOnlineDotHtml(targetU, "sm") : ""}</div>
             <div class="flex-1 min-w-0">
                 <div class="flex items-center gap-1 min-w-0">
                     <strong class="text-xs font-bold truncate">${escHtml(targetU.name || targetU.username)}</strong>
@@ -3334,6 +3359,46 @@ function shareOwnProfileLink() {
     } else {
         navigator.clipboard?.writeText(url);
         showToast("Link profil disalin!");
+    }
+}
+
+
+// ================= 16. HEARTBEAT STATUS ONLINE PENGGUNA (V14.9) =================
+let _onlinePingTimer = null;
+let _lastOnlinePingTs = 0;
+
+async function pingUserOnlinePresence(force = false) {
+    const u = typeof getCurrentUserObj === "function" ? getCurrentUserObj() : null;
+    if (!u || !u.username || !currentSessionUser) return;
+    if (document.hidden && !force) return;
+    const priv = typeof getUserPrivacy === "function" ? getUserPrivacy(u) : { showOnlineStatus: true };
+    if (!priv.showOnlineStatus) return;
+
+    const now = Date.now();
+    if (!force && (now - _lastOnlinePingTs) < 55000) return;
+    _lastOnlinePingTs = now;
+
+    const updated = Object.assign({}, u, { lastSeen: now });
+    delete updated.password;
+    ensureUserInLocalDb(updated);
+    try {
+        await apiAction({ action: "upsert_user", oldUsername: u.username, user: updated });
+    } catch {}
+}
+
+function startUserOnlineHeartbeat(immediate = false) {
+    if (!currentSessionUser) return;
+    if (immediate) setTimeout(() => pingUserOnlinePresence(true), 1200);
+    if (_onlinePingTimer) clearInterval(_onlinePingTimer);
+    _onlinePingTimer = setInterval(() => {
+        if (currentSessionUser && !document.hidden) pingUserOnlinePresence(false);
+    }, 60000);
+
+    if (!window.__LBK_VIS_PING_BOUND__) {
+        window.__LBK_VIS_PING_BOUND__ = true;
+        document.addEventListener("visibilitychange", () => {
+            if (!document.hidden && currentSessionUser) pingUserOnlinePresence(false);
+        });
     }
 }
 

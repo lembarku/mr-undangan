@@ -10,6 +10,7 @@ const QUICK_REPLIES_STAFF = [
 ];
 
 let tempChatAttachment = "";
+let _chatContactMasterFilter = "all"; // all | online | cabang | pro
 let _lastKnownChatCount = -1;
 window.openedFromChatThread = null;
 window._chatOriginView = null;
@@ -178,24 +179,33 @@ function getChatThreads() {
     return Object.values(map).sort((a, b) => b.lastTs - a.lastTs);
 }
 
-// HANYA tampilkan: Orang yang SUDAH DIIKUTI (following) + semua Administrasi + Founder
+// Master dapat chat SELURUH user manapun; akun lain hanya Founder, Administrasi & yang sudah diikuti
 function getAccessibleChatContacts() {
     const curU = getCurrentUserObj();
     if (!curU || !curU.username) return [];
     const myKey = _normChatKey(curU.username);
+    const all = (db.users || []).filter(u => u && u.username && _normChatKey(u.username) !== myKey);
+
+    if (curU.role === "master") {
+        const isOn = (u) => typeof isUserOnlineNow === "function" && isUserOnlineNow(u);
+        const rank = (role) => role === "administrasi" ? 0 : role === "cabang" ? 1 : 2;
+        return all.sort((a, b) =>
+            (Number(isOn(b)) - Number(isOn(a))) ||
+            (rank(a.role) - rank(b.role)) ||
+            String(a.name || a.username).localeCompare(String(b.name || b.username))
+        );
+    }
+
     const myBlocked = typeof getBlockedUsersList === "function" ? getBlockedUsersList(curU) : [];
     const myFollowing = typeof _getFollowingListForUser === "function"
         ? _getFollowingListForUser(curU)
         : (Array.isArray(curU.following) ? curU.following.map(_normChatKey) : []);
-
-    const all = (db.users || []).filter(u => u && u.username && _normChatKey(u.username) !== myKey);
 
     const filtered = all.filter(u => {
         const uKey = _normChatKey(u.username);
         const isFounderOrAdmin = u.role === "master" || u.role === "administrasi";
         const isFollowed = myFollowing.includes(uKey);
 
-        // Syarat wajib: hanya Founder, semua Tim Administrasi, atau akun yang sudah diikuti
         if (!isFounderOrAdmin && !isFollowed) return false;
 
         if (!isFounderOrAdmin) {
@@ -208,16 +218,29 @@ function getAccessibleChatContacts() {
         return true;
     });
 
+    const isOn = (u) => typeof isUserOnlineNow === "function" && isUserOnlineNow(u);
     const rank = (role) => role === "master" ? 0 : role === "administrasi" ? 1 : 2;
-    return filtered.sort((a, b) => (rank(a.role) - rank(b.role)) || String(a.name || a.username).localeCompare(String(b.name || b.username)));
+    return filtered.sort((a, b) =>
+        (Number(isOn(b)) - Number(isOn(a))) ||
+        (rank(a.role) - rank(b.role)) ||
+        String(a.name || a.username).localeCompare(String(b.name || b.username))
+    );
+}
+
+function setChatContactMasterFilter(f) {
+    _chatContactMasterFilter = f || "all";
+    renderChatContactsModalList();
 }
 
 function openChatContactsModal() {
     const curU = getCurrentUserObj();
     if (!curU) return showToast("Silakan masuk akun terlebih dahulu untuk melihat daftar kontak.", "info");
+    _chatContactMasterFilter = "all";
     const sub = document.getElementById("cc-access-sub");
     if (sub) {
-        sub.innerText = "Founder, Tim Administrasi & akun yang Anda ikuti";
+        sub.innerText = curU.role === "master"
+            ? "Seluruh pengguna terdaftar (User, PRO, Cabang & Administrasi)"
+            : "Founder, Tim Administrasi & akun yang Anda ikuti";
     }
     const inp = document.getElementById("cc-search-inp");
     if (inp) inp.value = "";
@@ -232,8 +255,36 @@ function openChatContactsModal() {
 
 function renderChatContactsModalList() {
     const box = document.getElementById("cc-contacts-list"); if (!box) return;
-    const q = (document.getElementById("cc-search-inp")?.value || "").trim().toLowerCase();
-    const contacts = getAccessibleChatContacts().filter(u => {
+    const curU = getCurrentUserObj();
+    const isMaster = !!(curU && curU.role === "master");
+    const allContacts = getAccessibleChatContacts();
+
+    const filterBox = document.getElementById("cc-master-filters");
+    if (filterBox) {
+        filterBox.classList.toggle("hide", !isMaster);
+        if (isMaster) {
+            const cntOnline = allContacts.filter(u => typeof isUserOnlineNow === "function" && isUserOnlineNow(u)).length;
+            const cntCabang = allContacts.filter(u => u.role === "cabang").length;
+            const cntPro = allContacts.filter(u => !!u.isPro).length;
+            const pills = [
+                { k: "all", l: `Semua (${allContacts.length})` },
+                { k: "online", l: `● Online (${cntOnline})` },
+                { k: "cabang", l: `Cabang (${cntCabang})` },
+                { k: "pro", l: `PRO (${cntPro})` }
+            ];
+            filterBox.innerHTML = pills.map(p =>
+                `<button type="button" onclick="setChatContactMasterFilter('${p.k}')" class="px-2.5 py-1 rounded-full text-[10.5px] font-bold whitespace-nowrap transition ${_chatContactMasterFilter === p.k ? "gold-pill-btn shadow-sm" : "app-btn-sec"}">${p.l}</button>`
+            ).join("");
+        }
+    }
+
+    const q = (document.getElementById("cc-search-inp")?.value || "").trim().toLowerCase().replace(/^@/, "");
+    const contacts = allContacts.filter(u => {
+        if (isMaster) {
+            if (_chatContactMasterFilter === "online" && !(typeof isUserOnlineNow === "function" && isUserOnlineNow(u))) return false;
+            if (_chatContactMasterFilter === "cabang" && u.role !== "cabang") return false;
+            if (_chatContactMasterFilter === "pro" && !u.isPro) return false;
+        }
         if (!q) return true;
         const canSeeHandle = typeof canSeeUserHandle === "function" ? canSeeUserHandle(u) : true;
         return String(u.name || "").toLowerCase().includes(q) ||
@@ -241,29 +292,33 @@ function renderChatContactsModalList() {
     });
 
     if (!contacts.length) {
-        box.innerHTML = `<p class="p-8 text-center text-xs app-muted">Belum ada kontak yang cocok. Ikuti (Follow) pengguna terlebih dahulu untuk memunculkannya di daftar chat.</p>`;
+        box.innerHTML = `<p class="p-8 text-center text-xs app-muted">${isMaster ? "Tidak ada pengguna yang cocok dengan filter ini." : "Belum ada kontak yang cocok. Ikuti (Follow) pengguna terlebih dahulu untuk memunculkannya di daftar chat."}</p>`;
         return;
     }
 
     box.innerHTML = contacts.map(u => {
         const isAdminRole = u.role === "master" || u.role === "administrasi";
         const canSeeHandle = typeof canSeeUserHandle === "function" ? canSeeUserHandle(u) : true;
+        const onlineDot = typeof buildOnlineDotHtml === "function" ? buildOnlineDotHtml(u, "md") : "";
+        const presenceTxt = typeof getUserPresenceText === "function" ? getUserPresenceText(u) : "";
         const roleBadge = u.role === "master"
             ? `<span class="text-[9px] px-1.5 py-0.5 rounded-full bg-amber-500/20 text-amber-600 font-extrabold">FOUNDER</span>`
             : u.role === "administrasi"
                 ? `<span class="text-[9px] px-1.5 py-0.5 rounded-full bg-emerald-500/20 text-emerald-600 font-extrabold">ADMIN</span>`
                 : u.role === "cabang"
                     ? `<span class="text-[9px] px-1.5 py-0.5 rounded-full bg-blue-500/20 text-blue-600 font-extrabold">CABANG</span>`
-                    : `<span class="text-[9px] px-1.5 py-0.5 rounded-full bg-zinc-500/15 app-muted font-bold">FOLLOWING</span>`;
-        const subLine = u.bio
-            ? escHtml(u.bio)
-            : (isAdminRole ? "Layanan Resmi Lembarku" : (canSeeHandle ? `@${escHtml(u.username)}` : "Pengguna Lembarku"));
+                    : (isMaster ? `<span class="text-[9px] px-1.5 py-0.5 rounded-full bg-zinc-500/15 app-muted font-bold">USER</span>` : `<span class="text-[9px] px-1.5 py-0.5 rounded-full bg-zinc-500/15 app-muted font-bold">FOLLOWING</span>`);
+        const subLine = presenceTxt === "Online"
+            ? `<span class="text-emerald-600 font-bold">● Online</span>${u.bio ? ` • ${escHtml(u.bio)}` : ""}`
+            : presenceTxt
+                ? `${escHtml(presenceTxt)}${u.bio ? ` • ${escHtml(u.bio)}` : ""}`
+                : (u.bio ? escHtml(u.bio) : (isAdminRole ? "Layanan Resmi Lembarku" : (canSeeHandle ? `@${escHtml(u.username)}` : "Pengguna Lembarku")));
 
         return `
             <div onclick="startDirectChatWithContact('${esc(u.username)}')" class="px-4 py-3 hover:bg-black/5 active:bg-black/10 cursor-pointer flex items-center gap-3.5 transition">
                 <div class="relative shrink-0">
                     <img src="${u.avatar || DEFAULT_AVATAR}" class="w-12 h-12 rounded-full object-cover bg-zinc-800 border gold-border">
-                    ${isAdminRole ? `<span class="w-3.5 h-3.5 rounded-full bg-emerald-500 border-2 border-white absolute bottom-0 right-0"></span>` : ""}
+                    ${onlineDot}
                 </div>
                 <div class="flex-1 min-w-0 border-b border-black/5 pb-3 -mb-3">
                     <div class="flex items-center justify-between gap-2">
@@ -413,6 +468,16 @@ function _syncWaChatHeader(mode = "list", title = "", avatarUrl = "", profileUse
         topBar.style.cssText = "display:flex !important;align-items:center !important;justify-content:space-between !important;gap:0.5rem !important;padding:0.75rem 0.9rem !important;border-radius:0 !important;";
 
         const isRealUser = mode === "thread" && profileUsername && !String(profileUsername).startsWith("tamu_") && profileUsername !== "admin_support";
+        const targetProfileObj = isRealUser ? (db.users || []).find(x => _normChatKey(x.username) === _normChatKey(profileUsername)) : null;
+        const headerOnlineDot = targetProfileObj && typeof buildOnlineDotHtml === "function" ? buildOnlineDotHtml(targetProfileObj, "sm") : "";
+        const headerPresence = targetProfileObj && typeof getUserPresenceText === "function" ? getUserPresenceText(targetProfileObj) : "";
+        const headerSubLine = isRealUser
+            ? (headerPresence === "Online"
+                ? `<span class="text-emerald-300 font-bold">● Online</span> • Ketuk lihat profil`
+                : headerPresence
+                    ? `${escHtml(headerPresence)} • Ketuk lihat profil`
+                    : "Ketuk untuk lihat profil")
+            : "Layanan Resmi Lembarku";
         const clickCall = isRealUser ? `onclick="_openUserProfileFromChat('${esc(profileUsername)}'); event.stopPropagation();"` : "";
         const backAction = mode === "thread" ? "exitChatThreadToList()" : "closeFullChatOverlay()";
 
@@ -423,10 +488,13 @@ function _syncWaChatHeader(mode = "list", title = "", avatarUrl = "", profileUse
                 </button>
                 <div id="wa-chat-profile-bar" class="flex items-center gap-2.5 flex-1 min-w-0 ${isRealUser ? "cursor-pointer active:opacity-75" : ""}" ${clickCall}>
                     ${mode === "thread"
-                        ? `<img id="wa-thread-avatar" src="${avatarUrl || DEFAULT_AVATAR}" class="w-10 h-10 rounded-full object-cover border border-white/60 bg-zinc-800 shrink-0">
+                        ? `<div class="relative shrink-0">
+                               <img id="wa-thread-avatar" src="${avatarUrl || DEFAULT_AVATAR}" class="w-10 h-10 rounded-full object-cover border border-white/60 bg-zinc-800">
+                               ${headerOnlineDot}
+                           </div>
                            <div class="min-w-0 flex-1">
                                <h3 id="wa-thread-name" class="text-base font-extrabold text-white tracking-tight truncate">${escHtml(title || "Pengguna")}</h3>
-                               <span class="text-[10px] text-white/80 block -mt-0.5">${isRealUser ? "Ketuk untuk lihat profil" : "Layanan Resmi Lembarku"}</span>
+                               <span class="text-[10px] text-white/85 block -mt-0.5 truncate">${headerSubLine}</span>
                            </div>`
                         : `<img src="./lembarku-logo.png" class="w-9 h-9 rounded-xl bg-white p-1 object-contain border border-black/10 shrink-0">
                            <div class="min-w-0 flex-1">
@@ -590,8 +658,13 @@ function renderFullChatOverlay() {
                     ? `${isStaff && lastStaff ? "✓✓ Admin: " : ""}${last.image ? "📷 [Lampiran] " : ""}${escHtml(last.text)}`
                     : "Ketuk untuk mulai berkirim pesan";
 
+                const thUserObj = (db.users || []).find(x => _normChatKey(x.username) === _normChatKey(th.contactUsername || th.threadUser));
+                const thOnlineDot = thUserObj && typeof buildOnlineDotHtml === "function" ? buildOnlineDotHtml(thUserObj, "md") : "";
                 return `<div onclick="openMasterChatThread('${esc(th.threadUser)}')" class="p-3.5 hover:bg-black/5 cursor-pointer flex items-center gap-3">
-                    <img src="${th.avatar}" class="w-12 h-12 rounded-full object-cover bg-zinc-800 border gold-border shrink-0">
+                    <div class="relative shrink-0">
+                        <img src="${th.avatar}" class="w-12 h-12 rounded-full object-cover bg-zinc-800 border gold-border">
+                        ${thOnlineDot}
+                    </div>
                     <div class="flex-1 min-w-0">
                         <div class="flex justify-between items-center gap-2">
                             <strong class="text-sm truncate flex items-center gap-1">${escHtml(th.displayName)} ${th.isPro ? '<i class="fa-solid fa-circle-check text-blue-500 text-xs"></i>' : ""} ${roleBadge}</strong>

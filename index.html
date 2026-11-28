@@ -1894,6 +1894,14 @@
 
                             <div class="flex items-center justify-between gap-3 border-t gold-border pt-3">
                                 <div class="min-w-0">
+                                    <strong class="text-xs block">Tampilkan Status Online (Titik Hijau)</strong>
+                                    <span class="text-[10px] app-muted block">Tampilkan indikator hijau &amp; waktu aktif terakhir saat Anda membuka aplikasi.</span>
+                                </div>
+                                <label class="lbk-switch"><input type="checkbox" id="priv-show-online" checked><span class="lbk-switch-track"></span></label>
+                            </div>
+
+                            <div class="flex items-center justify-between gap-3 border-t gold-border pt-3">
+                                <div class="min-w-0">
                                     <strong class="text-xs block">Tampilkan Daftar Followers</strong>
                                     <span class="text-[10px] app-muted block">Atur apakah daftar pengikut Anda boleh dilihat pengguna lain.</span>
                                 </div>
@@ -2553,8 +2561,9 @@
                 </div>
                 <button onclick="document.getElementById('modal-chat-contacts').classList.add('hide')" class="w-8 h-8 rounded-full app-btn-sec flex items-center justify-center text-xs"><i class="fa-solid fa-xmark"></i></button>
             </div>
-            <div class="p-3 border-b gold-border shrink-0">
+            <div class="p-3 border-b gold-border shrink-0 space-y-2">
                 <input type="text" id="cc-search-inp" oninput="renderChatContactsModalList()" placeholder="Cari nama atau username..." class="app-input !py-2 text-xs">
+                <div id="cc-master-filters" class="hide flex gap-1.5 overflow-x-auto no-scrollbar"></div>
             </div>
             <div id="cc-contacts-list" class="flex-1 overflow-y-auto divide-y divide-black/10"></div>
         </div>
