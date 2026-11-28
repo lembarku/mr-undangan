@@ -2721,25 +2721,31 @@ function initGlobalAppZoomLock() {
         }, { passive: false });
     });
 
-    // Blokir pinch 2 jari bawaan browser Android/iOS pada halaman UI utama
-    document.addEventListener("touchmove", (e) => {
-        if (e.touches && e.touches.length > 1 && !isZoomAllowedTarget(e.target)) {
-            e.preventDefault();
-        }
-    }, { passive: false });
+    function initGlobalAppZoomLock() {
+    if (window.__MR_ZOOM_LOCK_READY__) return;
+    window.__MR_ZOOM_LOCK_READY__ = true;
 
-    // Blokir double-tap zoom pada halaman UI utama (kecuali input/textarea & area zoom selektif)
-    let lastTouchEndTs = 0;
-    document.addEventListener("touchend", (e) => {
-        if (isZoomAllowedTarget(e.target)) return;
-        const tag = (e.target && e.target.tagName) || "";
-        if (["INPUT", "TEXTAREA", "SELECT"].includes(tag)) return;
-        const now = Date.now();
-        if (now - lastTouchEndTs <= 300) {
+    const isZoomAllowedTarget = (target) => {
+        if (!target || typeof target.closest !== "function") return false;
+        return !!target.closest('[data-pinch-zoom="1"], .cropper-container, #modal-image-cropper');
+    };
+
+    // Khusus Safari iOS: blokir gesture pinch zoom di luar area foto/preview
+    ["gesturestart", "gesturechange", "gestureend"].forEach(evtName => {
+        document.addEventListener(evtName, (e) => {
+            if (!isZoomAllowedTarget(e.target)) {
+                e.preventDefault();
+            }
+        }, { passive: false });
+    });
+
+    // Khusus PC: blokir Ctrl + Scroll wheel zoom di luar area foto/preview
+    window.addEventListener("wheel", (e) => {
+        if (e.ctrlKey && !isZoomAllowedTarget(e.target)) {
             e.preventDefault();
         }
-        lastTouchEndTs = now;
     }, { passive: false });
+}
 
     // Blokir Ctrl + Scroll wheel zoom pada PC di luar area foto/preview
     window.addEventListener("wheel", (e) => {
