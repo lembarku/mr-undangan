@@ -1181,3 +1181,55 @@ html[data-app-theme="black"] .gowes-conflict-alert {
     text-shadow: 0 1px 0 rgba(255, 248, 210, 0.9);
     line-height: 1;
 }
+
+/* =========================================================================
+   V14.9 — USER PRO FLOATING COVER COIN PILL & GOWES TODAY SCHEDULE BOARD
+   ========================================================================= */
+.prof-pro-coin-pill {
+    position: absolute;
+    top: 0.75rem;
+    left: 0.75rem;
+    z-index: 20;
+    display: inline-flex;
+    align-items: center;
+    gap: 0.45rem;
+    padding: 0.3rem 0.75rem 0.3rem 0.35rem;
+    border-radius: 9999px;
+    background: rgba(12, 12, 16, 0.72);
+    backdrop-filter: blur(12px);
+    -webkit-backdrop-filter: blur(12px);
+    border: 1px solid rgba(248, 213, 104, 0.55);
+    color: #fff8dc;
+    box-shadow: 0 6px 18px rgba(0, 0, 0, 0.35);
+    cursor: pointer;
+    transition: transform 0.16s ease, background-color 0.2s ease;
+}
+.prof-pro-coin-pill:hover {
+    background: rgba(18, 18, 24, 0.86);
+}
+.prof-pro-coin-pill:active {
+    transform: scale(0.96);
+}
+.prof-share-cover-btn {
+    position: absolute;
+    top: 0.75rem;
+    right: 0.75rem;
+    z-index: 20;
+    display: inline-flex;
+    align-items: center;
+    gap: 0.35rem;
+    padding: 0.35rem 0.7rem;
+    border-radius: 9999px;
+    background: rgba(12, 12, 16, 0.62);
+    backdrop-filter: blur(10px);
+    -webkit-backdrop-filter: blur(10px);
+    border: 1px solid rgba(255, 255, 255, 0.24);
+    color: #ffffff;
+    font-size: 0.68rem;
+    font-weight: 700;
+    cursor: pointer;
+    transition: transform 0.16s ease, background-color 0.2s ease;
+}
+.prof-share-cover-btn:active {
+    transform: scale(0.95);
+}

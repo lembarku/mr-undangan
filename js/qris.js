@@ -6,6 +6,8 @@ let activePaymentState = {
     id: null,
     basePrice: 0,
     origPrice: 0,
+    voucherCode: "",
+    voucherDiscount: 0,
     uniqueCode: 0,
     totalPay: 0,
     title: "",
@@ -113,27 +115,32 @@ async function decodeQrisFromImageInput(inp) {
 
 // ================= 3. HALAMAN PEMBAYARAN / KONFIRMASI TERPADU =================
 async function openUnifiedPayment(kind, docId) {
-    const isPf = kind === "portfolio";
+    const isPf = kind === "portfolio" || kind === "coin_topup" || kind === "pro_upgrade";
     const doc = isPf
         ? (db.portfolios || []).find(p => String(p.id) === String(docId))
         : (db.invitations || []).find(i => String(i.id) === String(docId));
-    if (!doc) return showToast("Data berkas tidak ditemukan.", "error");
+    if (!doc) return showToast("Data pesanan tidak ditemukan.", "error");
 
+    const isCoinOrPro = doc.docType === "coin_topup" || doc.docType === "pro_upgrade";
+    const resolvedKind = isCoinOrPro ? doc.docType : (isPf ? "portfolio" : "inv");
     const ms = db.masterSettings || {};
     const basePrice = Number(doc.price || (isPf ? 20000 : 99000));
     const origPrice = Number(doc.origPrice || 0);
     const useUnique = ms.qrisUniqueCode !== false;
 
+    const existingDisc = isCoinOrPro ? 0 : Math.max(0, Number(doc.voucherDiscount || 0));
     const uniqueCode = useUnique ? (Number(doc.uniqueCode) || getDeterministicUniqueCode(doc.id)) : 0;
-    const totalPay = basePrice + uniqueCode;
+    const totalPay = Math.max(1000, basePrice - existingDisc) + uniqueCode;
     doc.uniqueCode = uniqueCode;
     doc.totalPay = totalPay;
 
     activePaymentState = {
-        kind,
+        kind: resolvedKind,
         id: doc.id,
         basePrice,
         origPrice,
+        voucherCode: isCoinOrPro ? "" : (doc.voucherCode || ""),
+        voucherDiscount: existingDisc,
         uniqueCode,
         totalPay,
         title: doc.title || "Pesanan Berkas",
@@ -147,22 +154,54 @@ async function openUnifiedPayment(kind, docId) {
     renderHeaderActions();
     pushBackGuard();
 
-    document.getElementById("pay-item-name").innerText = `${isPf ? (doc.docType === "lamaran" ? "Surat Lamaran" : "CV") : "Undangan"} — ${doc.title}`;
-    document.getElementById("pay-final-price").innerText = fmtRp(totalPay);
+    const sendBtn = document.getElementById("btn-send-proof");
+    if (sendBtn) sendBtn.onclick = submitPaymentProofUnified;
 
-    const origEl = document.getElementById("pay-orig-price");
-    const discEl = document.getElementById("pay-disc-badge");
-    if (origPrice > basePrice && basePrice > 0) {
-        const pct = Math.round(((origPrice - basePrice) / origPrice) * 100);
-        origEl.innerText = fmtRp(origPrice);
-        origEl.classList.remove("hide");
-        discEl.innerText = `HEMAT ${pct}%`;
-        discEl.classList.remove("hide");
-    } else {
-        origEl.classList.add("hide");
-        discEl.classList.add("hide");
+    const statusBadge = document.getElementById("pay-status-badge");
+    const headTxt = document.getElementById("pay-heading-text");
+    if (statusBadge) {
+        statusBadge.className = "text-[11px] px-3 py-1 rounded-full app-accent-bg app-accent font-bold";
+        statusBadge.innerText = doc.docType === "coin_topup"
+            ? "TOP-UP COIN • QRIS DINAMIS"
+            : doc.docType === "pro_upgrade"
+                ? "UPGRADE AKUN PRO • QRIS DINAMIS"
+                : "STATUS: ● MENUNGGU KONFIRMASI";
     }
+    if (headTxt) {
+        headTxt.innerText = doc.docType === "coin_topup"
+            ? "Isi Ulang Coin Lembarku"
+            : doc.docType === "pro_upgrade"
+                ? "Upgrade ke Akun PRO"
+                : "Pesanan Tersimpan!";
+    }
+
+    const prefixLbl = doc.docType === "coin_topup"
+        ? "Top-Up Coin"
+        : doc.docType === "pro_upgrade"
+            ? "Upgrade PRO"
+            : isPf ? (doc.docType === "lamaran" ? "Surat Lamaran" : "CV") : "Undangan";
+    document.getElementById("pay-item-name").innerText = `${prefixLbl} — ${doc.title}`;
     document.getElementById("pay-unique-hint").classList.toggle("hide", !useUnique);
+
+    // Tampilkan input kode voucher hanya untuk pelanggan umum pada order reguler (bukan top-up coin/PRO)
+    const vWrap = document.getElementById("pay-voucher-wrap");
+    const vInp = document.getElementById("pay-voucher-code");
+    const vStat = document.getElementById("pay-voucher-status");
+    const vClr = document.getElementById("btn-pay-clear-voucher");
+    if (vWrap) vWrap.classList.toggle("hide", isCoinOrPro);
+    if (vInp) vInp.value = activePaymentState.voucherCode || "";
+    if (vClr) vClr.classList.toggle("hide", !activePaymentState.voucherCode);
+    if (vStat) {
+        if (activePaymentState.voucherCode && activePaymentState.voucherDiscount > 0) {
+            vStat.className = "text-[11px] font-semibold text-emerald-600";
+            vStat.innerText = `✓ Voucher ${activePaymentState.voucherCode} aktif (-${fmtRp(activePaymentState.voucherDiscount)})`;
+        } else {
+            vStat.className = "hide text-[11px] font-semibold";
+            vStat.innerText = "";
+        }
+    }
+
+    _syncPaymentTotalsUI();
 
     document.getElementById("pay-banks-list").innerHTML = getMasterBanksList().map(b => {
         const lg = BANK_LOGOS[b.bank] || { bg: "#333", text: "#fff", label: b.bank };
@@ -235,7 +274,7 @@ async function submitPaymentProofUnified() {
     const up = await apiAction({ action: "upload_media", dataUrl: tempPaymentProof, prefix: "proof" });
     const proofUrl = (up && up.ok && up.url) ? up.url : tempPaymentProof;
 
-    if (activePaymentState.kind === "portfolio") {
+    if (activePaymentState.kind === "portfolio" || activePaymentState.kind === "coin_topup" || activePaymentState.kind === "pro_upgrade") {
         const pf = (db.portfolios || []).find(p => String(p.id) === String(activePaymentState.id));
         if (pf) {
             await apiAction({
@@ -244,6 +283,8 @@ async function submitPaymentProofUnified() {
                     paymentProof: proofUrl,
                     uniqueCode: activePaymentState.uniqueCode,
                     totalPay: activePaymentState.totalPay,
+                    voucherCode: activePaymentState.voucherCode || "",
+                    voucherDiscount: Number(activePaymentState.voucherDiscount || 0),
                     status: "Menunggu Verifikasi"
                 })
             });
@@ -263,6 +304,8 @@ async function submitPaymentProofUnified() {
                     paymentProof: proofUrl,
                     uniqueCode: activePaymentState.uniqueCode,
                     totalPay: activePaymentState.totalPay,
+                    voucherCode: activePaymentState.voucherCode || "",
+                    voucherDiscount: Number(activePaymentState.voucherDiscount || 0),
                     allowShowcase: !!allowShowcase,
                     status: "Menunggu Verifikasi"
                 })
@@ -273,4 +316,173 @@ async function submitPaymentProofUnified() {
     setBtnLoading("btn-send-proof", false);
     showToast("Bukti / Screenshot terkirim! Admin segera mengonfirmasi.");
     routeDashboard();
+}
+
+// ================= 4. KODE VOUCHER & ORDER TOP-UP COIN / UPGRADE PRO VIA QRIS =================
+function _syncPaymentTotalsUI() {
+    const base = Number(activePaymentState.basePrice || 0);
+    const orig = Number(activePaymentState.origPrice || 0);
+    const disc = Number(activePaymentState.voucherDiscount || 0);
+    const total = Number(activePaymentState.totalPay || 0);
+
+    const finalEl = document.getElementById("pay-final-price");
+    if (finalEl) finalEl.innerText = fmtRp(total);
+
+    const origEl = document.getElementById("pay-orig-price");
+    const discEl = document.getElementById("pay-disc-badge");
+    if (disc > 0) {
+        if (origEl) { origEl.innerText = fmtRp(base + Number(activePaymentState.uniqueCode || 0)); origEl.classList.remove("hide"); }
+        if (discEl) { discEl.innerText = `VOUCHER -${fmtRp(disc)}`; discEl.classList.remove("hide"); }
+    } else if (orig > base && base > 0) {
+        const pct = Math.round(((orig - base) / orig) * 100);
+        if (origEl) { origEl.innerText = fmtRp(orig); origEl.classList.remove("hide"); }
+        if (discEl) { discEl.innerText = `HEMAT ${pct}%`; discEl.classList.remove("hide"); }
+    } else {
+        if (origEl) origEl.classList.add("hide");
+        if (discEl) discEl.classList.add("hide");
+    }
+}
+
+async function applyPaymentVoucher() {
+    const inp = document.getElementById("pay-voucher-code");
+    const stat = document.getElementById("pay-voucher-status");
+    const clr = document.getElementById("btn-pay-clear-voucher");
+    const rawCode = (inp && inp.value || "").trim();
+    const scope = activePaymentState.kind === "portfolio" ? "pf" : activePaymentState.kind === "gowes_rental" ? "gowes" : "inv";
+
+    if (typeof evaluateVoucherCode !== "function") return;
+    const res = evaluateVoucherCode(rawCode, scope, activePaymentState.basePrice);
+    if (!res.ok) {
+        if (stat) {
+            stat.className = "text-[11px] font-semibold text-red-500";
+            stat.innerText = res.message;
+        }
+        return showToast(res.message, "error");
+    }
+
+    activePaymentState.voucherCode = res.code;
+    activePaymentState.voucherDiscount = res.discount;
+    activePaymentState.totalPay = res.finalPrice + Number(activePaymentState.uniqueCode || 0);
+    if (inp) inp.value = res.code;
+    if (clr) clr.classList.remove("hide");
+    if (stat) {
+        stat.className = "text-[11px] font-semibold text-emerald-600";
+        stat.innerText = `✓ ${res.message}`;
+    }
+    _syncPaymentTotalsUI();
+    await renderPaymentQrisCode(db.masterSettings || {}, activePaymentState.totalPay);
+    showToast(res.message);
+}
+
+async function clearPaymentVoucher() {
+    activePaymentState.voucherCode = "";
+    activePaymentState.voucherDiscount = 0;
+    activePaymentState.totalPay = Number(activePaymentState.basePrice || 0) + Number(activePaymentState.uniqueCode || 0);
+    const inp = document.getElementById("pay-voucher-code");
+    const stat = document.getElementById("pay-voucher-status");
+    const clr = document.getElementById("btn-pay-clear-voucher");
+    if (inp) inp.value = "";
+    if (clr) clr.classList.add("hide");
+    if (stat) { stat.className = "hide text-[11px] font-semibold"; stat.innerText = ""; }
+    _syncPaymentTotalsUI();
+    await renderPaymentQrisCode(db.masterSettings || {}, activePaymentState.totalPay);
+    showToast("Voucher dibatalkan.", "info");
+}
+
+async function startCoinPackageQrisOrder(pkgId) {
+    const u = typeof getCurrentUserObj === "function" ? getCurrentUserObj() : null;
+    if (!u) {
+        showToast("Silakan masuk akun terlebih dahulu.", "info");
+        if (typeof openAuthModal === "function") openAuthModal();
+        return;
+    }
+    if (u.role !== "cabang" && !u.isPro && u.role !== "master") {
+        if (typeof openUpgradeProPromoModal === "function") openUpgradeProPromoModal(true);
+        return;
+    }
+    const pkgs = typeof getCoinPackagesList === "function" ? getCoinPackagesList() : [];
+    const pkg = pkgs.find(p => String(p.id) === String(pkgId)) || pkgs[0];
+    if (!pkg) return showToast("Paket Coin tidak ditemukan.", "error");
+
+    const totalCoins = Number(pkg.paidCoins || 0) + Number(pkg.bonusCoins || 0);
+    const newId = Date.now();
+    const uniqueCode = getDeterministicUniqueCode(newId);
+    const orderDoc = {
+        id: newId,
+        createdAt: newId,
+        owner: currentSessionUser,
+        docType: "coin_topup",
+        themeId: pkg.id,
+        themeName: `${pkg.name} (${totalCoins} Coin)`,
+        title: `Top-Up ${pkg.name} — ${totalCoins} Coin`,
+        coinAmount: totalCoins,
+        paidCoins: pkg.paidCoins,
+        bonusCoins: pkg.bonusCoins,
+        price: Number(pkg.price || 100000),
+        origPrice: 0,
+        uniqueCode,
+        totalPay: Number(pkg.price || 100000) + uniqueCode,
+        status: "Menunggu Pembayaran",
+        paymentProof: "",
+        fullName: u.name || u.username
+    };
+
+    showLoading("Menyiapkan QRIS Paket Coin...");
+    const res = await apiAction({ action: "upsert_portfolio", portfolio: orderDoc });
+    hideLoading();
+    if (!res || !res.ok) return showToast((res && res.message) || "Gagal membuat pesanan Coin.", "error");
+
+    if (!Array.isArray(db.portfolios)) db.portfolios = [];
+    if (!db.portfolios.some(p => String(p.id) === String(orderDoc.id))) {
+        db.portfolios.unshift(orderDoc);
+        idbSet("db_snapshot", db);
+    }
+    if (typeof closeCabangCoinInfoModal === "function") closeCabangCoinInfoModal();
+    openUnifiedPayment("coin_topup", orderDoc.id);
+}
+
+async function startProUpgradeQrisOrder() {
+    const u = typeof getCurrentUserObj === "function" ? getCurrentUserObj() : null;
+    if (!u) {
+        if (typeof closeUpgradeProPromoModal === "function") closeUpgradeProPromoModal();
+        if (typeof openAuthModal === "function") openAuthModal();
+        return;
+    }
+    if (u.isPro) {
+        if (typeof closeUpgradeProPromoModal === "function") closeUpgradeProPromoModal();
+        return showToast("Akun Anda sudah berstatus PRO!", "info");
+    }
+    const proCfg = typeof getProUpgradeConfig === "function" ? getProUpgradeConfig() : { price: 49000, bonusCoins: 5 };
+    const newId = Date.now();
+    const uniqueCode = getDeterministicUniqueCode(newId);
+    const orderDoc = {
+        id: newId,
+        createdAt: newId,
+        owner: currentSessionUser,
+        docType: "pro_upgrade",
+        themeId: "pro_membership",
+        themeName: `Akun PRO + Bonus ${proCfg.bonusCoins} Coin`,
+        title: `Upgrade Akun PRO (+${proCfg.bonusCoins} Bonus Coin)`,
+        coinAmount: Number(proCfg.bonusCoins || 0),
+        price: Number(proCfg.price || 49000),
+        origPrice: 0,
+        uniqueCode,
+        totalPay: Number(proCfg.price || 49000) + uniqueCode,
+        status: "Menunggu Pembayaran",
+        paymentProof: "",
+        fullName: u.name || u.username
+    };
+
+    showLoading("Menyiapkan QRIS Upgrade PRO...");
+    const res = await apiAction({ action: "upsert_portfolio", portfolio: orderDoc });
+    hideLoading();
+    if (!res || !res.ok) return showToast((res && res.message) || "Gagal membuat pesanan Upgrade PRO.", "error");
+
+    if (!Array.isArray(db.portfolios)) db.portfolios = [];
+    if (!db.portfolios.some(p => String(p.id) === String(orderDoc.id))) {
+        db.portfolios.unshift(orderDoc);
+        idbSet("db_snapshot", db);
+    }
+    if (typeof closeUpgradeProPromoModal === "function") closeUpgradeProPromoModal();
+    openUnifiedPayment("pro_upgrade", orderDoc.id);
 }

@@ -10,7 +10,8 @@ let _soloProjectSearch = "";
 let _soloProjectTypeFilter = "all";
 let _soloProjectDomainFilter = "all"; // 'all' | 'lembarku' | 'gowes'
 let _masterAnalyticsDomain = "lembarku"; // 'lembarku' | 'gowes'
-let _masterContentMediaTab = "banners"; // 'banners' | 'media'
+let _masterContentMediaTab = "banners";
+let _masterWsSubPage = ""; // Drill-down sub-sheet per workspace
 let _publicProjectsCache = {};
 let _adminStockAudio = null;
 let _adminStockPlayingUrl = "";
@@ -205,28 +206,21 @@ function openMasterWorkspace(name, fromNav = false) {
     if (name === "users_cabang" && curU) return openSoloFollowersModal(curU.username);
 
     let resolvedWs = name || "overview";
+    let initSub = "";
     if (resolvedWs === "home_editor") {
         resolvedWs = "content_media";
-        _masterContentMediaTab = "banners";
+        initSub = "banners";
     } else if (resolvedWs === "media") {
         resolvedWs = "content_media";
-        _masterContentMediaTab = "media";
+        initSub = "songs";
     }
     currentMasterWorkspace = resolvedWs;
+    _masterWsSubPage = initSub;
+    if (resolvedWs === "gowes_fleet" && typeof resetGowesFleetDrillDown === "function") {
+        resetGowesFleetDrillDown();
+    }
     pbTempUploadedImg = "";
     stopAdminStockSongPreview();
-
-    const meta = {
-        overview: { title: "Grafik & Analitik Ekosistem", sub: "Omzet berkas Lembarku, rental Titik Gowes & data PWA" },
-        themes: { title: "Kelola Tema & Harga", sub: "Foto template, nama contoh & harga CV/Lamaran" },
-        content_media: { title: "Konten & Media Beranda", sub: "Banner promosi 12:4.4, stok musik & testimoni pelanggan" },
-        gowes_fleet: { title: "Kelola Gerai & Armada Gowes", sub: "Atur cabang, sepeda tiap gerai & banner promosi 16:7" }
-    };
-    const info = meta[currentMasterWorkspace] || { title: "Panel Founder", sub: "Pengaturan Mandiri Lembarku" };
-    const tEl = document.getElementById("master-active-panel-title");
-    const sEl = document.getElementById("master-active-panel-sub");
-    if (tEl) tEl.innerText = info.title;
-    if (sEl) sEl.innerText = info.sub;
 
     renderMasterWorkspaceContent();
     const modal = document.getElementById("modal-master-workspace");
@@ -240,8 +234,34 @@ function openMasterWorkspace(name, fromNav = false) {
     }
 }
 
+function openMasterWsSubPage(subKey) {
+    stopAdminStockSongPreview();
+    _masterWsSubPage = String(subKey || "");
+    renderMasterWorkspaceContent();
+    const sc = document.querySelector("#modal-master-workspace .lbk-fs-scroll");
+    if (sc) sc.scrollTop = 0;
+}
+
+function handleMasterWorkspaceBackBtn() {
+    if (currentMasterWorkspace === "gowes_fleet" && typeof handleGowesFleetStepBack === "function") {
+        if (handleGowesFleetStepBack()) return true;
+    }
+    if (_masterWsSubPage) {
+        stopAdminStockSongPreview();
+        _masterWsSubPage = "";
+        renderMasterWorkspaceContent();
+        const sc = document.querySelector("#modal-master-workspace .lbk-fs-scroll");
+        if (sc) sc.scrollTop = 0;
+        return true;
+    }
+    closeMasterWorkspaceFullscreen();
+    return false;
+}
+
 function closeMasterWorkspaceFullscreen(fromNav = false) {
     stopAdminStockSongPreview();
+    _masterWsSubPage = "";
+    if (typeof resetGowesFleetDrillDown === "function") resetGowesFleetDrillDown();
     document.getElementById("modal-master-workspace")?.classList.add("hide");
     if (!fromNav && Array.isArray(window._mrNavStack) && window._mrNavStack.length > 1) {
         const top = window._mrNavStack[window._mrNavStack.length - 1];
@@ -251,13 +271,13 @@ function closeMasterWorkspaceFullscreen(fromNav = false) {
 
 function switchMasterAnalyticsDomain(domain) {
     _masterAnalyticsDomain = domain || "lembarku";
-    renderMasterWorkspaceContent();
+    openMasterWsSubPage(_masterAnalyticsDomain);
 }
 
 function switchMasterContentMediaTab(tab) {
     stopAdminStockSongPreview();
-    _masterContentMediaTab = (tab === "media") ? "media" : "banners";
-    renderMasterWorkspaceContent();
+    _masterContentMediaTab = tab || "banners";
+    openMasterWsSubPage(tab === "media" ? "songs" : tab);
 }
 
 function buildMasterAnalyticsHtml() {
@@ -266,12 +286,15 @@ function buildMasterAnalyticsHtml() {
     const users = (db.users || []).filter(u => u.role !== "master");
 
     const invActive = invs.filter(i => i.status === "Aktif");
-    const cvActive = pfs.filter(p => p.status === "Aktif" && p.docType !== "lamaran");
-    const lamActive = pfs.filter(p => p.status === "Aktif" && p.docType === "lamaran");
+    const realPfs = pfs.filter(p => typeof isSystemCoinOrder !== "function" || !isSystemCoinOrder(p));
+    const coinOrdersActive = pfs.filter(p => typeof isSystemCoinOrder === "function" && isSystemCoinOrder(p) && p.status === "Aktif");
+    const cvActive = realPfs.filter(p => p.status === "Aktif" && p.docType !== "lamaran");
+    const lamActive = realPfs.filter(p => p.status === "Aktif" && p.docType === "lamaran");
 
     const revInv = invActive.reduce((s, i) => s + Number(i.price || 99000), 0);
     const revPf = [...cvActive, ...lamActive].reduce((s, p) => s + Number(p.price || 20000), 0);
-    const totalRev = revInv + revPf;
+    const revCoinPro = coinOrdersActive.reduce((s, p) => s + Number(p.price || 0), 0);
+    const totalRev = revInv + revPf + revCoinPro;
 
     const now = new Date();
     const months = [];
@@ -298,7 +321,7 @@ function buildMasterAnalyticsHtml() {
     });
     const maxOrders = Math.max(1, ...months.map(m => m.orders));
 
-    const cInv = invs.length, cCv = pfs.filter(p => p.docType !== "lamaran").length, cLam = pfs.filter(p => p.docType === "lamaran").length;
+    const cInv = invs.length, cCv = realPfs.filter(p => p.docType !== "lamaran").length, cLam = realPfs.filter(p => p.docType === "lamaran").length;
     const totalProd = Math.max(1, cInv + cCv + cLam);
     const circ = 2 * Math.PI * 38;
     const dInv = (cInv / totalProd) * circ;
@@ -502,6 +525,30 @@ function buildFullOrderCardHtml(item, options = {}) {
     const closeModalBeforeAction = !!options.closeModalBeforeAction;
     const preCloseJs = closeModalBeforeAction ? "closeSoloStatsModal();closeUserProfileModalCustom();" : "";
 
+    if (typeof isSystemCoinOrder === "function" && isSystemCoinOrder(item)) {
+        const isProUp = item.docType === "pro_upgrade";
+        const isDone = item.status === "Aktif";
+        const priceInfo = item.totalPay ? `${fmtRp(item.totalPay)} (kode unik)` : fmtRp(item.price || 0);
+        return `<div class="app-card border rounded-2xl p-4 flex flex-col md:flex-row md:items-center justify-between gap-3 shadow-sm border-l-4 ${isProUp ? "border-l-blue-500" : "border-l-amber-500"}">
+            <div class="min-w-0 space-y-0.5">
+                <div class="flex flex-wrap items-center gap-1.5">
+                    <span class="text-[9px] px-2 py-0.5 rounded-full ${isProUp ? "bg-blue-600 text-white" : "bg-amber-400 text-black"} font-extrabold uppercase">${isProUp ? "UPGRADE AKUN PRO" : "TOP-UP COIN"}</span>
+                    <span class="text-[10px] px-2 py-0.5 rounded-full font-bold ${isDone ? "bg-emerald-500/20 text-emerald-600" : "bg-amber-500/20 app-accent"}">● ${escHtml(item.status)}</span>
+                </div>
+                <h4 class="font-bold text-sm mt-1 truncate">${escHtml(item.title)} <span class="text-xs app-muted font-normal">(@${escHtml(item.owner)})</span></h4>
+                <p class="text-xs app-muted">Nominal: <strong class="app-accent">${priceInfo}</strong> • Coin Diterima: <strong class="text-amber-600">+${Number(item.coinAmount || 0)} Coin</strong></p>
+            </div>
+            <div class="flex flex-wrap gap-1.5">
+                ${item.owner ? `<button type="button" onclick="${preCloseJs}openFullChatOverlay('${esc(item.owner)}')" class="px-3 py-1.5 rounded-xl bg-emerald-600/15 border border-emerald-500/40 text-emerald-600 text-xs font-bold"><i class="fa-solid fa-comments mr-1"></i>Chat</button>` : ""}
+                ${item.paymentProof ? `<button type="button" onclick="viewOrderProof('pf',${item.id})" class="px-3 py-1.5 rounded-xl bg-blue-600/15 border border-blue-500/40 text-blue-600 text-xs font-bold">Bukti / SS</button>` : ""}
+                ${!isDone
+                    ? `<button type="button" onclick="approveCoinOrProOrder(${item.id},this)" class="gold-pill-btn px-4 py-1.5 rounded-xl text-xs">✓ ${isProUp ? "ACC PRO & Coin" : "ACC & Tambah Coin"}</button>`
+                    : `<span class="px-3 py-1.5 rounded-xl bg-emerald-500/15 text-emerald-600 text-xs font-extrabold">✓ Selesai</span>`}
+                ${!isStaffMode ? `<button type="button" onclick="deleteOrderItem('pf',${item.id})" class="px-2.5 py-1.5 rounded-xl bg-red-600/15 text-red-500 text-xs"><i class="fa-solid fa-trash"></i></button>` : ""}
+            </div>
+        </div>`;
+    }
+
     const isPf = item._kind === "pf";
     const hasRev = !!item.pendingRevision;
     const typeTag = isPf ? (item.docType === "lamaran" ? "SURAT LAMARAN" : "CV") : `UNDANGAN • ${escHtml(item.category)}`;
@@ -639,6 +686,52 @@ async function setOrderStatus(kind, id, status, btn) {
     refreshAfterAdminOrderAction(`Status berkas diperbarui: ${status}`);
 }
 
+async function approveCoinOrProOrder(orderId, btn) {
+    const order = (db.portfolios || []).find(p => String(p.id) === String(orderId));
+    if (!order) return showToast("Data pesanan tidak ditemukan.", "error");
+    const isProUp = order.docType === "pro_upgrade";
+    const coinsToAdd = Math.max(0, Math.round(Number(order.coinAmount || 0)));
+    const buyerKey = _normAdminUserKey(order.owner);
+    const buyer = (db.users || []).find(u => _normAdminUserKey(u.username) === buyerKey);
+    if (!buyer) return showToast(`Akun pembeli @${order.owner} tidak ditemukan.`, "error");
+
+    const confirmMsg = isProUp
+        ? `Setujui Upgrade PRO untuk @${buyer.username}? Akun akan mendapat Centang Biru PRO dan +${coinsToAdd} Bonus Coin otomatis.`
+        : `Setujui Top-Up +${coinsToAdd} Coin untuk @${buyer.username}? Saldo Coin langsung bertambah otomatis.`;
+    if (!(await showConfirm(isProUp ? "ACC Upgrade PRO" : "ACC Top-Up Coin", confirmMsg, "fa-solid fa-coins", "Ya, Setujui"))) return;
+
+    setBtnLoading(btn, true, "Memproses...");
+    const nextQuota = Number(buyer.quota || 0) + coinsToAdd;
+    const updatedBuyer = Object.assign({}, buyer, {
+        quota: nextQuota,
+        isPro: isProUp ? true : !!buyer.isPro
+    });
+    if (typeof recordCoinMutation === "function" && coinsToAdd > 0) {
+        recordCoinMutation(
+            updatedBuyer,
+            coinsToAdd,
+            isProUp ? "Bonus Coin Upgrade PRO" : `Top-Up QRIS: ${order.themeName || order.title}`,
+            `Disetujui oleh Founder`,
+            nextQuota
+        );
+    }
+
+    await apiAction({ action: "upsert_user", oldUsername: buyer.username, user: updatedBuyer });
+    if (typeof ensureUserInLocalDb === "function") ensureUserInLocalDb(updatedBuyer);
+
+    await apiAction({
+        action: "upsert_portfolio",
+        portfolio: Object.assign({}, order, { status: "Aktif", approvedAt: Date.now() }),
+        adminActionLog: isProUp
+            ? `ACC Upgrade PRO +${coinsToAdd} Coin untuk @${buyer.username}`
+            : `ACC Top-Up +${coinsToAdd} Coin untuk @${buyer.username}`
+    });
+    setBtnLoading(btn, false);
+    refreshAfterAdminOrderAction(isProUp
+        ? `@${buyer.username} resmi PRO +${coinsToAdd} Coin!`
+        : `+${coinsToAdd} Coin ditambahkan ke @${buyer.username}!`);
+}
+
 async function approveOrderRevision(kind, id, btn) {
     if (!(await showConfirm("Setujui Revisi", "Versi lama otomatis digantikan versi revisi terbaru. Lanjutkan?", "fa-solid fa-check-double", "Ya, Setujui"))) return;
     setBtnLoading(btn, true, "...");
@@ -726,106 +819,249 @@ function renderMasterThemesGridOnly() {
 
 function renderMasterWorkspaceContent() {
     const box = document.getElementById("master-workspace-body"); if (!box) return;
+    const titleEl = document.getElementById("master-active-panel-title");
+    const subEl = document.getElementById("master-active-panel-sub");
 
+    // 1. GRAFIK & ANALITIK BISNIS (DRILL-DOWN 2 LEMBAR)
     if (currentMasterWorkspace === "overview") {
-        box.innerHTML = `
-            <div class="space-y-4">
-                <div class="flex gap-2 border-b gold-border pb-3 overflow-x-auto no-scrollbar">
-                    <button type="button" onclick="switchMasterAnalyticsDomain('lembarku')" class="px-4 py-2 rounded-2xl text-xs font-extrabold whitespace-nowrap transition ${_masterAnalyticsDomain === 'lembarku' ? 'gold-pill-btn shadow' : 'app-btn-sec'}">
-                        <i class="fa-solid fa-file-pdf mr-1.5"></i>Analitik Bisnis Lembarku
+        if (!_masterWsSubPage) {
+            if (titleEl) titleEl.innerText = "Grafik & Analitik Bisnis";
+            if (subEl) subEl.innerText = "Pilih unit bisnis untuk melihat laporan lengkap";
+            box.innerHTML = `
+                <div class="max-w-2xl mx-auto space-y-2.5">
+                    <p class="text-xs app-muted px-1">Pilih laporan analitik yang ingin dibuka:</p>
+                    <button type="button" onclick="openMasterWsSubPage('lembarku')" class="menu-row-card">
+                        <span class="menu-row-ic"><i class="fa-solid fa-file-pdf"></i></span>
+                        <div class="flex-1 min-w-0">
+                            <strong class="text-xs sm:text-sm block">Analitik Bisnis Lembarku &amp; PWA</strong>
+                            <span class="text-[10.5px] app-muted block">Omzet undangan, CV/Lamaran, Top-Up Coin &amp; statistik install aplikasi</span>
+                        </div>
+                        <i class="fa-solid fa-chevron-right text-[10px] app-muted shrink-0"></i>
                     </button>
-                    <button type="button" onclick="switchMasterAnalyticsDomain('gowes')" class="px-4 py-2 rounded-2xl text-xs font-extrabold whitespace-nowrap transition ${_masterAnalyticsDomain === 'gowes' ? 'gowes-pill-btn shadow' : 'app-btn-sec'}">
-                        <i class="fa-solid fa-bicycle mr-1.5"></i>Analitik Titik Gowes
+                    <button type="button" onclick="openMasterWsSubPage('gowes')" class="menu-row-card">
+                        <span class="menu-row-ic !bg-emerald-500/15 !text-emerald-600"><i class="fa-solid fa-bicycle"></i></span>
+                        <div class="flex-1 min-w-0">
+                            <strong class="text-xs sm:text-sm block">Analitik Rental Titik Gowes</strong>
+                            <span class="text-[10.5px] app-muted block">Omzet rental (Cash &amp; QRIS), okupansi armada &amp; tren sewa bulanan</span>
+                        </div>
+                        <i class="fa-solid fa-chevron-right text-[10px] app-muted shrink-0"></i>
                     </button>
                 </div>
-                <div id="master-analytics-subcontent">
-                    ${_masterAnalyticsDomain === 'gowes' && typeof buildGowesAnalyticsDashboardHtml === 'function'
-                        ? buildGowesAnalyticsDashboardHtml()
-                        : buildMasterAnalyticsHtml()}
-                </div>
-            </div>
-        `;
+            `;
+            return;
+        }
+        if (_masterWsSubPage === "gowes") {
+            if (titleEl) titleEl.innerText = "Analitik Titik Gowes";
+            if (subEl) subEl.innerText = "Omzet sewa sepeda, okupansi & unit terlaris";
+            box.innerHTML = typeof buildGowesAnalyticsDashboardHtml === "function" ? buildGowesAnalyticsDashboardHtml() : buildMasterAnalyticsHtml();
+            return;
+        }
+        if (titleEl) titleEl.innerText = "Analitik Lembarku & PWA";
+        if (subEl) subEl.innerText = "Omzet digital, tren pesanan & retensi aplikasi";
+        box.innerHTML = buildMasterAnalyticsHtml();
         return;
     }
 
+    // 2. KELOLA GERAI & ARMADA GOWES (DRILL-DOWN DARI js/gowes-admin.js)
     if (currentMasterWorkspace === "gowes_fleet") {
         if (typeof renderGowesFleetWorkspaceHtml === "function") {
             box.innerHTML = renderGowesFleetWorkspaceHtml();
-        } else {
-            box.innerHTML = `
-                <div class="space-y-4">
-                    <div class="flex flex-wrap items-center justify-between gap-3">
-                        <div>
-                            <h4 class="text-sm font-extrabold text-emerald-600"><i class="fa-solid fa-bicycle mr-1.5"></i>Manajemen Armada Sepeda</h4>
-                            <p class="text-[11px] app-muted">Atur unit sepeda sewaan, tarif paket, dan ketersediaan garasi.</p>
-                        </div>
-                        <button type="button" onclick="if(typeof openMasterGowesBikeModal==='function')openMasterGowesBikeModal()" class="gowes-pill-btn px-4 py-2 rounded-xl text-xs shadow">
-                            <i class="fa-solid fa-plus mr-1"></i>Tambah Unit Sepeda
-                        </button>
-                    </div>
-                    <div class="space-y-3">
-                        ${typeof renderGowesBikesAdminList === 'function' ? renderGowesBikesAdminList() : '<p class="text-xs app-muted">Modul armada tidak termuat. Pastikan file js/gowes-admin.js ada.</p>'}
-                    </div>
-                </div>
-            `;
         }
         return;
     }
 
+    // 3. KELOLA TEMA, HARGA, COIN & VOUCHER (DRILL-DOWN 4 LEMBAR TERPISAH)
     if (currentMasterWorkspace === "themes") {
-        const cats = [...Object.keys(THEME_CATALOG), "CV & Lamaran", "Paket Coin"];
-        if (masterThemeCatFilter === "Paket Coin") {
+        if (!_masterWsSubPage) {
+            if (titleEl) titleEl.innerText = "Kelola Tema, Harga & Promo";
+            if (subEl) subEl.innerText = "Pilih kategori pengaturan di bawah ini";
+            const vCount = (typeof getVouchersList === "function" ? getVouchersList() : []).length;
+            const pCount = (typeof getCoinPackagesList === "function" ? getCoinPackagesList() : []).length;
+            box.innerHTML = `
+                <div class="max-w-2xl mx-auto space-y-2.5">
+                    <p class="text-xs app-muted px-1">Setiap pengaturan terbuka di lembarnya sendiri agar rapi dan fokus:</p>
+                    <button type="button" onclick="openMasterWsSubPage('inv_themes')" class="menu-row-card">
+                        <span class="menu-row-ic"><i class="fa-solid fa-envelope-open-text"></i></span>
+                        <div class="flex-1 min-w-0">
+                            <strong class="text-xs sm:text-sm block">Tema Undangan Digital</strong>
+                            <span class="text-[10.5px] app-muted block">Foto template, nama contoh, harga eceran &amp; tarif Coin per tema</span>
+                        </div>
+                        <i class="fa-solid fa-chevron-right text-[10px] app-muted shrink-0"></i>
+                    </button>
+                    <button type="button" onclick="openMasterWsSubPage('pf_themes')" class="menu-row-card">
+                        <span class="menu-row-ic !bg-emerald-500/15 !text-emerald-600"><i class="fa-solid fa-id-card"></i></span>
+                        <div class="flex-1 min-w-0">
+                            <strong class="text-xs sm:text-sm block">Desain CV &amp; Surat Lamaran</strong>
+                            <span class="text-[10.5px] app-muted block">Atur harga coret, harga jual &amp; tarif Coin untuk 12 desain</span>
+                        </div>
+                        <i class="fa-solid fa-chevron-right text-[10px] app-muted shrink-0"></i>
+                    </button>
+                    <button type="button" onclick="openMasterWsSubPage('coin_pro')" class="menu-row-card">
+                        <span class="menu-row-ic !bg-amber-500/15 !text-amber-600"><i class="fa-solid fa-coins"></i></span>
+                        <div class="flex-1 min-w-0">
+                            <strong class="text-xs sm:text-sm block">Pricelist Coin &amp; Harga Upgrade PRO</strong>
+                            <span class="text-[10.5px] app-muted block">${pCount} paket isi ulang Coin &amp; biaya/bonus Upgrade PRO</span>
+                        </div>
+                        <i class="fa-solid fa-chevron-right text-[10px] app-muted shrink-0"></i>
+                    </button>
+                    <button type="button" onclick="openMasterWsSubPage('vouchers')" class="menu-row-card">
+                        <span class="menu-row-ic !bg-purple-500/15 !text-purple-600"><i class="fa-solid fa-ticket"></i></span>
+                        <div class="flex-1 min-w-0">
+                            <strong class="text-xs sm:text-sm block">Kode Voucher &amp; Diskon Musiman</strong>
+                            <span class="text-[10.5px] app-muted block">${vCount} kode kupon promo untuk pelanggan umum &amp; Titik Gowes</span>
+                        </div>
+                        <i class="fa-solid fa-chevron-right text-[10px] app-muted shrink-0"></i>
+                    </button>
+                </div>
+            `;
+            return;
+        }
+
+        // LEMBAR ANAK 3A: PRICELIST COIN & UPGRADE PRO
+        if (_masterWsSubPage === "coin_pro") {
+            if (titleEl) titleEl.innerText = "Pricelist Coin & Upgrade PRO";
+            if (subEl) subEl.innerText = "Atur harga paket Coin, bonus & biaya Upgrade PRO";
             const pkgs = typeof getCoinPackagesList === "function" ? getCoinPackagesList() : [];
+            const proCfg = typeof getProUpgradeConfig === "function" ? getProUpgradeConfig() : { price: 49000, bonusCoins: 5 };
             box.innerHTML = `<div class="space-y-4">
-                <div class="flex flex-wrap gap-1.5">${cats.map(c => `<button type="button" onclick="masterThemeCatFilter='${c}';renderMasterWorkspaceContent();" class="px-3 py-1.5 rounded-xl text-[11px] font-bold ${masterThemeCatFilter===c?"gold-pill-btn":"app-btn-sec"}">${c}</button>`).join("")}</div>
+                <div class="app-card border rounded-3xl p-4 sm:p-5 space-y-3 shadow-sm">
+                    <div class="flex items-center gap-2.5 border-b gold-border pb-2.5">
+                        <span class="w-9 h-9 rounded-2xl bg-blue-600/15 text-blue-600 flex items-center justify-center text-base shrink-0"><i class="fa-solid fa-circle-check"></i></span>
+                        <div>
+                            <h4 class="font-extrabold text-sm">Pengaturan Upgrade Akun PRO (User Biasa)</h4>
+                            <p class="text-[10.5px] app-muted">Biaya sekali bayar &amp; Bonus Coin Perdana saat user biasa upgrade ke PRO.</p>
+                        </div>
+                    </div>
+                    <div class="grid sm:grid-cols-2 gap-3">
+                        <div>
+                            <label class="app-label">Harga Upgrade PRO (Rp)</label>
+                            <input type="number" id="mpro-price" value="${proCfg.price}" step="1000" min="1000" class="app-input font-extrabold">
+                        </div>
+                        <div>
+                            <label class="app-label text-amber-600">Bonus Coin Perdana (Coin)</label>
+                            <input type="number" id="mpro-bonus-coins" value="${proCfg.bonusCoins}" step="1" min="0" class="app-input font-extrabold text-amber-600">
+                        </div>
+                    </div>
+                </div>
+
                 <div class="app-card border rounded-3xl p-4 sm:p-5 space-y-3 shadow-sm">
                     <div class="flex flex-wrap items-center justify-between gap-2 border-b gold-border pb-2.5">
                         <div class="flex items-center gap-2.5">
                             ${typeof buildGoldLembarkuCoinHtml === "function" ? buildGoldLembarkuCoinHtml("md") : ""}
                             <div>
-                                <h4 class="font-extrabold text-sm">Pricelist Paket Top-Up Coin Cabang</h4>
-                                <p class="text-[10.5px] app-muted">Atur harga paket, jumlah Coin dasar, dan Bonus Coin. Langsung tampil di info Coin Admin Cabang.</p>
+                                <h4 class="font-extrabold text-sm">Pricelist Paket Isi Ulang Coin</h4>
+                                <p class="text-[10.5px] app-muted">Ubah harga, Coin dasar, bonus, atau tambah paket baru sesuai kebutuhan.</p>
                             </div>
                         </div>
+                        <button type="button" onclick="addMasterCoinPackageRow()" class="px-3 py-1.5 rounded-xl app-card-soft border app-accent text-xs font-bold"><i class="fa-solid fa-plus mr-1"></i>Tambah Paket</button>
                     </div>
-                    <div class="grid sm:grid-cols-2 gap-3">
-                        ${pkgs.map((pk, idx) => {
-                            const totalC = pk.paidCoins + pk.bonusCoins;
-                            const eff = Math.round(pk.price / Math.max(1, totalC));
-                            return `
-                                <div class="app-card-soft border rounded-2xl p-3.5 space-y-2.5 coin-pkg-row" data-pkg-id="${esc(pk.id)}">
-                                    <div class="flex items-center justify-between gap-2">
-                                        <span class="text-[10px] font-extrabold uppercase text-amber-600">Paket #${idx + 1}</span>
-                                        <span class="text-[10px] app-muted font-bold">Total: ${totalC} Coin (${fmtRp(eff)}/Coin)</span>
-                                    </div>
-                                    <div class="grid grid-cols-2 gap-2">
-                                        <div><label class="text-[10px] app-muted block">Nama Paket</label><input type="text" value="${esc(pk.name)}" class="cpk-name app-input !py-1.5 text-xs font-bold"></div>
-                                        <div><label class="text-[10px] app-muted block">Label (Opsional)</label><input type="text" value="${esc(pk.badge || "")}" placeholder="TERLARIS" class="cpk-badge app-input !py-1.5 text-xs"></div>
-                                    </div>
-                                    <div class="grid grid-cols-3 gap-2">
-                                        <div><label class="text-[10px] app-muted block">Harga (Rp)</label><input type="number" value="${pk.price}" step="10000" min="1000" class="cpk-price app-input !py-1.5 text-xs font-bold"></div>
-                                        <div><label class="text-[10px] app-muted block">Coin Dasar</label><input type="number" value="${pk.paidCoins}" min="1" class="cpk-paid app-input !py-1.5 text-xs font-bold text-amber-600"></div>
-                                        <div><label class="text-[10px] app-muted block">Bonus Coin</label><input type="number" value="${pk.bonusCoins}" min="0" class="cpk-bonus app-input !py-1.5 text-xs font-bold text-emerald-600"></div>
-                                    </div>
-                                </div>
-                            `;
-                        }).join("")}
+                    <div id="master-coin-pkgs-grid" class="grid sm:grid-cols-2 gap-3">
+                        ${pkgs.map((pk, idx) => _buildMasterCoinPkgRowHtml(pk, idx)).join("")}
                     </div>
                     <div class="flex justify-end pt-1">
-                        <button type="button" id="btn-save-coin-pkgs" onclick="saveMasterCoinPackages(this)" class="gold-pill-btn px-6 py-2.5 rounded-xl text-xs uppercase shadow">Simpan Pricelist Coin</button>
+                        <button type="button" id="btn-save-coin-pkgs" onclick="saveMasterCoinPackages(this)" class="gold-pill-btn px-6 py-2.5 rounded-xl text-xs uppercase shadow">Simpan Pricelist Coin &amp; PRO</button>
                     </div>
                 </div>
             </div>`;
             return;
         }
-        if (masterThemeCatFilter === "CV & Lamaran") {
+
+        // LEMBAR ANAK 3B: KODE VOUCHER PROMO
+        if (_masterWsSubPage === "vouchers") {
+            if (titleEl) titleEl.innerText = "Kode Voucher & Diskon";
+            if (subEl) subEl.innerText = "Kelola kupon promo musiman untuk pelanggan umum";
+            const vouchers = typeof getVouchersList === "function" ? getVouchersList() : [];
+            const scopeLabels = { all: "Semua Layanan", inv: "Undangan Digital", pf: "CV & Lamaran", gowes: "Titik Gowes" };
+            box.innerHTML = `<div class="grid md:grid-cols-2 gap-5">
+                <form onsubmit="savePromoVoucherForm(event)" class="app-card border rounded-3xl p-4 sm:p-5 space-y-3 shadow-sm h-fit">
+                    <div class="flex items-center justify-between border-b gold-border pb-2">
+                        <h4 class="font-extrabold text-sm app-accent"><i class="fa-solid fa-ticket mr-1.5"></i>Buat / Edit Kode Voucher</h4>
+                        <button type="button" onclick="resetPromoVoucherForm()" class="text-[11px] app-muted hover:underline">Reset</button>
+                    </div>
+                    <input type="hidden" id="vch-id">
+                    <div class="grid grid-cols-2 gap-2.5">
+                        <div>
+                            <label class="app-label">Kode Kupon</label>
+                            <input type="text" id="vch-code" placeholder="NIKAH2027" class="app-input uppercase font-extrabold" required>
+                        </div>
+                        <div>
+                            <label class="app-label">Berlaku Untuk</label>
+                            <select id="vch-scope" class="app-input font-bold">
+                                <option value="all">Semua Layanan</option>
+                                <option value="inv">Undangan Digital</option>
+                                <option value="pf">CV &amp; Surat Lamaran</option>
+                                <option value="gowes">Titik Gowes</option>
+                            </select>
+                        </div>
+                    </div>
+                    <div class="grid grid-cols-2 gap-2.5">
+                        <div>
+                            <label class="app-label">Jenis Potongan</label>
+                            <select id="vch-type" class="app-input font-bold">
+                                <option value="fixed">Potongan Rupiah (Rp)</option>
+                                <option value="percent">Persentase (%)</option>
+                            </select>
+                        </div>
+                        <div>
+                            <label class="app-label">Nilai Potongan</label>
+                            <input type="number" id="vch-value" value="15000" min="1" class="app-input font-extrabold" required>
+                        </div>
+                    </div>
+                    <div class="grid grid-cols-2 gap-2.5">
+                        <div>
+                            <label class="app-label">Kuota Pemakaian (0=Bebas)</label>
+                            <input type="number" id="vch-max-uses" value="50" min="0" class="app-input">
+                        </div>
+                        <div>
+                            <label class="app-label">Berlaku Sampai</label>
+                            <input type="date" id="vch-expires" value="2027-12-31" class="app-input">
+                        </div>
+                    </div>
+                    <div>
+                        <label class="app-label">Keterangan Promo (Opsional)</label>
+                        <input type="text" id="vch-label" placeholder="Misal: Promo Spesial Akhir Tahun" class="app-input">
+                    </div>
+                    <label class="flex items-center gap-2 text-xs font-bold cursor-pointer">
+                        <input type="checkbox" id="vch-active" checked class="w-4 h-4 accent-blue-600"> Voucher Aktif
+                    </label>
+                    <button type="submit" id="btn-save-vch" class="w-full gold-pill-btn py-2.5 rounded-xl text-xs uppercase shadow">Simpan Voucher</button>
+                </form>
+
+                <div class="space-y-2.5">
+                    <h4 class="font-bold text-xs app-accent uppercase">Daftar Voucher (${vouchers.length})</h4>
+                    ${vouchers.length ? vouchers.map((v, i) => `
+                        <div class="app-card border rounded-2xl p-3.5 shadow-sm space-y-2 ${v.active === false ? "opacity-60" : ""}">
+                            <div class="flex items-start justify-between gap-2">
+                                <div class="min-w-0">
+                                    <div class="flex items-center gap-1.5 flex-wrap">
+                                        <span class="px-2.5 py-0.5 rounded-lg bg-purple-600/15 text-purple-600 font-mono font-extrabold text-xs">${escHtml(v.code)}</span>
+                                        <span class="text-[9px] px-2 py-0.5 rounded-full font-bold ${v.active !== false ? "bg-emerald-500/15 text-emerald-600" : "bg-zinc-500/20 app-muted"}">${v.active !== false ? "AKTIF" : "NONAKTIF"}</span>
+                                    </div>
+                                    <p class="text-xs font-bold mt-1">${v.type === "percent" ? `Diskon ${v.value}%` : `Potongan ${fmtRp(v.value)}`} • ${escHtml(scopeLabels[v.scope] || "Semua")}</p>
+                                    <p class="text-[10px] app-muted">${escHtml(v.label || "Promo")} • s/d ${escHtml(v.expiresAt || "Selamanya")}${Number(v.maxUses || 0) > 0 ? ` • Kuota: ${v.usedCount || 0}/${v.maxUses}` : ""}</p>
+                                </div>
+                                <div class="flex items-center gap-1 shrink-0">
+                                    <button type="button" onclick="editPromoVoucherItem(${i})" class="px-2.5 py-1.5 rounded-lg app-btn-sec text-[10px] font-bold">Edit</button>
+                                    <button type="button" onclick="deletePromoVoucherItem(${i})" class="px-2 py-1.5 rounded-lg bg-red-600/15 text-red-500 text-[10px]"><i class="fa-solid fa-trash"></i></button>
+                                </div>
+                            </div>
+                        </div>
+                    `).join("") : '<p class="text-xs app-muted app-card border border-dashed rounded-2xl p-6 text-center">Belum ada kode voucher promo.</p>'}
+                </div>
+            </div>`;
+            return;
+        }
+
+        // LEMBAR ANAK 3C: DESAIN CV & SURAT LAMARAN
+        if (_masterWsSubPage === "pf_themes") {
+            if (titleEl) titleEl.innerText = "Desain CV & Surat Lamaran";
+            if (subEl) subEl.innerText = "Atur harga coret, harga jual & Coin Cabang";
             const allPf = [
                 ...PORTFOLIO_CATALOG.cv.map(x => Object.assign({}, getPortfolioThemeObj("cv", x.id), { _dt: "cv" })),
                 ...PORTFOLIO_CATALOG.lamaran.map(x => Object.assign({}, getPortfolioThemeObj("lamaran", x.id), { _dt: "lamaran" }))
             ];
             box.innerHTML = `<div class="space-y-4">
-                <div class="flex flex-wrap gap-1.5">${cats.map(c => `<button type="button" onclick="masterThemeCatFilter='${c}';renderMasterWorkspaceContent();" class="px-3 py-1.5 rounded-xl text-[11px] font-bold ${masterThemeCatFilter===c?"gold-pill-btn":"app-btn-sec"}">${c}</button>`).join("")}</div>
-                <p class="text-xs app-muted">Atur harga normal (coret), harga jual eceran, dan <strong>besaran Coin Cabang</strong> untuk tiap desain CV &amp; Surat Lamaran:</p>
+                <p class="text-xs app-muted">Atur harga normal (coret), harga jual eceran, dan <strong>besaran Coin</strong> untuk tiap desain CV &amp; Surat Lamaran:</p>
                 <div class="grid sm:grid-cols-2 lg:grid-cols-3 gap-3">${allPf.map(p => `
                     <div class="app-card border rounded-2xl p-3.5 space-y-2.5 shadow-sm">
                         <div class="flex items-center justify-between gap-2">
@@ -835,7 +1071,7 @@ function renderMasterWorkspaceContent() {
                         <div class="grid grid-cols-3 gap-2">
                             <div><label class="text-[10px] app-muted block">Harga Coret</label><input type="number" id="cvp-orig-${p.id}" value="${p.origPrice||35000}" step="1000" class="app-input !py-1.5 text-xs"></div>
                             <div><label class="text-[10px] app-muted block">Harga Jual</label><input type="number" id="cvp-sell-${p.id}" value="${p.price||20000}" step="1000" class="app-input !py-1.5 text-xs font-bold"></div>
-                            <div><label class="text-[10px] text-amber-600 font-bold block">Coin Cabang</label><input type="number" id="cvp-coin-${p.id}" value="${getPortfolioCoinCost(p._dt, p)}" min="1" step="1" class="app-input !py-1.5 text-xs font-extrabold text-amber-600"></div>
+                            <div><label class="text-[10px] text-amber-600 font-bold block">Coin</label><input type="number" id="cvp-coin-${p.id}" value="${getPortfolioCoinCost(p._dt, p)}" min="1" step="1" class="app-input !py-1.5 text-xs font-extrabold text-amber-600"></div>
                         </div>
                         <button type="button" onclick="saveCvThemePrice('${p.id}','${p._dt}',this)" class="w-full gold-pill-btn py-1.5 rounded-xl text-[11px]">Simpan Harga &amp; Coin</button>
                     </div>
@@ -844,14 +1080,19 @@ function renderMasterWorkspaceContent() {
             return;
         }
 
+        // LEMBAR ANAK 3D: TEMA UNDANGAN DIGITAL
+        if (titleEl) titleEl.innerText = "Tema Undangan Digital";
+        if (subEl) subEl.innerText = "Edit desain, foto template, harga & besaran Coin";
+        const invCats = Object.keys(THEME_CATALOG);
+        if (!invCats.includes(masterThemeCatFilter)) masterThemeCatFilter = invCats[0];
         box.innerHTML = `<div class="space-y-4">
             <div class="flex flex-wrap items-center justify-between gap-2.5">
-                <div class="flex flex-wrap gap-1.5">${cats.map(c => `<button type="button" onclick="masterThemeCatFilter='${c}';renderMasterWorkspaceContent();" class="px-3 py-1.5 rounded-xl text-[11px] font-bold ${masterThemeCatFilter===c?"gold-pill-btn":"app-btn-sec"}">${c}</button>`).join("")}</div>
+                <div class="flex flex-wrap gap-1.5">${invCats.map(c => `<button type="button" onclick="masterThemeCatFilter='${c}';renderMasterWorkspaceContent();" class="px-3 py-1.5 rounded-xl text-[11px] font-bold ${masterThemeCatFilter===c?"gold-pill-btn":"app-btn-sec"}">${c}</button>`).join("")}</div>
                 <button type="button" onclick="openThemeBuilderModal(null,null,false)" class="gold-pill-btn px-4 py-2 rounded-xl text-xs shadow"><i class="fa-solid fa-plus mr-1"></i>Buat Tema Baru</button>
             </div>
             <div class="flex flex-col sm:flex-row gap-2 items-center justify-between">
                 <input type="text" id="master-theme-search-inp" value="${esc(masterThemeSearch)}" oninput="masterThemeSearch=this.value;renderMasterThemesGridOnly();" placeholder="Cari nama tema..." class="app-input !py-2 sm:max-w-xs">
-                <span class="text-[11px] app-muted"><strong id="master-themes-count">0</strong> tema di ${escHtml(masterThemeCatFilter)} • Klik <strong>Edit</strong> untuk ganti foto template, nama contoh &amp; harga.</span>
+                <span class="text-[11px] app-muted"><strong id="master-themes-count">0</strong> tema di ${escHtml(masterThemeCatFilter)} • Klik <strong>Edit</strong> untuk atur foto, harga &amp; Coin.</span>
             </div>
             <div id="master-themes-grid" class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3.5"></div>
         </div>`;
@@ -859,25 +1100,51 @@ function renderMasterWorkspaceContent() {
         return;
     }
 
+    // 4. KONTEN & MEDIA BERANDA (DRILL-DOWN 3 LEMBAR TERPISAH)
     if (currentMasterWorkspace === "content_media" || currentMasterWorkspace === "home_editor" || currentMasterWorkspace === "media") {
         const banners = db.promoBanners || [];
-        const songsCount = (db.musicLibrary || []).length;
-        const testiCount = (db.testimonials || []).length;
-        const isMediaTab = _masterContentMediaTab === "media";
+        const songs = db.musicLibrary || [];
+        const testis = db.testimonials || [];
 
-        const subTabsHtml = `
-            <div class="flex gap-2 border-b gold-border pb-3 mb-4 overflow-x-auto no-scrollbar">
-                <button type="button" onclick="switchMasterContentMediaTab('banners')" class="px-4 py-2 rounded-2xl text-xs font-extrabold whitespace-nowrap transition ${!isMediaTab ? "gold-pill-btn shadow" : "app-btn-sec"}">
-                    <i class="fa-solid fa-rectangle-ad mr-1.5"></i>Banner Promosi 12:4.4 (${banners.length})
-                </button>
-                <button type="button" onclick="switchMasterContentMediaTab('media')" class="px-4 py-2 rounded-2xl text-xs font-extrabold whitespace-nowrap transition ${isMediaTab ? "gold-pill-btn shadow" : "app-btn-sec"}">
-                    <i class="fa-solid fa-music mr-1.5"></i>Stok Lagu &amp; Testimoni (${songsCount} Lagu • ${testiCount} Ulasan)
-                </button>
-            </div>
-        `;
+        if (!_masterWsSubPage) {
+            if (titleEl) titleEl.innerText = "Konten & Media Beranda";
+            if (subEl) subEl.innerText = "Pilih bagian konten beranda yang ingin diatur";
+            box.innerHTML = `
+                <div class="max-w-2xl mx-auto space-y-2.5">
+                    <p class="text-xs app-muted px-1">Pilih konten yang ingin dikelola pada lembar tersendiri:</p>
+                    <button type="button" onclick="openMasterWsSubPage('banners')" class="menu-row-card">
+                        <span class="menu-row-ic"><i class="fa-solid fa-rectangle-ad"></i></span>
+                        <div class="flex-1 min-w-0">
+                            <strong class="text-xs sm:text-sm block">Banner Promosi Beranda (12:4.4)</strong>
+                            <span class="text-[10.5px] app-muted block">${banners.length} slide banner promosi aktif</span>
+                        </div>
+                        <i class="fa-solid fa-chevron-right text-[10px] app-muted shrink-0"></i>
+                    </button>
+                    <button type="button" onclick="openMasterWsSubPage('songs')" class="menu-row-card">
+                        <span class="menu-row-ic !bg-emerald-500/15 !text-emerald-600"><i class="fa-solid fa-music"></i></span>
+                        <div class="flex-1 min-w-0">
+                            <strong class="text-xs sm:text-sm block">Stok Lagu Website</strong>
+                            <span class="text-[10.5px] app-muted block">${songs.length} lagu tersedia untuk backsound undangan</span>
+                        </div>
+                        <i class="fa-solid fa-chevron-right text-[10px] app-muted shrink-0"></i>
+                    </button>
+                    <button type="button" onclick="openMasterWsSubPage('testimonials')" class="menu-row-card">
+                        <span class="menu-row-ic !bg-amber-500/15 !text-amber-600"><i class="fa-solid fa-star"></i></span>
+                        <div class="flex-1 min-w-0">
+                            <strong class="text-xs sm:text-sm block">Testimoni Pelanggan Beranda</strong>
+                            <span class="text-[10.5px] app-muted block">${testis.length} ulasan tampil di slideshow beranda</span>
+                        </div>
+                        <i class="fa-solid fa-chevron-right text-[10px] app-muted shrink-0"></i>
+                    </button>
+                </div>
+            `;
+            return;
+        }
 
-        if (!isMediaTab) {
-            box.innerHTML = `${subTabsHtml}<div class="grid md:grid-cols-2 gap-6">
+        if (_masterWsSubPage === "banners") {
+            if (titleEl) titleEl.innerText = "Banner Promosi Beranda";
+            if (subEl) subEl.innerText = `${banners.length} slide banner rasio 12:4.4`;
+            box.innerHTML = `<div class="grid md:grid-cols-2 gap-6">
                 <form onsubmit="savePromoBannerForm(event)" class="app-card p-4 rounded-3xl border space-y-2.5 shadow-sm">
                     <div class="flex justify-between items-center">
                         <h4 class="font-bold text-sm app-accent">Edit Banner Promosi (Rasio 12 : 4.4 Full)</h4>
@@ -915,59 +1182,175 @@ function renderMasterWorkspaceContent() {
                     </div>`).join("")}
                 </div>
             </div>`;
-        } else {
-            box.innerHTML = `${subTabsHtml}<div class="grid md:grid-cols-2 gap-6">
-                <div class="space-y-4">
-                    <div class="app-card p-4 rounded-3xl border space-y-3 shadow-sm">
-                        <div class="flex items-center justify-between">
-                            <h4 class="font-bold text-sm app-accent"><i class="fa-solid fa-music mr-1.5"></i>Stok Lagu Website</h4>
-                            <span class="text-[10px] app-muted font-semibold">${songsCount} Lagu</span>
-                        </div>
-                        <label class="block gold-pill-btn py-3 px-4 rounded-2xl text-center cursor-pointer text-xs shadow-md">
-                            <i class="fa-solid fa-upload mr-1.5"></i>Upload File Musik dari Perangkat (MP3/WAV/M4A)
-                            <input type="file" accept="audio/*" class="hide" onchange="openAudioCropperFromInput(this,'library')">
-                        </label>
-                        <p class="text-[10px] app-muted leading-relaxed">Lagu dari perangkat Anda bisa langsung dipotong bagian terbaiknya (30–90 dtk), dikompresi otomatis ke MP3 ringan, dan tersimpan ke Google Drive Stok Lagu.</p>
-
-                        <form onsubmit="addStockSong(event)" class="pt-2.5 border-t gold-border space-y-2">
-                            <span class="text-[10px] font-bold uppercase app-muted block">Atau Tambah Manual via Link MP3:</span>
-                            <div class="grid grid-cols-2 gap-2">
-                                <input type="text" id="song-title" placeholder="Judul Lagu" class="app-input !py-2 text-xs" required>
-                                <input type="text" id="song-cat" placeholder="Kategori (Pernikahan)" class="app-input !py-2 text-xs" required>
-                            </div>
-                            <input type="url" id="song-url" placeholder="Link MP3 (https://.../lagu.mp3)" class="app-input !py-2 text-xs" required>
-                            <button id="btn-add-song" class="w-full app-btn-sec py-2 rounded-xl text-xs font-bold">+ Tambah dari Link</button>
-                        </form>
-                    </div>
-
-                    <div class="space-y-2 max-h-72 overflow-y-auto">${(db.musicLibrary || []).map((m, i) => `
-                        <div class="app-card border rounded-2xl p-3 flex justify-between items-center gap-2 text-xs shadow-sm">
-                            <button type="button" data-stock-play-btn="${i}" onclick="toggleAdminStockSongPreview(${i},this)" class="w-8 h-8 rounded-full app-accent-bg border gold-border app-accent flex items-center justify-center shrink-0 text-[11px]" title="Putar Preview">
-                                <i class="fa-solid fa-play"></i>
-                            </button>
-                            <div class="flex-1 min-w-0">
-                                <strong class="block truncate">${escHtml(m.title)}</strong>
-                                <span class="block text-[10px] app-accent truncate">${escHtml(m.category)}</span>
-                            </div>
-                            <button type="button" onclick="delStockSong(${i})" class="w-8 h-8 rounded-xl bg-red-600/12 text-red-500 flex items-center justify-center shrink-0" title="Hapus Lagu"><i class="fa-solid fa-trash"></i></button>
-                        </div>
-                    `).join("") || '<p class="text-xs app-muted text-center py-4">Belum ada stok lagu.</p>'}</div>
-                </div>
-
-                <div class="space-y-4">
-                    <form onsubmit="addTestimonial(event)" class="app-card p-4 rounded-3xl border space-y-2.5 shadow-sm">
-                        <h4 class="font-bold text-sm app-accent"><i class="fa-solid fa-star mr-1.5"></i>Tambah Testimoni Beranda</h4>
-                        <input type="text" id="t-name" placeholder="Nama Pelanggan" class="app-input" required>
-                        <input type="text" id="t-cat" placeholder="Kategori (Undangan / CV & Lamaran / Titik Gowes)" class="app-input" required>
-                        <textarea id="t-text" placeholder="Isi testimoni..." class="app-input h-20" required></textarea>
-                        <button id="btn-add-testi" class="w-full gold-pill-btn py-2.5 rounded-xl text-xs">+ Tampilkan di Slideshow</button>
-                    </form>
-                    <div class="space-y-2 max-h-72 overflow-y-auto">${(db.testimonials || []).map((t, i) => `<div class="app-card border rounded-2xl p-3 flex justify-between items-center text-xs gap-2 shadow-sm"><div><strong>${escHtml(t.name)}</strong> <span class="text-[10px] app-accent">(${escHtml(t.category)})</span><p class="text-[11px] app-muted mt-0.5">${escHtml(t.text)}</p></div><button onclick="delTestimonial(${i})" class="text-red-500 px-2"><i class="fa-solid fa-trash"></i></button></div>`).join("")}</div>
-                </div>
-            </div>`;
+            return;
         }
+
+        if (_masterWsSubPage === "songs") {
+            if (titleEl) titleEl.innerText = "Stok Lagu Website";
+            if (subEl) subEl.innerText = `${songs.length} lagu backsound undangan`;
+            box.innerHTML = `<div class="max-w-2xl mx-auto space-y-4">
+                <div class="app-card p-4 rounded-3xl border space-y-3 shadow-sm">
+                    <div class="flex items-center justify-between">
+                        <h4 class="font-bold text-sm app-accent"><i class="fa-solid fa-music mr-1.5"></i>Tambah Lagu Baru</h4>
+                        <span class="text-[10px] app-muted font-semibold">${songs.length} Lagu</span>
+                    </div>
+                    <label class="block gold-pill-btn py-3 px-4 rounded-2xl text-center cursor-pointer text-xs shadow-md">
+                        <i class="fa-solid fa-upload mr-1.5"></i>Upload File Musik dari Perangkat (MP3/WAV/M4A)
+                        <input type="file" accept="audio/*" class="hide" onchange="openAudioCropperFromInput(this,'library')">
+                    </label>
+                    <p class="text-[10px] app-muted leading-relaxed">Lagu dari perangkat Anda bisa langsung dipotong bagian terbaiknya (30–90 dtk), dikompresi otomatis ke MP3 ringan, dan tersimpan ke Google Drive Stok Lagu.</p>
+
+                    <form onsubmit="addStockSong(event)" class="pt-2.5 border-t gold-border space-y-2">
+                        <span class="text-[10px] font-bold uppercase app-muted block">Atau Tambah Manual via Link MP3:</span>
+                        <div class="grid grid-cols-2 gap-2">
+                            <input type="text" id="song-title" placeholder="Judul Lagu" class="app-input !py-2 text-xs" required>
+                            <input type="text" id="song-cat" placeholder="Kategori (Pernikahan)" class="app-input !py-2 text-xs" required>
+                        </div>
+                        <input type="url" id="song-url" placeholder="Link MP3 (https://.../lagu.mp3)" class="app-input !py-2 text-xs" required>
+                        <button id="btn-add-song" class="w-full app-btn-sec py-2 rounded-xl text-xs font-bold">+ Tambah dari Link</button>
+                    </form>
+                </div>
+
+                <div class="space-y-2">${songs.map((m, i) => `
+                    <div class="app-card border rounded-2xl p-3 flex justify-between items-center gap-2 text-xs shadow-sm">
+                        <button type="button" data-stock-play-btn="${i}" onclick="toggleAdminStockSongPreview(${i},this)" class="w-8 h-8 rounded-full app-accent-bg border gold-border app-accent flex items-center justify-center shrink-0 text-[11px]" title="Putar Preview">
+                            <i class="fa-solid fa-play"></i>
+                        </button>
+                        <div class="flex-1 min-w-0">
+                            <strong class="block truncate">${escHtml(m.title)}</strong>
+                            <span class="block text-[10px] app-accent truncate">${escHtml(m.category)}</span>
+                        </div>
+                        <button type="button" onclick="delStockSong(${i})" class="w-8 h-8 rounded-xl bg-red-600/12 text-red-500 flex items-center justify-center shrink-0" title="Hapus Lagu"><i class="fa-solid fa-trash"></i></button>
+                    </div>
+                `).join("") || '<p class="text-xs app-muted text-center py-4">Belum ada stok lagu.</p>'}</div>
+            </div>`;
+            return;
+        }
+
+        if (titleEl) titleEl.innerText = "Testimoni Pelanggan";
+        if (subEl) subEl.innerText = `${testis.length} ulasan aktif di Beranda`;
+        box.innerHTML = `<div class="max-w-2xl mx-auto space-y-4">
+            <form onsubmit="addTestimonial(event)" class="app-card p-4 rounded-3xl border space-y-2.5 shadow-sm">
+                <h4 class="font-bold text-sm app-accent"><i class="fa-solid fa-star mr-1.5"></i>Tambah Testimoni Beranda</h4>
+                <input type="text" id="t-name" placeholder="Nama Pelanggan" class="app-input" required>
+                <input type="text" id="t-cat" placeholder="Kategori (Undangan / CV & Lamaran / Titik Gowes)" class="app-input" required>
+                <textarea id="t-text" placeholder="Isi testimoni..." class="app-input h-20" required></textarea>
+                <button id="btn-add-testi" class="w-full gold-pill-btn py-2.5 rounded-xl text-xs">+ Tampilkan di Slideshow</button>
+            </form>
+            <div class="space-y-2">${testis.map((t, i) => `<div class="app-card border rounded-2xl p-3 flex justify-between items-center text-xs gap-2 shadow-sm"><div><strong>${escHtml(t.name)}</strong> <span class="text-[10px] app-accent">(${escHtml(t.category)})</span><p class="text-[11px] app-muted mt-0.5">${escHtml(t.text)}</p></div><button onclick="delTestimonial(${i})" class="text-red-500 px-2"><i class="fa-solid fa-trash"></i></button></div>`).join("")}</div>
+        </div>`;
         return;
     }
+}
+
+function _buildMasterCoinPkgRowHtml(pk, idx) {
+    const totalC = Number(pk.paidCoins || 0) + Number(pk.bonusCoins || 0);
+    const eff = Math.round(Number(pk.price || 0) / Math.max(1, totalC));
+    return `
+        <div class="app-card-soft border rounded-2xl p-3.5 space-y-2.5 coin-pkg-row" data-pkg-id="${esc(pk.id || ("pkg_" + idx))}">
+            <div class="flex items-center justify-between gap-2">
+                <span class="text-[10px] font-extrabold uppercase text-amber-600">Paket #${idx + 1} • ${totalC} Coin (${fmtRp(eff)}/Coin)</span>
+                <button type="button" onclick="removeMasterCoinPackageRow(this)" class="w-6 h-6 rounded-lg bg-red-600/15 text-red-500 text-[10px]" title="Hapus Paket"><i class="fa-solid fa-trash"></i></button>
+            </div>
+            <div class="grid grid-cols-2 gap-2">
+                <div><label class="text-[10px] app-muted block">Nama Paket</label><input type="text" value="${esc(pk.name || "")}" class="cpk-name app-input !py-1.5 text-xs font-bold"></div>
+                <div><label class="text-[10px] app-muted block">Label (Opsional)</label><input type="text" value="${esc(pk.badge || "")}" placeholder="TERLARIS" class="cpk-badge app-input !py-1.5 text-xs"></div>
+            </div>
+            <div class="grid grid-cols-3 gap-2">
+                <div><label class="text-[10px] app-muted block">Harga (Rp)</label><input type="number" value="${pk.price || 100000}" step="10000" min="1000" class="cpk-price app-input !py-1.5 text-xs font-bold"></div>
+                <div><label class="text-[10px] app-muted block">Coin Dasar</label><input type="number" value="${pk.paidCoins || 20}" min="1" class="cpk-paid app-input !py-1.5 text-xs font-bold text-amber-600"></div>
+                <div><label class="text-[10px] app-muted block">Bonus Coin</label><input type="number" value="${pk.bonusCoins || 0}" min="0" class="cpk-bonus app-input !py-1.5 text-xs font-bold text-emerald-600"></div>
+            </div>
+        </div>
+    `;
+}
+
+function addMasterCoinPackageRow() {
+    const grid = document.getElementById("master-coin-pkgs-grid"); if (!grid) return;
+    const idx = grid.querySelectorAll(".coin-pkg-row").length;
+    const div = document.createElement("div");
+    div.innerHTML = _buildMasterCoinPkgRowHtml({ id: "pkg_" + Date.now(), name: "Paket Baru", badge: "", price: 150000, paidCoins: 30, bonusCoins: 3 }, idx);
+    grid.appendChild(div.firstElementChild);
+}
+
+function removeMasterCoinPackageRow(btn) {
+    const rows = document.querySelectorAll(".coin-pkg-row");
+    if (rows.length <= 1) return showToast("Minimal harus menyisakan 1 paket Coin.", "info");
+    btn.closest(".coin-pkg-row")?.remove();
+}
+
+function resetPromoVoucherForm() {
+    ["vch-id", "vch-code", "vch-label"].forEach(id => { const el = document.getElementById(id); if (el) el.value = ""; });
+    const tEl = document.getElementById("vch-type"); if (tEl) tEl.value = "fixed";
+    const sEl = document.getElementById("vch-scope"); if (sEl) sEl.value = "all";
+    const vEl = document.getElementById("vch-value"); if (vEl) vEl.value = "15000";
+    const mEl = document.getElementById("vch-max-uses"); if (mEl) mEl.value = "50";
+    const eEl = document.getElementById("vch-expires"); if (eEl) eEl.value = "2027-12-31";
+    const aEl = document.getElementById("vch-active"); if (aEl) aEl.checked = true;
+}
+
+function editPromoVoucherItem(idx) {
+    const v = (typeof getVouchersList === "function" ? getVouchersList() : [])[idx];
+    if (!v) return;
+    document.getElementById("vch-id").value = v.id || "";
+    document.getElementById("vch-code").value = v.code || "";
+    document.getElementById("vch-scope").value = v.scope || "all";
+    document.getElementById("vch-type").value = v.type || "fixed";
+    document.getElementById("vch-value").value = v.value || 10000;
+    document.getElementById("vch-max-uses").value = v.maxUses || 0;
+    document.getElementById("vch-expires").value = v.expiresAt || "2027-12-31";
+    document.getElementById("vch-label").value = v.label || "";
+    document.getElementById("vch-active").checked = v.active !== false;
+    showToast(`Mengedit voucher ${v.code}`, "info");
+}
+
+async function savePromoVoucherForm(e) {
+    e.preventDefault();
+    const idVal = (document.getElementById("vch-id")?.value || "").trim();
+    const code = (document.getElementById("vch-code")?.value || "").trim().toUpperCase().replace(/\s+/g, "");
+    if (!code) return showToast("Kode voucher wajib diisi.", "error");
+
+    const list = [...(typeof getVouchersList === "function" ? getVouchersList() : [])];
+    const existing = list.find(x => String(x.id) === idVal);
+    const item = {
+        id: idVal || ("vch_" + Date.now()),
+        code,
+        scope: document.getElementById("vch-scope")?.value || "all",
+        type: document.getElementById("vch-type")?.value || "fixed",
+        value: Math.max(1, Math.round(Number(document.getElementById("vch-value")?.value || 10000))),
+        maxUses: Math.max(0, Math.round(Number(document.getElementById("vch-max-uses")?.value || 0))),
+        usedCount: existing ? Number(existing.usedCount || 0) : 0,
+        expiresAt: (document.getElementById("vch-expires")?.value || "").trim(),
+        label: (document.getElementById("vch-label")?.value || "").trim(),
+        active: !!document.getElementById("vch-active")?.checked
+    };
+
+    const idx = list.findIndex(x => String(x.id) === String(item.id) || String(x.code || "").toUpperCase() === code);
+    if (idx >= 0) list[idx] = item; else list.unshift(item);
+
+    setBtnLoading("btn-save-vch", true, "Menyimpan...");
+    const nextMs = Object.assign({}, db.masterSettings || {}, { vouchers: list });
+    db.masterSettings = nextMs;
+    idbSet("db_snapshot", db);
+    await apiAction({ action: "update_section", section: "masterSettings", value: nextMs });
+    setBtnLoading("btn-save-vch", false);
+    renderMasterWorkspaceContent();
+    showToast(`Voucher ${code} tersimpan permanen!`);
+}
+
+async function deletePromoVoucherItem(idx) {
+    const list = [...(typeof getVouchersList === "function" ? getVouchersList() : [])];
+    if (!list[idx]) return;
+    if (!(await showConfirm("Hapus Voucher", `Hapus kode voucher "${list[idx].code}"?`, "fa-solid fa-trash", "Ya, Hapus"))) return;
+    list.splice(idx, 1);
+    const nextMs = Object.assign({}, db.masterSettings || {}, { vouchers: list });
+    db.masterSettings = nextMs;
+    idbSet("db_snapshot", db);
+    showLoading("Menghapus voucher...");
+    await apiAction({ action: "update_section", section: "masterSettings", value: nextMs });
+    hideLoading();
+    renderMasterWorkspaceContent();
+    showToast("Voucher dihapus.", "info");
 }
 
 // ================= 4. BERANDA PROFIL PUBLIK & DETAIL TERPISAH =================
@@ -1450,7 +1833,12 @@ function renderSoloStatsModal() {
             </div>
         ` : "";
 
+        const gowesScheduleStrip = (_soloProjectDomainFilter === "gowes" && typeof buildGowesTodayScheduleBoardHtml === "function")
+            ? `<div class="mb-3">${buildGowesTodayScheduleBoardHtml()}</div>`
+            : "";
+
         const controlsHtml = `
+            ${gowesScheduleStrip}
             <div class="space-y-2 mb-2">
                 <div class="flex flex-col sm:flex-row gap-2">
                     <input type="text" value="${esc(_soloProjectSearch)}" oninput="_soloProjectSearch=this.value;renderSoloStatsModal();" placeholder="Cari pesanan berkas atau booking sepeda..." class="app-input !py-2 text-xs flex-1">
@@ -1597,9 +1985,11 @@ function viewUserProfileModal(username, fromNav = false) {
         </div>
     ` : "";
 
+    const targetFollowsMe = !!(curU && typeof _getFollowingListForUser === "function" && _getFollowingListForUser(u).includes(_normAdminUserKey(curU.username)));
+    const followBtnLabel = isFollowingThis ? "Following" : (targetFollowsMe ? "Ikuti Balik" : "Follow");
     const followBtnHtml = canFollowThis
         ? `<button type="button" onclick="toggleFollowTargetUser('${esc(cleanU)}')" class="w-full py-2.5 rounded-2xl text-xs font-extrabold transition shadow-sm ${isFollowingThis ? "app-btn-sec border" : "gold-pill-btn"}">
-            <i class="fa-solid ${isFollowingThis ? "fa-user-check" : "fa-user-plus"} mr-1.5"></i>${isFollowingThis ? "Following" : "Follow"}
+            <i class="fa-solid ${isFollowingThis ? "fa-user-check" : "fa-user-plus"} mr-1.5"></i>${followBtnLabel}
            </button>`
         : "";
 
@@ -1795,7 +2185,16 @@ async function deleteUserRealTime(uname) {
 
 async function topUpCabangRealTime(uname, amt, btn, reopenModal = false) {
     setBtnLoading(btn, true, "...");
+    const targetU = (db.users || []).find(u => _normAdminUserKey(u.username) === _normAdminUserKey(uname));
+    const beforeBal = Number((targetU && targetU.quota) || 0);
     await apiAction({ action: "topup_quota", username: uname, amount: amt });
+    const freshU = (db.users || []).find(u => _normAdminUserKey(u.username) === _normAdminUserKey(uname)) || targetU;
+    if (freshU && typeof recordCoinMutation === "function") {
+        const afterBal = Number(freshU.quota || (beforeBal + amt));
+        const updatedU = Object.assign({}, freshU, { quota: afterBal });
+        recordCoinMutation(updatedU, amt, "Top-Up Coin dari Founder", "Penambahan saldo langsung oleh Founder", afterBal);
+        await apiAction({ action: "upsert_user", oldUsername: freshU.username, user: updatedU });
+    }
     renderMasterHeaderStats();
     if (window._soloStatsViewState && window._soloStatsViewState.open) renderSoloStatsModal();
     if (reopenModal) viewUserProfileModal(uname, true);
@@ -1900,14 +2299,21 @@ async function saveMasterCoinPackages(btn) {
         paidCoins: Math.max(1, Math.round(Number(row.querySelector(".cpk-paid")?.value || 20))),
         bonusCoins: Math.max(0, Math.round(Number(row.querySelector(".cpk-bonus")?.value || 0)))
     }));
+    const proUpgradePrice = Math.max(1000, Math.round(Number(document.getElementById("mpro-price")?.value || 49000)));
+    const proUpgradeBonusCoins = Math.max(0, Math.round(Number(document.getElementById("mpro-bonus-coins")?.value || 5)));
+
     setBtnLoading(btn, true, "Menyimpan...");
-    const nextMs = Object.assign({}, db.masterSettings || {}, { coinPackages });
+    const nextMs = Object.assign({}, db.masterSettings || {}, {
+        coinPackages,
+        proUpgradePrice,
+        proUpgradeBonusCoins
+    });
     db.masterSettings = nextMs;
     idbSet("db_snapshot", db);
     await apiAction({ action: "update_section", section: "masterSettings", value: nextMs });
     setBtnLoading(btn, false);
     renderMasterWorkspaceContent();
-    showToast("Pricelist Paket Coin tersimpan permanen!");
+    showToast("Pricelist Coin & Harga Upgrade PRO tersimpan permanen!");
 }
 
 // ================= 8. VISUAL THEME BUILDER =================

@@ -158,7 +158,7 @@
 </head>
 <body class="min-h-screen flex flex-col in-home">
 
-    <!-- 1. LAYAR LOADING "HALO" BERGAYA iOS -->
+    <!-- 1. LAYAR LOADING "HALO" -->
     <div id="ios-hello-splash">
         <svg viewBox="0 0 360 110" class="w-64 sm:w-80 h-auto overflow-visible">
             <text x="50%" y="76" text-anchor="middle" class="ios-hello-text">Halo</text>
@@ -529,6 +529,14 @@
             <div class="app-card rounded-3xl border overflow-hidden shadow-sm relative">
                 <div id="prof-banner" class="h-32 md:h-40 bg-gradient-to-r from-zinc-700 to-zinc-900 bg-cover bg-center relative">
                     <div class="absolute inset-0 bg-gradient-to-t from-black/65 via-transparent to-black/15"></div>
+                    <button type="button" id="prof-pro-coin-pill" onclick="openCabangCoinInfoModal()" class="hide prof-pro-coin-pill" title="Saldo Coin PRO — Ketuk untuk info, beli Coin &amp; riwayat mutasi">
+                        <span class="lbk-gold-coin lbk-gold-coin-sm" aria-hidden="true"><img src="./lembarku-logo.png" alt="Coin" class="lbk-gold-coin-logo" onerror="this.style.display='none';if(this.nextElementSibling)this.nextElementSibling.classList.remove('hide');"><span class="hide lbk-gold-coin-fallback text-[11px]">L</span></span>
+                        <span id="prof-pro-coin-val" class="text-xs font-extrabold tracking-tight">0</span>
+                        <span class="text-[10px] font-bold text-amber-300">Coin</span>
+                    </button>
+                    <button type="button" onclick="shareOwnProfileLink()" class="prof-share-cover-btn" title="Bagikan Profil">
+                        <i class="fa-solid fa-share-nodes text-[10px]"></i> Bagikan
+                    </button>
                 </div>
                 <div class="px-4 pb-4 relative text-center md:text-left md:flex md:items-end md:justify-between">
                     <div class="flex flex-col md:flex-row items-center md:items-end gap-2.5 -mt-11 relative z-10">
@@ -585,6 +593,9 @@
             <div class="app-card rounded-3xl border overflow-hidden shadow-sm relative">
                 <div id="cprof-banner" class="h-32 md:h-40 bg-gradient-to-r from-blue-950 via-zinc-900 to-black bg-cover bg-center relative">
                     <div class="absolute inset-0 bg-gradient-to-t from-black/70 via-transparent to-black/20"></div>
+                    <button type="button" onclick="shareOwnProfileLink()" class="prof-share-cover-btn" title="Bagikan Profil">
+                        <i class="fa-solid fa-share-nodes text-[10px]"></i> Bagikan
+                    </button>
                 </div>
                 <div class="px-4 pb-4 relative text-center md:text-left md:flex md:items-end md:justify-between gap-3">
                     <div class="flex flex-col md:flex-row items-center md:items-end gap-2.5 -mt-11 relative z-10">
@@ -642,6 +653,9 @@
             <div class="app-card rounded-3xl border overflow-hidden shadow-md relative">
                 <div id="mprof-banner" class="h-32 md:h-40 bg-gradient-to-r from-blue-900 via-zinc-900 to-black bg-cover bg-center relative">
                     <div class="absolute inset-0 bg-gradient-to-t from-black/70 via-transparent to-black/20"></div>
+                    <button type="button" onclick="shareOwnProfileLink()" class="prof-share-cover-btn" title="Bagikan Profil">
+                        <i class="fa-solid fa-share-nodes text-[10px]"></i> Bagikan
+                    </button>
                 </div>
                 <div class="px-5 pb-5 relative text-center md:text-left md:flex md:items-end md:justify-between gap-4">
                     <div class="flex flex-col md:flex-row items-center md:items-end gap-3 -mt-11 relative z-10">
@@ -880,6 +894,28 @@
                         <input type="checkbox" id="toggle-wishes" checked class="w-5 h-5 accent-blue-600 cursor-pointer">
                     </div>
 
+                    <div id="wiz-pro-paymode-wrap" class="hide app-card-soft border-2 border-amber-400/50 rounded-2xl p-3.5 space-y-2">
+                        <div class="flex items-center justify-between gap-2">
+                            <span class="text-xs font-extrabold text-amber-600 flex items-center gap-1.5"><i class="fa-solid fa-coins"></i>Pilihan Bayar Akun PRO</span>
+                            <span id="wiz-pro-coin-bal" class="text-[11px] font-bold app-muted">Saldo: 0 Coin</span>
+                        </div>
+                        <div class="grid grid-cols-2 gap-2">
+                            <label class="cursor-pointer">
+                                <input type="radio" name="wiz_pro_paymode" value="coin" onchange="onWizardProPayModeChange()" class="hide peer">
+                                <div class="app-card border-2 rounded-xl p-2.5 text-center peer-checked:border-amber-500 peer-checked:bg-amber-500/12 transition">
+                                    <strong id="wiz-pro-coin-opt-lbl" class="text-xs font-extrabold text-amber-600 block">Potong Coin</strong>
+                                    <span class="text-[10px] app-muted block">Langsung Aktif Instan</span>
+                                </div>
+                            </label>
+                            <label class="cursor-pointer">
+                                <input type="radio" name="wiz_pro_paymode" value="normal" checked onchange="onWizardProPayModeChange()" class="hide peer">
+                                <div class="app-card border-2 rounded-xl p-2.5 text-center peer-checked:border-blue-500 peer-checked:bg-blue-500/10 transition">
+                                    <strong class="text-xs font-extrabold block">Bayar Normal</strong>
+                                    <span class="text-[10px] app-muted block">QRIS / Rekening / Voucher</span>
+                                </div>
+                            </label>
+                        </div>
+                    </div>
                     <div class="flex justify-end gap-3 pt-2">
                         <button type="button" onclick="stopPreviewAudio();routeDashboard()" class="px-6 py-3 rounded-xl app-btn-sec text-xs font-bold">Batal</button>
                         <button type="submit" id="btn-submit-inv" class="gold-pill-btn px-8 py-3 rounded-xl text-xs uppercase tracking-wider shadow-xl">Ajukan Undangan</button>
@@ -923,6 +959,28 @@
                 </div>
                 <form id="portfolio-form" onsubmit="submitPortfolioForm(event)" class="space-y-5">
                     <div id="pfw-dynamic-fields" class="space-y-4"></div>
+                    <div id="pfw-pro-paymode-wrap" class="hide app-card-soft border-2 border-amber-400/50 rounded-2xl p-3.5 space-y-2">
+                        <div class="flex items-center justify-between gap-2">
+                            <span class="text-xs font-extrabold text-amber-600 flex items-center gap-1.5"><i class="fa-solid fa-coins"></i>Pilihan Bayar Akun PRO</span>
+                            <span id="pfw-pro-coin-bal" class="text-[11px] font-bold app-muted">Saldo: 0 Coin</span>
+                        </div>
+                        <div class="grid grid-cols-2 gap-2">
+                            <label class="cursor-pointer">
+                                <input type="radio" name="pfw_pro_paymode" value="coin" onchange="onPortfolioProPayModeChange()" class="hide peer">
+                                <div class="app-card border-2 rounded-xl p-2.5 text-center peer-checked:border-amber-500 peer-checked:bg-amber-500/12 transition">
+                                    <strong id="pfw-pro-coin-opt-lbl" class="text-xs font-extrabold text-amber-600 block">Potong Coin</strong>
+                                    <span class="text-[10px] app-muted block">Langsung Aktif Instan</span>
+                                </div>
+                            </label>
+                            <label class="cursor-pointer">
+                                <input type="radio" name="pfw_pro_paymode" value="normal" checked onchange="onPortfolioProPayModeChange()" class="hide peer">
+                                <div class="app-card border-2 rounded-xl p-2.5 text-center peer-checked:border-blue-500 peer-checked:bg-blue-500/10 transition">
+                                    <strong class="text-xs font-extrabold block">Bayar Normal</strong>
+                                    <span class="text-[10px] app-muted block">QRIS / Rekening / Voucher</span>
+                                </div>
+                            </label>
+                        </div>
+                    </div>
                     <div class="flex justify-end gap-3 pt-2">
                         <button type="button" onclick="routeDashboard()" class="px-6 py-3 rounded-xl app-btn-sec text-xs font-bold">Batal</button>
                         <button type="submit" id="btn-submit-pf" class="gold-pill-btn px-8 py-3 rounded-xl text-xs uppercase tracking-wider shadow-xl">Ajukan Berkas</button>
@@ -948,6 +1006,16 @@
                 </div>
                 <p id="pay-unique-hint" class="hide text-[10px] app-muted">Sudah termasuk 3 angka kode unik transaksi agar verifikasi super cepat.</p>
                 <button type="button" onclick="copyPaymentNominal()" class="px-3.5 py-1.5 rounded-lg app-btn-sec text-[11px] font-bold"><i class="fa-regular fa-copy mr-1"></i>Salin Nominal</button>
+            </div>
+
+            <div id="pay-voucher-wrap" class="app-card-soft border rounded-2xl p-3.5 text-left space-y-2">
+                <label class="app-label !mb-0 app-accent"><i class="fa-solid fa-ticket mr-1"></i>Punya Kode Voucher Promo?</label>
+                <div class="flex gap-2">
+                    <input type="text" id="pay-voucher-code" placeholder="Masukkan kode voucher (misal: HEMAT10)" class="app-input !py-2 text-xs uppercase font-bold flex-1">
+                    <button type="button" id="btn-pay-apply-voucher" onclick="applyPaymentVoucher()" class="gold-pill-btn px-4 py-2 rounded-xl text-xs shrink-0">Pakai</button>
+                    <button type="button" id="btn-pay-clear-voucher" onclick="clearPaymentVoucher()" class="hide px-3 py-2 rounded-xl bg-red-600/15 text-red-500 text-xs font-bold shrink-0" title="Batalkan Voucher"><i class="fa-solid fa-xmark"></i></button>
+                </div>
+                <p id="pay-voucher-status" class="hide text-[11px] font-semibold"></p>
             </div>
 
             <p class="text-xs app-muted leading-relaxed">
@@ -1067,6 +1135,18 @@
             </div>
 
             <div class="p-4 flex-1 overflow-y-auto space-y-3.5">
+                <!-- PENCARIAN USER & FOLLOW CEPAT (HANYA SAAT LOGIN) -->
+                <div id="drawer-user-search-wrap" class="hide space-y-2">
+                    <div class="relative">
+                        <i class="fa-solid fa-magnifying-glass text-xs app-muted absolute left-3.5 top-1/2 -translate-y-1/2 pointer-events-none"></i>
+                        <input type="text" id="eco-user-search-inp" oninput="onEcoUserSearchInput()" onfocus="onEcoUserSearchFocus()" placeholder="Cari nama atau @username..." class="app-input !pl-9 !pr-9 !py-2.5 !rounded-2xl text-xs">
+                        <button type="button" id="eco-user-search-clear" onclick="clearEcoUserSearch()" class="hide absolute right-2.5 top-1/2 -translate-y-1/2 w-6 h-6 rounded-full app-btn-sec flex items-center justify-center text-[10px]">
+                            <i class="fa-solid fa-xmark"></i>
+                        </button>
+                    </div>
+                    <div id="eco-user-search-results" class="hide space-y-1.5 max-h-64 overflow-y-auto pr-0.5"></div>
+                </div>
+
                 <div id="drawer-eco-user-box" class="app-card-soft border rounded-2xl p-3 flex items-center gap-3">
                     <img id="drawer-eco-avatar" src="./lembarku-logo.png" class="w-10 h-10 rounded-full object-cover border gold-border bg-zinc-800 shrink-0">
                     <div class="min-w-0 flex-1">
@@ -1232,6 +1312,17 @@
                         <label class="app-label">Catatan Tambahan (Opsional)</label>
                         <input type="text" id="gw-book-note" placeholder="Misal: Helm ukuran L, pasang tas depan..." class="app-input">
                     </div>
+                </div>
+
+                <!-- Kode Voucher Promo Titik Gowes -->
+                <div class="app-card-soft border rounded-2xl p-3 space-y-2">
+                    <label class="app-label !mb-0 text-emerald-600"><i class="fa-solid fa-ticket mr-1"></i>Kode Voucher Promo (Opsional)</label>
+                    <div class="flex gap-2">
+                        <input type="text" id="gw-book-voucher" placeholder="Ketik kode voucher..." class="app-input !py-2 text-xs uppercase font-bold flex-1">
+                        <button type="button" onclick="applyGowesBookingVoucher()" class="gowes-pill-btn px-4 py-2 rounded-xl text-xs shrink-0">Pakai</button>
+                        <button type="button" id="btn-gw-clear-voucher" onclick="clearGowesBookingVoucher()" class="hide px-3 py-2 rounded-xl bg-red-600/15 text-red-500 text-xs font-bold shrink-0"><i class="fa-solid fa-xmark"></i></button>
+                    </div>
+                    <p id="gw-book-voucher-status" class="hide text-[11px] font-semibold"></p>
                 </div>
 
                 <!-- Total Kalkulasi -->
@@ -1759,10 +1850,10 @@
                     <div id="drawer-main-list" class="space-y-2.5"></div>
 
                     <div id="drawer-sub-theme" class="hide space-y-3">
-                        <p class="text-xs app-muted">Pilih tampilan warna aplikasi (default gaya Pengaturan iOS):</p>
+                        <p class="text-xs app-muted">Pilih tampilan warna aplikasi sesuai selera Anda:</p>
                         <div class="space-y-2">
-                            <button onclick="applyAppTheme('light',true)" data-topt="light" class="theme-opt-row menu-row-card"><span class="w-7 h-7 rounded-full bg-[#f2f2f7] border-2 border-[#007aff] shrink-0"></span><span class="flex-1 text-xs font-bold">iOS Terang (Default)</span><i class="fa-solid fa-check app-accent hide theme-chk"></i></button>
-                            <button onclick="applyAppTheme('dark',true)" data-topt="dark" class="theme-opt-row menu-row-card"><span class="w-7 h-7 rounded-full bg-[#1c1c1e] border-2 border-[#0a84ff] shrink-0"></span><span class="flex-1 text-xs font-bold">iOS Gelap</span><i class="fa-solid fa-check app-accent hide theme-chk"></i></button>
+                            <button onclick="applyAppTheme('light',true)" data-topt="light" class="theme-opt-row menu-row-card"><span class="w-7 h-7 rounded-full bg-[#f2f2f7] border-2 border-[#007aff] shrink-0"></span><span class="flex-1 text-xs font-bold">Terang Bersih (Default)</span><i class="fa-solid fa-check app-accent hide theme-chk"></i></button>
+                            <button onclick="applyAppTheme('dark',true)" data-topt="dark" class="theme-opt-row menu-row-card"><span class="w-7 h-7 rounded-full bg-[#1c1c1e] border-2 border-[#0a84ff] shrink-0"></span><span class="flex-1 text-xs font-bold">Gelap Elegan</span><i class="fa-solid fa-check app-accent hide theme-chk"></i></button>
                             <button onclick="applyAppTheme('gold',true)" data-topt="gold" class="theme-opt-row menu-row-card"><span class="w-7 h-7 rounded-full bg-gradient-to-tr from-[#f59e0b] to-[#eab308] border-2 border-amber-700 shrink-0"></span><span class="flex-1 text-xs font-bold">Emas Hangat</span><i class="fa-solid fa-check app-accent hide theme-chk"></i></button>
                             <button onclick="applyAppTheme('blue',true)" data-topt="blue" class="theme-opt-row menu-row-card"><span class="w-7 h-7 rounded-full bg-[#1877f2] border-2 border-blue-200 shrink-0"></span><span class="flex-1 text-xs font-bold">Biru Klasik</span><i class="fa-solid fa-check app-accent hide theme-chk"></i></button>
                             <button onclick="applyAppTheme('black',true)" data-topt="black" class="theme-opt-row menu-row-card"><span class="w-7 h-7 rounded-full bg-[#000000] border-2 border-white shrink-0"></span><span class="flex-1 text-xs font-bold">Hitam Pekat</span><i class="fa-solid fa-check app-accent hide theme-chk"></i></button>
@@ -1770,7 +1861,7 @@
                         </div>
                     </div>
 
-                    <div id="drawer-sub-privacy" class="hide space-y-4">
+                    <div id="drawer-sub-privacy" class="hide space-y-3.5">
                         <div class="app-card border rounded-3xl p-4 space-y-3.5 shadow-sm">
                             <div class="border-b gold-border pb-2.5">
                                 <h4 class="font-extrabold text-sm">Visibilitas Profil &amp; Dokumen</h4>
@@ -1791,6 +1882,14 @@
                                     <span class="text-[10px] app-muted block">Jika dimatikan, username Anda disembunyikan dari profil publik &amp; daftar kontak.</span>
                                 </div>
                                 <label class="lbk-switch"><input type="checkbox" id="priv-show-username" checked><span class="lbk-switch-track"></span></label>
+                            </div>
+
+                            <div class="flex items-center justify-between gap-3 border-t gold-border pt-3">
+                                <div class="min-w-0">
+                                    <strong class="text-xs block">Izinkan Ditemukan di Pencarian</strong>
+                                    <span class="text-[10px] app-muted block">Jika dimatikan, akun Anda tidak muncul saat dicari pengguna lain di pencarian user.</span>
+                                </div>
+                                <label class="lbk-switch"><input type="checkbox" id="priv-allow-search" checked><span class="lbk-switch-track"></span></label>
                             </div>
 
                             <div class="flex items-center justify-between gap-3 border-t gold-border pt-3">
@@ -1836,13 +1935,22 @@
                             <button type="button" id="btn-save-privacy" onclick="savePrivacySettings()" class="w-full gold-pill-btn py-3 rounded-xl text-xs uppercase mt-1">Simpan Pengaturan Privasi</button>
                         </div>
 
+                        <button type="button" onclick="openSlideSub('blocked')" class="menu-row-card">
+                            <span class="menu-row-ic !bg-red-500/15 !text-red-500"><i class="fa-solid fa-ban"></i></span>
+                            <div class="flex-1 min-w-0">
+                                <strong class="text-xs block">Daftar Akun Diblokir</strong>
+                                <span class="text-[10px] app-muted block">Kelola &amp; buka blokir akun pengguna</span>
+                            </div>
+                            <span id="priv-blocked-count" class="text-[11px] px-2.5 py-0.5 rounded-full app-btn-sec font-bold shrink-0">0</span>
+                            <i class="fa-solid fa-chevron-right text-[10px] app-muted shrink-0"></i>
+                        </button>
+                    </div>
+
+                    <div id="drawer-sub-blocked" class="hide space-y-3">
                         <div class="app-card border rounded-3xl p-4 space-y-3 shadow-sm">
-                            <div class="flex items-center justify-between border-b gold-border pb-2.5">
-                                <div>
-                                    <h4 class="font-extrabold text-sm"><i class="fa-solid fa-ban text-red-500 mr-1.5"></i>Daftar Akun Diblokir</h4>
-                                    <p class="text-[10px] app-muted">Akun yang diblokir tidak bisa melihat profil, project, atau mengikuti Anda.</p>
-                                </div>
-                                <span id="priv-blocked-count" class="text-[11px] px-2.5 py-0.5 rounded-full app-btn-sec font-bold">0</span>
+                            <div class="border-b gold-border pb-2.5">
+                                <h4 class="font-extrabold text-sm"><i class="fa-solid fa-ban text-red-500 mr-1.5"></i>Akun yang Anda Blokir</h4>
+                                <p class="text-[10px] app-muted">Akun yang diblokir tidak bisa melihat profil, project, atau mengikuti Anda.</p>
                             </div>
                             <div id="priv-blocked-list" class="space-y-2"></div>
                         </div>
@@ -1961,7 +2069,27 @@
                         </form>
                     </div>
 
-                    <div id="drawer-sub-qris" class="hide space-y-3.5">
+                    <div id="drawer-sub-qris" class="hide space-y-2.5">
+                        <p class="text-xs app-muted px-1">Pilih pengaturan pembayaran yang ingin Anda kelola:</p>
+                        <button type="button" onclick="openSlideSub('qris_cfg')" class="menu-row-card">
+                            <span class="menu-row-ic"><i class="fa-solid fa-qrcode"></i></span>
+                            <div class="flex-1 min-w-0">
+                                <strong class="text-xs block">Pengaturan QRIS DANA</strong>
+                                <span class="text-[10px] app-muted block">Mode QRIS Tetap / Dinamis, gambar QRIS &amp; kode unik</span>
+                            </div>
+                            <i class="fa-solid fa-chevron-right text-[10px] app-muted shrink-0"></i>
+                        </button>
+                        <button type="button" onclick="openSlideSub('banks_cfg')" class="menu-row-card">
+                            <span class="menu-row-ic"><i class="fa-solid fa-building-columns"></i></span>
+                            <div class="flex-1 min-w-0">
+                                <strong class="text-xs block">Daftar Rekening &amp; Backup Data</strong>
+                                <span class="text-[10px] app-muted block">Kelola nomor rekening transfer, harga default &amp; ekspor JSON</span>
+                            </div>
+                            <i class="fa-solid fa-chevron-right text-[10px] app-muted shrink-0"></i>
+                        </button>
+                    </div>
+
+                    <div id="drawer-sub-qris-cfg" class="hide space-y-3.5">
                         <div class="app-card border rounded-3xl p-4 space-y-3 shadow-sm">
                             <label class="app-label !mb-0 app-accent"><i class="fa-solid fa-qrcode mr-1"></i>Mode QRIS Pembayaran (DANA Bisnis)</label>
                             <select id="ms-qris-mode" onchange="toggleQrisModeFields()" class="app-input font-bold">
@@ -1977,14 +2105,18 @@
                                 <img id="ms-qris-prev" src="" class="w-32 h-32 mx-auto rounded-xl bg-white p-1 object-contain border">
                                 <label class="block app-card-soft border p-2 rounded-xl text-center cursor-pointer text-[11px] app-accent font-bold">Ganti Gambar QRIS Tetap<input type="file" accept="image/*" class="hide" onchange="uploadMasterQRIS(this)"></label>
                             </div>
+                            <button type="button" id="btn-save-qris" onclick="saveMasterSettings()" class="w-full gold-pill-btn py-2.5 rounded-xl text-xs uppercase">Simpan Pengaturan QRIS</button>
                         </div>
+                    </div>
+
+                    <div id="drawer-sub-banks-cfg" class="hide space-y-3.5">
                         <div class="app-card border rounded-3xl p-4 space-y-3 shadow-sm">
                             <div class="flex items-center justify-between"><span class="text-xs font-bold app-accent">Daftar Rekening Bank</span><button type="button" onclick="addMasterBankRow()" class="text-[11px] app-accent font-bold hover:underline">+ Rekening</button></div>
                             <div id="ms-banks-container" class="space-y-2"></div>
-                            <div><label class="app-label">Harga Default Undangan</label><input type="text" id="ms-p" placeholder="Rp 150.000" class="app-input"></div>
+                            <div><label class="app-label">Harga Default Undangan</label><input type="text" id="ms-p" placeholder="Rp 99.000" class="app-input"></div>
                             <div class="flex gap-2">
-                                <button id="btn-save-qris" onclick="saveMasterSettings()" class="flex-1 gold-pill-btn py-2.5 rounded-xl text-xs">Simpan Pembayaran</button>
-                                <button onclick="exportDB()" class="px-4 app-btn-sec py-2.5 rounded-xl text-xs font-bold">Backup</button>
+                                <button type="button" id="btn-save-banks" onclick="saveMasterSettings()" class="flex-1 gold-pill-btn py-2.5 rounded-xl text-xs uppercase">Simpan Rekening</button>
+                                <button type="button" onclick="exportDB()" class="px-4 app-btn-sec py-2.5 rounded-xl text-xs font-bold">Backup</button>
                             </div>
                         </div>
                     </div>
@@ -1999,7 +2131,7 @@
     <div id="modal-master-workspace" class="hide fixed inset-0 z-[74] bg-[var(--app-bg)] flex flex-col overflow-hidden">
         <div class="lbk-fs-header px-4 sm:px-6 py-3.5 flex items-center justify-between gap-3">
             <div class="flex items-center gap-2.5 min-w-0">
-                <button type="button" onclick="closeMasterWorkspaceFullscreen()" class="w-9 h-9 rounded-full app-btn-sec flex items-center justify-center text-xs shrink-0 active:scale-95 transition" title="Kembali">
+                <button type="button" onclick="handleMasterWorkspaceBackBtn()" class="w-9 h-9 rounded-full app-btn-sec flex items-center justify-center text-xs shrink-0 active:scale-95 transition" title="Kembali">
                     <i class="fa-solid fa-chevron-left"></i>
                 </button>
                 <div class="min-w-0">
@@ -2572,73 +2704,82 @@
         </div>
     </div>
 
-    <!-- MODAL PENJELASAN COIN ADMIN CABANG -->
+    <!-- MODAL COIN LEMBARKU (INFO, BELI PAKET VIA QRIS & BUKU KAS MUTASI) -->
     <div id="modal-cabang-coin-info" class="hide fixed inset-0 z-[151] bg-black/82 backdrop-blur-sm flex items-center justify-center p-4" onclick="if(event.target===this)closeCabangCoinInfoModal()">
-        <div class="app-card border rounded-3xl max-w-md w-full overflow-hidden shadow-2xl" onclick="event.stopPropagation()">
-            <div class="relative p-6 text-center space-y-2.5 bg-gradient-to-b from-amber-500/20 via-amber-400/5 to-transparent border-b gold-border">
+        <div class="app-card border rounded-3xl max-w-md w-full overflow-hidden shadow-2xl flex flex-col max-h-[90vh]" onclick="event.stopPropagation()">
+            <div class="relative p-5 text-center space-y-2 bg-gradient-to-b from-amber-500/20 via-amber-400/5 to-transparent border-b gold-border shrink-0">
                 <button type="button" onclick="closeCabangCoinInfoModal()" class="absolute top-4 right-4 w-8 h-8 rounded-full app-btn-sec flex items-center justify-center text-xs"><i class="fa-solid fa-xmark"></i></button>
-                <div class="flex justify-center pt-1">
+                <div class="flex justify-center pt-0.5">
                     <span class="lbk-gold-coin lbk-gold-coin-lg" aria-hidden="true">
                         <img src="./lembarku-logo.png" alt="Lembarku Coin" class="lbk-gold-coin-logo" onerror="this.style.display='none';if(this.nextElementSibling)this.nextElementSibling.classList.remove('hide');">
                         <span class="hide lbk-gold-coin-fallback text-3xl">L</span>
                     </span>
                 </div>
                 <div>
-                    <span class="text-[10px] uppercase tracking-[0.22em] font-extrabold text-amber-600 block">Lembarku Partner Coin</span>
+                    <span id="cci-tier-tag" class="text-[10px] uppercase tracking-[0.22em] font-extrabold text-amber-600 block">Lembarku Coin</span>
                     <h3 class="text-2xl font-extrabold mt-0.5"><span id="cci-balance-num" class="text-amber-600">0</span> Coin</h3>
-                    <p id="cci-owner-sub" class="text-[11px] app-muted">Saldo Coin Resmi Mitra Cabang</p>
+                    <p id="cci-owner-sub" class="text-[11px] app-muted">Saldo Coin Aktif</p>
+                </div>
+                <div class="flex justify-center gap-1.5 pt-1">
+                    <button type="button" id="cci-tab-info" onclick="switchCoinModalTab('info')" class="px-3.5 py-1.5 rounded-full text-[11px] font-extrabold gold-pill-btn">Info &amp; Beli Coin</button>
+                    <button type="button" id="cci-tab-history" onclick="switchCoinModalTab('history')" class="px-3.5 py-1.5 rounded-full text-[11px] font-bold app-btn-sec"><i class="fa-solid fa-clock-rotate-left mr-1"></i>Riwayat Mutasi</button>
                 </div>
             </div>
 
-            <div class="p-5 space-y-3.5 text-xs max-h-[58vh] overflow-y-auto">
+            <div id="cci-pane-info" class="p-5 space-y-3.5 text-xs overflow-y-auto flex-1">
                 <div class="app-card-soft border rounded-2xl p-3.5 space-y-1">
                     <h4 class="font-extrabold text-xs text-amber-600"><i class="fa-solid fa-coins mr-1.5"></i>Apa Fungsi Coin Lembarku?</h4>
                     <p class="text-[11.5px] app-muted leading-relaxed">
-                        <strong>Coin</strong> adalah saldo khusus Admin Cabang yang digunakan untuk membeli &amp; mengaktifkan project (Undangan Digital, CV, maupun Surat Lamaran) dengan <strong>harga grosir jauh lebih murah</strong> dibanding pembelian satuan biasa.
+                        <strong>Coin</strong> adalah saldo resmi untuk membeli &amp; mengaktifkan project (Undangan Digital, CV, maupun Surat Lamaran) dengan <strong>tarif lebih hemat 30%–52%</strong> dan aktivasi instan otomatis tanpa menunggu antrean.
                     </p>
                 </div>
 
-                <div class="space-y-2">
-                    <h4 class="font-extrabold text-[11px] uppercase tracking-wider app-muted px-1">Keuntungan Menggunakan Coin</h4>
-                    <div class="app-card-soft border rounded-2xl p-3 flex items-start gap-2.5">
-                        <span class="w-7 h-7 rounded-xl bg-amber-500/15 text-amber-600 flex items-center justify-center shrink-0 text-xs"><i class="fa-solid fa-tags"></i></span>
-                        <div>
-                            <strong class="block text-xs">Harga Lebih Murah &amp; Untung Besar</strong>
-                            <span class="text-[11px] app-muted leading-snug block">Tarif Coin menyesuaikan tiap jenis project (lebih hemat 30%–52% dari harga eceran), sehingga Anda bebas menentukan harga jual ke klien.</span>
-                        </div>
-                    </div>
-                    <div class="app-card-soft border rounded-2xl p-3 flex items-start gap-2.5">
-                        <span class="w-7 h-7 rounded-xl bg-emerald-500/15 text-emerald-600 flex items-center justify-center shrink-0 text-xs"><i class="fa-solid fa-bolt"></i></span>
-                        <div>
-                            <strong class="block text-xs">Aktivasi Instan Tanpa Menunggu</strong>
-                            <span class="text-[11px] app-muted leading-snug block">Project klien langsung berstatus <strong>Aktif</strong> otomatis (saldo terpotong sesuai Coin tema) tanpa antre verifikasi pembayaran.</span>
-                        </div>
-                    </div>
-                    <div class="app-card-soft border rounded-2xl p-3 flex items-start gap-2.5">
-                        <span class="w-7 h-7 rounded-xl bg-blue-500/15 text-blue-600 flex items-center justify-center shrink-0 text-xs"><i class="fa-solid fa-crown"></i></span>
-                        <div>
-                            <strong class="block text-xs">Brand Sendiri &amp; Portal Tamu Mandiri</strong>
-                            <span class="text-[11px] app-muted leading-snug block">Undangan tampil dengan nama usaha Anda dan klien bisa input daftar tamu sendiri lewat link khusus.</span>
-                        </div>
-                    </div>
-                    <div class="app-card-soft border rounded-2xl p-3 flex items-start gap-2.5">
-                        <span class="w-7 h-7 rounded-xl bg-purple-500/15 text-purple-600 flex items-center justify-center shrink-0 text-xs"><i class="fa-solid fa-infinity"></i></span>
-                        <div>
-                            <strong class="block text-xs">Coin Tidak Hangus</strong>
-                            <span class="text-[11px] app-muted leading-snug block">Saldo Coin tersimpan permanen di akun cabang tanpa batas masa berlaku.</span>
-                        </div>
-                    </div>
-                </div>
-
-                <!-- Rincian Tarif Coin per Project & Pricelist Isi Ulang (Dinamis) -->
-                <div id="cci-rates-and-pricelist" class="space-y-3 pt-1"></div>
+                <!-- Rincian Tarif Coin per Project & Pricelist Isi Ulang (Dinamis + Tombol Beli QRIS) -->
+                <div id="cci-rates-and-pricelist" class="space-y-3"></div>
             </div>
 
-            <div class="px-5 py-3.5 border-t gold-border flex gap-2">
+            <div id="cci-pane-history" class="hide p-5 space-y-2.5 text-xs overflow-y-auto flex-1">
+                <div id="cci-history-list" class="space-y-2"></div>
+            </div>
+
+            <div class="px-5 py-3.5 border-t gold-border flex gap-2 shrink-0">
                 <button type="button" onclick="closeCabangCoinInfoModal()" class="px-4 py-2.5 rounded-xl app-btn-sec text-xs font-bold">Tutup</button>
-                <button type="button" id="cci-topup-btn" onclick="requestTopUpCoinViaChat()" class="flex-1 gold-pill-btn py-2.5 rounded-xl text-xs shadow-lg flex items-center justify-center gap-1.5">
-                    <i class="fa-solid fa-comments"></i> Isi Ulang Coin (Chat Founder)
+                <button type="button" id="cci-topup-btn" onclick="requestTopUpCoinViaChat()" class="flex-1 app-card-soft border gold-border app-accent py-2.5 rounded-xl text-xs font-bold flex items-center justify-center gap-1.5">
+                    <i class="fa-solid fa-comments"></i> Bantuan Top-Up (Chat)
                 </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- POPUP PENAWARAN UPGRADE PRO BERKALA (NON-PERMANEN, KHUSUS USER BIASA) -->
+    <div id="modal-upgrade-pro-promo" class="hide fixed inset-0 z-[151] bg-black/82 backdrop-blur-sm flex items-center justify-center p-4" onclick="if(event.target===this)closeUpgradeProPromoModal()">
+        <div class="app-card border rounded-3xl max-w-sm w-full overflow-hidden shadow-2xl" onclick="event.stopPropagation()">
+            <div class="relative p-6 text-center space-y-3 bg-gradient-to-b from-blue-600/20 via-amber-400/10 to-transparent border-b gold-border">
+                <button type="button" onclick="closeUpgradeProPromoModal()" class="absolute top-3.5 right-3.5 w-8 h-8 rounded-full app-btn-sec flex items-center justify-center text-xs"><i class="fa-solid fa-xmark"></i></button>
+                <div class="flex items-center justify-center gap-2 pt-1">
+                    <span class="lbk-gold-coin lbk-gold-coin-lg" aria-hidden="true">
+                        <img src="./lembarku-logo.png" alt="Lembarku PRO Coin" class="lbk-gold-coin-logo" onerror="this.style.display='none';if(this.nextElementSibling)this.nextElementSibling.classList.remove('hide');">
+                        <span class="hide lbk-gold-coin-fallback text-3xl">L</span>
+                    </span>
+                </div>
+                <span class="inline-flex items-center gap-1 px-3 py-0.5 rounded-full bg-blue-600 text-white text-[9.5px] font-extrabold uppercase tracking-wider shadow"><i class="fa-solid fa-circle-check"></i> Penawaran Akun PRO</span>
+                <h3 class="text-lg font-extrabold leading-snug">Upgrade ke PRO — Bikin Berkas Lebih Hemat &amp; Instan</h3>
+                <p class="text-xs app-muted leading-relaxed">
+                    Nikmati fitur <strong>Coin harga khusus</strong>, aktivasi project otomatis tanpa antre, <strong>Centang Biru</strong>, dan <strong>Album Rahasia tanpa batas</strong>. Sekali upgrade, <strong id="upp-bonus-coin-lbl" class="text-amber-600">Bonus Coin Perdana</strong> langsung masuk ke saldo Anda.
+                </p>
+            </div>
+            <div class="p-5 space-y-3.5 text-xs">
+                <div class="app-card-soft border-2 border-amber-400/50 rounded-2xl p-3.5 flex items-center justify-between gap-2">
+                    <div>
+                        <span class="text-[10px] uppercase font-bold app-muted block">Biaya Upgrade Sekali Bayar</span>
+                        <strong id="upp-price-lbl" class="text-xl font-extrabold app-accent">Rp 49.000</strong>
+                    </div>
+                    <span id="upp-bonus-pill" class="px-3 py-1.5 rounded-xl bg-amber-500/15 text-amber-600 text-[11px] font-extrabold">+5 Coin</span>
+                </div>
+                <div class="flex gap-2">
+                    <button type="button" onclick="closeUpgradeProPromoModal()" class="px-4 py-2.5 rounded-xl app-btn-sec text-xs font-bold">Nanti Saja</button>
+                    <button type="button" onclick="startProUpgradeQrisOrder()" class="flex-1 gold-pill-btn py-2.5 rounded-xl text-xs shadow-lg"><i class="fa-solid fa-bolt mr-1"></i>Upgrade PRO Sekarang</button>
+                </div>
             </div>
         </div>
     </div>

@@ -399,6 +399,26 @@ function selectWizardTheme(name) {
     document.getElementById("form-badge-cat").innerText = wizardState.category;
     document.getElementById("form-badge-theme").innerText = name;
     document.getElementById("form-badge-price").innerText = wizardState.isCabangBypass ? `${coinCost} Coin` : fmtRp(pr.price);
+
+    const curU = getCurrentUserObj();
+    const isProUser = !!(curU && curU.role === "user" && curU.isPro && !wizardState.isEdit && !wizardState.isCabangBypass);
+    const proWrap = document.getElementById("wiz-pro-paymode-wrap");
+    if (proWrap) {
+        proWrap.classList.toggle("hide", !isProUser);
+        if (isProUser) {
+            const bal = Number(curU.quota || 0);
+            const balEl = document.getElementById("wiz-pro-coin-bal");
+            const optEl = document.getElementById("wiz-pro-coin-opt-lbl");
+            if (balEl) balEl.innerText = `Saldo Anda: ${bal} Coin`;
+            if (optEl) optEl.innerText = `Potong ${coinCost} Coin`;
+            const coinRad = document.querySelector('input[name="wiz_pro_paymode"][value="coin"]');
+            const normRad = document.querySelector('input[name="wiz_pro_paymode"][value="normal"]');
+            if (coinRad && normRad) {
+                if (bal >= coinCost) { coinRad.checked = true; } else { normRad.checked = true; }
+            }
+            onWizardProPayModeChange();
+        }
+    }
     wizardState.hiddenFields = [];
     wizardState.sections = { sesi2: wizardState.category === "Pernikahan", story: wizardState.category === "Pernikahan", bank: true, music: true, closing: true };
     document.getElementById("toggle-countdown").checked = true; document.getElementById("toggle-wishes").checked = true;
@@ -428,6 +448,21 @@ function selectWizardTheme(name) {
     populateMusicDropdown(tObj.defaultAudio || "");
     bindInvFormAutoSave();
     setWizardStep(2);
+}
+
+function onWizardProPayModeChange() {
+    const mode = document.querySelector('input[name="wiz_pro_paymode"]:checked')?.value || "normal";
+    const coinCost = getThemeCoinCost(wizardState.category, getSelectedThemeObj());
+    const pr = getThemePricing(getSelectedThemeObj());
+    const btnEl = document.getElementById("btn-submit-inv");
+    const priceEl = document.getElementById("form-badge-price");
+    if (mode === "coin") {
+        if (btnEl) btnEl.innerText = `Buat & Aktifkan (-${coinCost} Coin)`;
+        if (priceEl) priceEl.innerText = `${coinCost} Coin`;
+    } else {
+        if (btnEl) btnEl.innerText = "Ajukan Undangan";
+        if (priceEl) priceEl.innerText = fmtRp(pr.price);
+    }
 }
 
 function bindInvFormAutoSave() {
@@ -571,13 +606,16 @@ async function saveInvitationDraft(e) {
     }
 
     const coinCost = getThemeCoinCost(wizardState.category, getSelectedThemeObj());
+    const proWantsCoin = !!(curU && curU.role === "user" && curU.isPro && !wizardState.isCabangBypass && (document.querySelector('input[name="wiz_pro_paymode"]:checked')?.value === "coin"));
+    const useCoinInstant = wizardState.isCabangBypass || proWantsCoin;
+
     let beforeQuota = 0;
-    if (wizardState.isCabangBypass) {
-        const cabNow = getCurrentUserObj();
-        beforeQuota = Number((cabNow && cabNow.quota) || 0);
+    if (useCoinInstant) {
+        const uNow = getCurrentUserObj();
+        beforeQuota = Number((uNow && uNow.quota) || 0);
         if (beforeQuota < coinCost) {
             setBtnLoading("btn-submit-inv", false);
-            return showToast(`Saldo Coin tidak cukup! Butuh ${coinCost} Coin, saldo Anda ${beforeQuota} Coin.`, "error");
+            return showToast(`Saldo Coin tidak cukup! Butuh ${coinCost} Coin, saldo Anda ${beforeQuota} Coin. Silakan beli paket Coin dulu.`, "error");
         }
     }
 
@@ -585,8 +623,8 @@ async function saveInvitationDraft(e) {
     const newId = Date.now();
     const newInv = {
         id: newId, createdAt: newId, owner: currentSessionUser, clientKey: genKey,
-        status: wizardState.isCabangBypass ? "Aktif" : "Menunggu Pembayaran",
-        coinCost: wizardState.isCabangBypass ? coinCost : 0,
+        status: useCoinInstant ? "Aktif" : "Menunggu Pembayaran",
+        coinCost: useCoinInstant ? coinCost : 0,
         editCount: 0, uniqueCode: getDeterministicUniqueCode(newId),
         paymentProof: "", guests: ["Tamu Kehormatan"], sentGuests: [], waTemplate: "", wishes: [], ...payload
     };
@@ -595,21 +633,24 @@ async function saveInvitationDraft(e) {
     const resInv = await apiAction({
         action: "upsert_invitation",
         invitation: newInv,
-        deductQuotaFrom: wizardState.isCabangBypass ? currentSessionUser : "",
-        deductQuotaAmount: wizardState.isCabangBypass ? coinCost : 0
+        deductQuotaFrom: useCoinInstant ? currentSessionUser : "",
+        deductQuotaAmount: useCoinInstant ? coinCost : 0
     });
     if (!resInv || !resInv.ok) {
         setBtnLoading("btn-submit-inv", false);
         return showToast((resInv && resInv.message) || "Gagal menyimpan undangan.", "error");
     }
 
-    if (wizardState.isCabangBypass) {
+    if (useCoinInstant) {
         const expectedQuota = Math.max(0, beforeQuota - coinCost);
-        const cabAfter = getCurrentUserObj();
-        if (cabAfter && Number(cabAfter.quota) !== expectedQuota) {
-            const fixedCab = Object.assign({}, cabAfter, { quota: expectedQuota });
-            await apiAction({ action: "upsert_user", oldUsername: cabAfter.username, user: fixedCab });
-            if (typeof ensureUserInLocalDb === "function") ensureUserInLocalDb(fixedCab);
+        const uAfter = getCurrentUserObj();
+        if (uAfter) {
+            const fixedU = Object.assign({}, uAfter, { quota: expectedQuota });
+            if (typeof recordCoinMutation === "function") {
+                recordCoinMutation(fixedU, -coinCost, `Undangan: ${payload.title || wizardState.theme}`, `${wizardState.category} • ${wizardState.theme}`, expectedQuota);
+            }
+            await apiAction({ action: "upsert_user", oldUsername: uAfter.username, user: fixedU });
+            if (typeof ensureUserInLocalDb === "function") ensureUserInLocalDb(fixedU);
         }
     }
 
@@ -620,8 +661,10 @@ async function saveInvitationDraft(e) {
         idbSet("db_snapshot", db);
     }
     try { localStorage.removeItem(DRAFT_INV_KEY); } catch {}
-    if (wizardState.isCabangBypass) {
-        showToast(`Undangan klien langsung AKTIF (-${coinCost} Coin)! Klik Link Klien untuk portal tamu.`);
+    if (useCoinInstant) {
+        showToast(wizardState.isCabangBypass
+            ? `Undangan klien langsung AKTIF (-${coinCost} Coin)! Klik Link Klien untuk portal tamu.`
+            : `Undangan PRO langsung AKTIF (-${coinCost} Coin)! Siap dibagikan ke tamu.`);
         return routeDashboard();
     }
     openUnifiedPayment("inv", newInv.id);
@@ -1557,6 +1600,7 @@ function closeGuestInvitation() {
     if (scrollRafId) { cancelAnimationFrame(scrollRafId); scrollRafId = null; }
     previewOpenCount++;
     if (previewOpenCount >= 2 && !currentSessionUser && typeof maybeShowLoginReminder === "function") setTimeout(maybeShowLoginReminder, 600);
+    if (previewOpenCount >= 2 && currentSessionUser && typeof maybeShowUpgradeProPromoPopup === "function") setTimeout(maybeShowUpgradeProPromoPopup, 900);
 }
 function openEventMap(t) { window.open((t === "resepsi" ? activeGuestInv.resepsiMap : activeGuestInv.akadMap) || "https://maps.google.com", "_blank"); }
 function saveEventToGoogleCalendar() {

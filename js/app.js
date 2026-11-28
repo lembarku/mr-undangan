@@ -337,7 +337,7 @@ function _mrDropTopTransientToken(closedId) {
 }
 
 function _mrHasVisibleDrawerSub() {
-    return ["drawer-sub-theme", "drawer-sub-privacy", "drawer-sub-about", "drawer-sub-profil", "drawer-sub-akun", "drawer-sub-password", "drawer-sub-qris"]
+    return ["drawer-sub-theme", "drawer-sub-privacy", "drawer-sub-blocked", "drawer-sub-about", "drawer-sub-profil", "drawer-sub-akun", "drawer-sub-password", "drawer-sub-qris", "drawer-sub-qris-cfg", "drawer-sub-banks-cfg"]
         .some(id => _isElVis(id));
 }
 
@@ -444,6 +444,10 @@ function _mrCloseTransientOverlayIfAny() {
         if (typeof closeSecretPhotoLightbox === "function") closeSecretPhotoLightbox();
         return "ios-vault-lightbox";
     }
+    if (_isElVis("modal-upgrade-pro-promo")) {
+        closeUpgradeProPromoModal();
+        return "modal-upgrade-pro-promo";
+    }
     if (_isElVis("modal-cabang-coin-info")) {
         closeCabangCoinInfoModal();
         return "modal-cabang-coin-info";
@@ -526,6 +530,9 @@ function _mrCloseTransientOverlayIfAny() {
         return "drawer-main";
     }
     if (_isElVis("modal-master-workspace")) {
+        if (typeof handleMasterWorkspaceBackBtn === "function" && handleMasterWorkspaceBackBtn()) {
+            return "modal-master-workspace-sub";
+        }
         if (typeof closeMasterWorkspaceFullscreen === "function") closeMasterWorkspaceFullscreen(true);
         else document.getElementById("modal-master-workspace")?.classList.add("hide");
         return "modal-master-workspace";
@@ -1211,6 +1218,71 @@ function buildNotificationsForCurrentUser() {
         }
     }
 
+    // 1. Pengingat Otomatis Jadwal Sewa Sepeda (< 15 Menit atau Lewat Waktu)
+    if (typeof getGowesScheduleStatusInfo === "function") {
+        if (role === "master" || role === "administrasi") {
+            allRentals.filter(r => r && r.status === "Sedang Digunakan").forEach(r => {
+                const info = getGowesScheduleStatusInfo(r);
+                if (info.state === "overdue" || info.state === "warning") {
+                    items.push({
+                        id: `gw_alert_${r.id}_${info.state}`,
+                        ts: Date.now(),
+                        unread: true,
+                        priority: true,
+                        icon: "fa-solid fa-stopwatch",
+                        accent: info.state === "overdue" ? "text-red-500" : "text-amber-500",
+                        title: info.state === "overdue"
+                            ? `[OVERDUE] ${r.bikeName} — ${info.badge}`
+                            : `[HAMPIR HABIS] ${r.bikeName} — ${info.badge}`,
+                        desc: `Penyewa: ${r.customerName || r.customerUsername} • Batas kembali ${info.deadlineLabel} WITA. Ketuk untuk lihat jadwal & WA pengingat.`,
+                        actionJs: `closeNotificationsFullscreen(true);if(typeof openSoloProjectModal==='function'){if(typeof setSoloProjectDomainFilter==='function')setSoloProjectDomainFilter('gowes');openSoloProjectModal('${esc(myKey)}');}`
+                    });
+                }
+            });
+        } else {
+            allRentals.filter(r => r && _normAppUserKey(r.customerUsername) === myKey && r.status === "Sedang Digunakan").forEach(r => {
+                const info = getGowesScheduleStatusInfo(r);
+                if (info.state === "overdue" || info.state === "warning") {
+                    items.push({
+                        id: `gw_my_alert_${r.id}_${info.state}`,
+                        ts: Date.now(),
+                        unread: true,
+                        priority: true,
+                        icon: "fa-solid fa-bicycle",
+                        accent: info.state === "overdue" ? "text-red-500" : "text-amber-500",
+                        title: info.state === "overdue"
+                            ? `Waktu Sewa Sepeda Habis (${info.badge})`
+                            : `Pengingat Sewa Sepeda: ${info.badge}`,
+                        desc: `Unit ${r.bikeName} batas pengembalian pukul ${info.deadlineLabel} WITA di ${r.pickupLocation || "Shelter"}.`,
+                        actionJs: `closeNotificationsFullscreen(true);if(typeof openGowesRentalDetail==='function')openGowesRentalDetail('${esc(r.id)}');`
+                    });
+                }
+            });
+        }
+    }
+
+    // 2. Notifikasi Follower Baru (bisa langsung ketuk untuk Ikuti Balik / Follback)
+    if (role !== "cabang") {
+        const myFollowers = typeof _getFollowersListForUser === "function" ? _getFollowersListForUser(u) : [];
+        const myFollowing = typeof _getFollowingListForUser === "function" ? _getFollowingListForUser(u) : [];
+        myFollowers.slice(0, 6).forEach((fKey, idx) => {
+            const fObj = (db.users || []).find(x => _normAppUserKey(x.username) === fKey);
+            if (!fObj) return;
+            const alreadyBack = myFollowing.includes(fKey);
+            const fHandle = (typeof canSeeUserHandle !== "function" || canSeeUserHandle(fObj)) ? `@${fObj.username}` : (fObj.name || "Pengguna");
+            items.push({
+                id: `fol_${fKey}`,
+                ts: Number(fObj.createdAt || (Date.now() - idx * 60000)),
+                unread: !alreadyBack && (Date.now() - lastRead > 1000 * 60 * 5 || lastRead === 0),
+                icon: "fa-solid fa-user-plus",
+                accent: "text-blue-500",
+                title: `${fObj.name || fObj.username} mengikuti Anda`,
+                desc: alreadyBack ? `${fHandle} — Anda sudah saling mengikuti.` : `${fHandle} — Ketuk untuk melihat profil & Ikuti Balik.`,
+                actionJs: `closeNotificationsFullscreen(true);if(typeof viewUserProfileModal==='function')viewUserProfileModal('${esc(fKey)}');`
+            });
+        });
+    }
+
     return items.sort((a, b) => (Number(!!b.priority) - Number(!!a.priority)) || (Number(b.ts || 0) - Number(a.ts || 0)));
 }
 
@@ -1508,6 +1580,14 @@ function handleDrawerBackBtn(fromPopstate = false) {
         openSlideSub("akun", true);
         return;
     }
+    if (_currentDrawerSub === "blocked") {
+        openSlideSub("privacy", true);
+        return;
+    }
+    if (_currentDrawerSub === "qris_cfg" || _currentDrawerSub === "banks_cfg") {
+        openSlideSub("qris", true);
+        return;
+    }
     backToMainSlideMenu(fromPopstate);
 }
 
@@ -1517,7 +1597,7 @@ function backToMainSlideMenu(silent = false) {
     if (tEl) tEl.innerText = "Pengaturan";
     document.getElementById("drawer-back-btn")?.classList.add("hide");
     document.getElementById("drawer-main-list")?.classList.remove("hide");
-    ["drawer-sub-theme", "drawer-sub-privacy", "drawer-sub-about", "drawer-sub-profil", "drawer-sub-akun", "drawer-sub-password", "drawer-sub-qris"]
+    ["drawer-sub-theme", "drawer-sub-privacy", "drawer-sub-blocked", "drawer-sub-about", "drawer-sub-profil", "drawer-sub-akun", "drawer-sub-password", "drawer-sub-qris", "drawer-sub-qris-cfg", "drawer-sub-banks-cfg"]
         .forEach(id => document.getElementById(id)?.classList.add("hide"));
     const sc = document.getElementById("drawer-scroll-body");
     if (sc) sc.scrollTop = 0;
@@ -1568,12 +1648,17 @@ function renderMainSlideMenuList() {
         html += menuRowItem("fa-user-pen", "Profil & Label Brand Cabang", "Foto, sampul, nama brand & kontak", "openSlideSub('profil')");
         html += menuRowItem("fa-shield-halved", "Keamanan Akun & Keluar", "Username, ganti password aman & logout", "openSlideSub('akun')");
     } else {
+        if (!u.isPro) {
+            html += menuRowItem("fa-crown", "Upgrade Akun PRO", "Buka fitur Coin harga hemat, Centang Biru & Album Unlimited", "toggleSlideMenu(false);openUpgradeProPromoModal(true);");
+        } else {
+            html += menuRowItem("fa-coins", "Saldo Coin PRO & Buku Kas", "Beli paket Coin via QRIS & cek riwayat mutasi", "toggleSlideMenu(false);openCabangCoinInfoModal();");
+        }
         html += menuRowItem("fa-user-pen", "Pengaturan Profil", "Foto, sampul, nama & kontak", "openSlideSub('profil')");
-        html += menuRowItem("fa-user-shield", "Privasi & Blokir User", "Atur postingan, followers, following & blokir", "openSlideSub('privacy')");
+        html += menuRowItem("fa-user-shield", "Privasi & Blokir User", "Atur postingan, username, pencarian & blokir", "openSlideSub('privacy')");
         html += menuRowItem("fa-shield-halved", "Keamanan Akun & Keluar", "Username, ganti password aman & logout", "openSlideSub('akun')");
     }
 
-    html += menuRowItem("fa-swatchbook", "Tampilan & Warna Aplikasi", "Gaya Pengaturan iOS & nuansa lainnya", "openSlideSub('theme')");
+    html += menuRowItem("fa-swatchbook", "Tampilan & Warna Aplikasi", "Mode terang, gelap & nuansa warna lainnya", "openSlideSub('theme')");
     if (!isAppInstalled()) {
         html += menuRowItem("fa-mobile-screen-button", "Pasang Aplikasi (< 2 MB)", "Akses super cepat dari layar utama HP", "toggleSlideMenu(false);openWelcomeInstallModal(true);");
     }
@@ -1591,7 +1676,7 @@ function openSlideSub(sec, skipNavPush = false) {
     _currentDrawerSub = sec;
     document.getElementById("drawer-back-btn")?.classList.remove("hide");
     document.getElementById("drawer-main-list")?.classList.add("hide");
-    ["drawer-sub-theme", "drawer-sub-privacy", "drawer-sub-about", "drawer-sub-profil", "drawer-sub-akun", "drawer-sub-password", "drawer-sub-qris"]
+    ["drawer-sub-theme", "drawer-sub-privacy", "drawer-sub-blocked", "drawer-sub-about", "drawer-sub-profil", "drawer-sub-akun", "drawer-sub-password", "drawer-sub-qris", "drawer-sub-qris-cfg", "drawer-sub-banks-cfg"]
         .forEach(id => document.getElementById(id)?.classList.add("hide"));
 
     const sc = document.getElementById("drawer-scroll-body");
@@ -1648,21 +1733,32 @@ function openSlideSub(sec, skipNavPush = false) {
         });
         evaluatePasswordStrengthUI();
         document.getElementById("drawer-sub-password")?.classList.remove("hide");
+    } else if (sec === "blocked" && u) {
+        if (tEl) tEl.innerText = "Daftar Akun Diblokir";
+        renderPrivacySubPanel();
+        document.getElementById("drawer-sub-blocked")?.classList.remove("hide");
     } else if (sec === "qris" && u && u.role === "master") {
         if (tEl) tEl.innerText = "QRIS DANA & Rekening";
+        document.getElementById("drawer-sub-qris")?.classList.remove("hide");
+    } else if (sec === "qris_cfg" && u && u.role === "master") {
+        if (tEl) tEl.innerText = "Pengaturan QRIS DANA";
         const ms = db.masterSettings || {};
         const mSel = document.getElementById("ms-qris-mode"); if (mSel) mSel.value = ms.qrisMode || "static";
         const dInp = document.getElementById("ms-qris-dyn-str"); if (dInp) dInp.value = ms.qrisDynamicString || "";
         const uChk = document.getElementById("ms-qris-unique"); if (uChk) uChk.checked = ms.qrisUniqueCode !== false;
         const qPrev = document.getElementById("ms-qris-prev"); if (qPrev) qPrev.src = ms.qrisImage || "";
-        const pInp = document.getElementById("ms-p"); if (pInp) pInp.value = ms.priceText || "Rp 99.000";
         if (typeof toggleQrisModeFields === "function") toggleQrisModeFields();
+        document.getElementById("drawer-sub-qris-cfg")?.classList.remove("hide");
+    } else if (sec === "banks_cfg" && u && u.role === "master") {
+        if (tEl) tEl.innerText = "Rekening & Backup";
+        const ms = db.masterSettings || {};
+        const pInp = document.getElementById("ms-p"); if (pInp) pInp.value = ms.priceText || "Rp 99.000";
         const box = document.getElementById("ms-banks-container");
         if (box && typeof getMasterBanksList === "function" && typeof addMasterBankRow === "function") {
             box.innerHTML = "";
             getMasterBanksList().forEach(b => addMasterBankRow(b.bank, b.no, b.holder));
         }
-        document.getElementById("drawer-sub-qris")?.classList.remove("hide");
+        document.getElementById("drawer-sub-banks-cfg")?.classList.remove("hide");
     }
 
     if (!skipNavPush) mrNavPush({ type: "drawer_sub", sec });
@@ -1676,6 +1772,7 @@ function renderPrivacySubPanel() {
     const setChk = (id, val) => { const el = document.getElementById(id); if (el) el.checked = !!val; };
     setChk("priv-show-projects", priv.showProjects);
     setChk("priv-show-username", priv.showUsername);
+    setChk("priv-allow-search", priv.allowSearchDiscovery);
     setChk("priv-show-followers", priv.showFollowers);
     setChk("priv-show-following", priv.showFollowing);
     setChk("priv-show-contact", priv.showContact);
@@ -1718,6 +1815,7 @@ async function savePrivacySettings() {
     const privacy = {
         showProjects: !!document.getElementById("priv-show-projects")?.checked,
         showUsername: !!document.getElementById("priv-show-username")?.checked,
+        allowSearchDiscovery: !!document.getElementById("priv-allow-search")?.checked,
         showFollowers: !!document.getElementById("priv-show-followers")?.checked,
         showFollowing: !!document.getElementById("priv-show-following")?.checked,
         showContact: !!document.getElementById("priv-show-contact")?.checked,
@@ -2328,7 +2426,7 @@ function buildFilmPosterDocCardHtml(doc, isCabang = false) {
 function getUserCombinedDocs(username) {
     const uname = _normAppUserKey(username);
     const invs = (db.invitations || []).filter(i => _normAppUserKey(i.owner) === uname).map(i => Object.assign({}, i, { _kind: "inv" }));
-    const pfs = (db.portfolios || []).filter(p => _normAppUserKey(p.owner) === uname).map(p => Object.assign({}, p, { _kind: "pf" }));
+    const pfs = (db.portfolios || []).filter(p => _normAppUserKey(p.owner) === uname && (typeof isSystemCoinOrder !== "function" || !isSystemCoinOrder(p))).map(p => Object.assign({}, p, { _kind: "pf" }));
     return [...invs, ...pfs].sort((a, b) => Number(b.createdAt || b.id || 0) - Number(a.createdAt || a.id || 0));
 }
 
@@ -2392,6 +2490,10 @@ function renderUserProfile() {
     const caEl = document.getElementById("prof-composer-avatar"); if (caEl) caEl.src = u.avatar || defAv;
     const nEl = document.getElementById("prof-name"); if (nEl) nEl.innerText = u.name;
     document.getElementById("prof-pro-badge")?.classList.toggle("hide", !u.isPro);
+    const proCoinPill = document.getElementById("prof-pro-coin-pill");
+    const proCoinVal = document.getElementById("prof-pro-coin-val");
+    if (proCoinPill) proCoinPill.classList.toggle("hide", !(u.role === "user" && u.isPro));
+    if (proCoinVal) proCoinVal.innerText = String(u.quota || 0);
     const uPriv = typeof getUserPrivacy === "function" ? getUserPrivacy(u) : { showUsername: true };
     const uEl = document.getElementById("prof-username"); if (uEl) uEl.innerHTML = uPriv.showUsername ? `@${escHtml(u.username)}` : `@${escHtml(u.username)} <span class="text-[9px] px-1.5 py-0.5 rounded-full app-btn-sec app-muted ml-1"><i class="fa-solid fa-eye-slash mr-0.5"></i>Disembunyikan</span>`;
     const bioEl = document.getElementById("prof-bio"); if (bioEl) bioEl.innerText = u.bio || "";
@@ -2556,6 +2658,10 @@ async function bootMrUndanganApp() {
             return;
         }
 
+        if (p.has("user")) {
+            window.__PENDING_OPEN_PROFILE_USER__ = String(p.get("user") || "").trim().toLowerCase();
+        }
+
         if ((p.has("inv") || p.has("to")) && typeof fetchSingleInvitationFast === "function") {
             if (typeof hideHelloSplash === "function") hideHelloSplash();
             if (typeof showEnvelopeLoader === "function") showEnvelopeLoader("Membuka Undangan...");
@@ -2607,6 +2713,13 @@ async function bootMrUndanganApp() {
                         ensureUserInLocalDb(uNow);
                         renderHeaderActions();
                         refreshActiveViewSmart();
+                        if (window.__PENDING_OPEN_PROFILE_USER__ && typeof viewUserProfileModal === "function") {
+                            const tgtU = window.__PENDING_OPEN_PROFILE_USER__;
+                            window.__PENDING_OPEN_PROFILE_USER__ = "";
+                            setTimeout(() => viewUserProfileModal(tgtU), 300);
+                        } else if (typeof maybeShowUpgradeProPromoPopup === "function") {
+                            setTimeout(() => maybeShowUpgradeProPromoPopup(), 18000);
+                        }
                     }
                     if (typeof updateChatBadges === "function") updateChatBadges();
                 });
@@ -2863,25 +2976,74 @@ function attachSelectivePinchZoom(stageEl, targetEl, opts = {}) {
     reset();
 }
 
-// ================= 12. MODAL INFO COIN ADMIN CABANG (V14.9) =================
+// ================= 12. MODAL COIN LEMBARKU (INFO, BELI QRIS & BUKU KAS MUTASI) =================
+let _activeCoinModalUserKey = "";
+
+function switchCoinModalTab(tab) {
+    const isHistory = tab === "history";
+    document.getElementById("cci-pane-info")?.classList.toggle("hide", isHistory);
+    document.getElementById("cci-pane-history")?.classList.toggle("hide", !isHistory);
+    const tInfo = document.getElementById("cci-tab-info");
+    const tHist = document.getElementById("cci-tab-history");
+    if (tInfo) tInfo.className = `px-3.5 py-1.5 rounded-full text-[11px] font-extrabold ${!isHistory ? "gold-pill-btn" : "app-btn-sec"}`;
+    if (tHist) tHist.className = `px-3.5 py-1.5 rounded-full text-[11px] font-bold ${isHistory ? "gold-pill-btn" : "app-btn-sec"}`;
+}
+
+function renderCoinMutationHistoryHtml(userObj) {
+    const list = typeof getCoinHistoryForUser === "function" ? getCoinHistoryForUser(userObj) : [];
+    if (!list.length) {
+        return `<div class="app-card-soft border border-dashed rounded-2xl p-6 text-center space-y-1.5">
+            <i class="fa-solid fa-book-open text-2xl text-amber-500/60"></i>
+            <p class="text-xs font-bold">Belum Ada Riwayat Mutasi Coin</p>
+            <p class="text-[11px] app-muted">Setiap pengisian ulang dan pemakaian Coin untuk project akan tercatat otomatis di buku kas ini.</p>
+        </div>`;
+    }
+    return list.map(m => {
+        const isPlus = Number(m.delta || 0) >= 0;
+        const dtStr = m.ts ? new Date(Number(m.ts)).toLocaleDateString("id-ID", { day: "2-digit", month: "short", year: "2-digit", hour: "2-digit", minute: "2-digit" }) : "";
+        return `
+            <div class="app-card-soft border rounded-2xl p-3 flex items-center justify-between gap-2.5">
+                <div class="flex items-start gap-2.5 min-w-0 flex-1">
+                    <span class="w-8 h-8 rounded-xl ${isPlus ? "bg-emerald-500/15 text-emerald-600" : "bg-red-500/15 text-red-500"} flex items-center justify-center text-xs shrink-0">
+                        <i class="fa-solid ${isPlus ? "fa-arrow-down" : "fa-arrow-up"}"></i>
+                    </span>
+                    <div class="min-w-0">
+                        <strong class="text-xs block truncate">${escHtml(m.title || "Mutasi Coin")}</strong>
+                        ${m.note ? `<span class="text-[10px] app-muted block truncate">${escHtml(m.note)}</span>` : ""}
+                        <span class="text-[9.5px] app-muted block mt-0.5">${escHtml(dtStr)}</span>
+                    </div>
+                </div>
+                <div class="text-right shrink-0">
+                    <strong class="text-xs font-extrabold block ${isPlus ? "text-emerald-600" : "text-red-500"}">${isPlus ? "+" : ""}${m.delta} Coin</strong>
+                    <span class="text-[9.5px] app-muted block">Sisa: ${m.balanceAfter}</span>
+                </div>
+            </div>
+        `;
+    }).join("");
+}
+
 function openCabangCoinInfoModal(targetUsername = "") {
     const cleanKey = _normAppUserKey(targetUsername || currentSessionUser || "");
     const targetU = (db.users || []).find(u => _normAppUserKey(u.username) === cleanKey) || getCurrentUserObj();
     const curU = getCurrentUserObj();
-    const isSelfCabang = !!(curU && curU.role === "cabang" && targetU && _normAppUserKey(curU.username) === _normAppUserKey(targetU.username));
+    const isSelfOwner = !!(curU && targetU && _normAppUserKey(curU.username) === _normAppUserKey(targetU.username));
+    const canBuySelf = isSelfOwner && (curU.role === "cabang" || curU.isPro || curU.role === "master");
+    _activeCoinModalUserKey = targetU ? _normAppUserKey(targetU.username) : "";
 
+    const tagEl = document.getElementById("cci-tier-tag");
     const balEl = document.getElementById("cci-balance-num");
     const subEl = document.getElementById("cci-owner-sub");
     const topupBtn = document.getElementById("cci-topup-btn");
 
+    if (tagEl) tagEl.innerText = (targetU && targetU.role === "cabang") ? "Lembarku Partner Coin" : "Lembarku PRO Coin";
     if (balEl) balEl.innerText = String((targetU && targetU.quota) || 0);
     if (subEl) {
-        const brandLbl = targetU ? ((targetU.brandName && targetU.brandName.trim()) || targetU.name || "Mitra Cabang") : "Mitra Cabang";
-        subEl.innerText = `Saldo Coin Aktif • ${brandLbl}`;
+        const labelNm = targetU
+            ? (targetU.role === "cabang" ? ((targetU.brandName && targetU.brandName.trim()) || targetU.name) : (targetU.name || targetU.username))
+            : "Pengguna";
+        subEl.innerText = `Saldo Coin Aktif • ${labelNm}`;
     }
-    if (topupBtn) {
-        topupBtn.classList.toggle("hide", !isSelfCabang);
-    }
+    if (topupBtn) topupBtn.classList.toggle("hide", !canBuySelf);
 
     const ratesBox = document.getElementById("cci-rates-and-pricelist");
     if (ratesBox && typeof getCoinPackagesList === "function") {
@@ -2907,21 +3069,24 @@ function openCabangCoinInfoModal(targetUsername = "") {
                 </div>
             </div>
             <div class="app-card-soft border rounded-2xl p-3.5 space-y-2">
-                <h4 class="font-extrabold text-[11px] uppercase tracking-wider text-amber-600"><i class="fa-solid fa-coins mr-1.5"></i>Pricelist Paket Isi Ulang Coin</h4>
-                <div class="space-y-1.5">
+                <h4 class="font-extrabold text-[11px] uppercase tracking-wider text-amber-600"><i class="fa-solid fa-qrcode mr-1.5"></i>Beli Paket Coin via QRIS Dinamis</h4>
+                <div class="space-y-2">
                     ${pkgs.map(pk => {
                         const tot = pk.paidCoins + pk.bonusCoins;
                         const eff = Math.round(pk.price / Math.max(1, tot));
                         return `
-                            <div class="app-card border rounded-xl px-3 py-2 flex items-center justify-between gap-2">
-                                <div class="min-w-0">
+                            <div class="app-card border rounded-xl p-2.5 flex items-center justify-between gap-2">
+                                <div class="min-w-0 flex-1">
                                     <div class="flex items-center gap-1.5 flex-wrap">
                                         <strong class="text-xs truncate">${escHtml(pk.name)}</strong>
                                         ${pk.badge ? `<span class="text-[8.5px] px-1.5 py-0.5 rounded-full bg-amber-400 text-black font-extrabold">${escHtml(pk.badge)}</span>` : ""}
                                     </div>
                                     <span class="text-[10px] app-muted block">${pk.paidCoins}${pk.bonusCoins > 0 ? ` + ${pk.bonusCoins} Bonus` : ""} = <strong class="text-amber-600">${tot} Coin</strong> (${fmtRp(eff)}/Coin)</span>
                                 </div>
-                                <strong class="text-xs font-extrabold app-accent shrink-0">${fmtRp(pk.price)}</strong>
+                                <div class="text-right shrink-0 flex flex-col items-end gap-1">
+                                    <strong class="text-xs font-extrabold app-accent">${fmtRp(pk.price)}</strong>
+                                    ${canBuySelf ? `<button type="button" onclick="startCoinPackageQrisOrder('${esc(pk.id)}')" class="gold-pill-btn px-3 py-1 rounded-lg text-[10px] shadow">Beli Paket</button>` : ""}
+                                </div>
                             </div>
                         `;
                     }).join("")}
@@ -2929,6 +3094,10 @@ function openCabangCoinInfoModal(targetUsername = "") {
             </div>
         `;
     }
+
+    const histBox = document.getElementById("cci-history-list");
+    if (histBox) histBox.innerHTML = renderCoinMutationHistoryHtml(targetU);
+    switchCoinModalTab("info");
 
     const modal = document.getElementById("modal-cabang-coin-info");
     if (modal) {
@@ -2949,10 +3118,222 @@ function requestTopUpCoinViaChat() {
         setTimeout(() => {
             const inp = document.getElementById("chat-input-text");
             if (inp) {
-                inp.value = "Halo Founder, saya ingin isi ulang (Top-Up) Coin untuk akun Admin Cabang saya.";
+                inp.value = "Halo Founder, saya ingin konsultasi atau isi ulang Coin untuk akun saya.";
                 inp.focus();
             }
         }, 250);
+    }
+}
+
+// ================= 13. POPUP PENAWARAN UPGRADE PRO BERKALA (USER BIASA) =================
+const PRO_PROMO_COOLDOWN_KEY = "LBK_PRO_PROMO_LAST_TS";
+
+function openUpgradeProPromoModal(force = false) {
+    const u = getCurrentUserObj();
+    if (!u || u.role !== "user" || u.isPro) return;
+    if (!force) {
+        const lastTs = Number(localStorage.getItem(PRO_PROMO_COOLDOWN_KEY) || 0);
+        if (Date.now() - lastTs < 1000 * 60 * 60 * 24) return;
+    }
+    const proCfg = typeof getProUpgradeConfig === "function" ? getProUpgradeConfig() : { price: 49000, bonusCoins: 5 };
+    const pEl = document.getElementById("upp-price-lbl");
+    const bEl = document.getElementById("upp-bonus-pill");
+    const bTxt = document.getElementById("upp-bonus-coin-lbl");
+    if (pEl) pEl.innerText = fmtRp(proCfg.price);
+    if (bEl) bEl.innerText = proCfg.bonusCoins > 0 ? `+${proCfg.bonusCoins} Coin` : "PRO Aktif";
+    if (bTxt) bTxt.innerText = proCfg.bonusCoins > 0 ? `Bonus ${proCfg.bonusCoins} Coin Perdana` : "fitur Coin harga khusus";
+
+    localStorage.setItem(PRO_PROMO_COOLDOWN_KEY, String(Date.now()));
+    document.getElementById("modal-upgrade-pro-promo")?.classList.remove("hide");
+    mrNavPush({ type: "modal", id: "modal-upgrade-pro-promo" });
+}
+
+function closeUpgradeProPromoModal() {
+    localStorage.setItem(PRO_PROMO_COOLDOWN_KEY, String(Date.now()));
+    document.getElementById("modal-upgrade-pro-promo")?.classList.add("hide");
+    _mrDropTopModalById("modal-upgrade-pro-promo");
+}
+
+function maybeShowUpgradeProPromoPopup() {
+    const u = getCurrentUserObj();
+    if (!u || u.role !== "user" || u.isPro) return;
+    if (_isElVis("guest-invitation-overlay") || _isElVis("full-chat-overlay") || _isElVis("modal-auth") || _isElVis("modal-install-welcome")) return;
+    openUpgradeProPromoModal(false);
+}
+
+// ================= 14. PENCARIAN USER & FOLLOW CEPAT DI MENU GARIS 2 KIRI =================
+const RECENT_USER_SEARCH_KEY = "LBK_RECENT_USER_SEARCHES";
+
+function _getRecentUserSearches() {
+    try {
+        const arr = JSON.parse(localStorage.getItem(RECENT_USER_SEARCH_KEY) || "[]");
+        return Array.isArray(arr) ? arr : [];
+    } catch { return []; }
+}
+
+function _saveRecentUserSearch(uname) {
+    const clean = _normAppUserKey(uname);
+    if (!clean) return;
+    const prev = _getRecentUserSearches().filter(x => x !== clean);
+    const next = [clean, ...prev].slice(0, 4);
+    try { localStorage.setItem(RECENT_USER_SEARCH_KEY, JSON.stringify(next)); } catch {}
+}
+
+function renderEcoUserSearchBox() {
+    const wrap = document.getElementById("drawer-user-search-wrap");
+    const inp = document.getElementById("eco-user-search-inp");
+    const clr = document.getElementById("eco-user-search-clear");
+    const resBox = document.getElementById("eco-user-search-results");
+    const u = getCurrentUserObj();
+    if (!wrap) return;
+    wrap.classList.toggle("hide", !u);
+    if (!u) return;
+    if (inp) inp.value = "";
+    if (clr) clr.classList.add("hide");
+    if (resBox) { resBox.innerHTML = ""; resBox.classList.add("hide"); }
+}
+
+function clearEcoUserSearch() {
+    const inp = document.getElementById("eco-user-search-inp");
+    const clr = document.getElementById("eco-user-search-clear");
+    const resBox = document.getElementById("eco-user-search-results");
+    if (inp) inp.value = "";
+    if (clr) clr.classList.add("hide");
+    if (resBox) { resBox.innerHTML = ""; resBox.classList.add("hide"); }
+}
+
+function onEcoUserSearchFocus() {
+    const inp = document.getElementById("eco-user-search-inp");
+    if (!inp) return;
+    onEcoUserSearchInput();
+}
+
+function _buildEcoSearchUserRowHtml(targetU, myU, myFollowing, myFollowers) {
+    const tKey = _normAppUserKey(targetU.username);
+    const defAv = typeof DEFAULT_AVATAR !== "undefined" ? DEFAULT_AVATAR : "./lembarku-logo.png";
+    const canSeeHandle = typeof canSeeUserHandle !== "function" || canSeeUserHandle(targetU);
+    const isFollowing = myFollowing.includes(tKey);
+    const followsMe = myFollowers.includes(tKey);
+    const isMasterProfile = targetU.role === "master";
+    const canFollow = !(isMasterProfile && myU.role !== "user" && myU.role !== "administrasi");
+
+    const btnText = isFollowing ? "Following" : (followsMe ? "Ikuti Balik" : "Follow");
+    const btnCls = isFollowing ? "app-btn-sec border" : "gold-pill-btn";
+    const roleTag = targetU.role === "master"
+        ? `<span class="text-[8px] px-1.5 py-0.2 rounded bg-amber-500/20 text-amber-600 font-extrabold">FOUNDER</span>`
+        : targetU.role === "administrasi"
+            ? `<span class="text-[8px] px-1.5 py-0.2 rounded bg-emerald-500/20 text-emerald-600 font-extrabold">ADMIN</span>`
+            : followsMe
+                ? `<span class="text-[8px] px-1.5 py-0.2 rounded bg-blue-500/15 text-blue-600 font-bold">Mengikuti Anda</span>`
+                : "";
+
+    return `
+        <div onclick="openUserFromEcoSearch('${esc(tKey)}')" class="app-card-soft border rounded-2xl p-2.5 flex items-center gap-2.5 cursor-pointer hover:brightness-95 transition">
+            <img src="${targetU.avatar || defAv}" class="w-9 h-9 rounded-full object-cover border gold-border bg-zinc-800 shrink-0">
+            <div class="flex-1 min-w-0">
+                <div class="flex items-center gap-1 min-w-0">
+                    <strong class="text-xs font-bold truncate">${escHtml(targetU.name || targetU.username)}</strong>
+                    ${targetU.isPro ? '<i class="fa-solid fa-circle-check text-blue-500 text-[10px] shrink-0"></i>' : ""}
+                </div>
+                <div class="flex items-center gap-1.5 flex-wrap">
+                    ${canSeeHandle ? `<span class="text-[10px] app-muted truncate">@${escHtml(targetU.username)}</span>` : ""}
+                    ${roleTag}
+                </div>
+            </div>
+            ${canFollow ? `<button type="button" onclick="toggleFollowFromEcoSearch(event,'${esc(tKey)}')" class="px-2.5 py-1.5 rounded-xl text-[10px] font-extrabold shrink-0 ${btnCls}">${btnText}</button>` : ""}
+        </div>
+    `;
+}
+
+function onEcoUserSearchInput() {
+    const inp = document.getElementById("eco-user-search-inp");
+    const clr = document.getElementById("eco-user-search-clear");
+    const resBox = document.getElementById("eco-user-search-results");
+    const myU = getCurrentUserObj();
+    if (!inp || !resBox || !myU) return;
+
+    const q = inp.value.trim().toLowerCase().replace(/^@/, "");
+    if (clr) clr.classList.toggle("hide", !q);
+
+    const myKey = _normAppUserKey(myU.username);
+    const isFounderViewer = myU.role === "master";
+    const myBlocked = typeof getBlockedUsersList === "function" ? getBlockedUsersList(myU) : [];
+    const myFollowing = typeof _getFollowingListForUser === "function" ? _getFollowingListForUser(myU) : [];
+    const myFollowers = typeof _getFollowersListForUser === "function" ? _getFollowersListForUser(myU) : [];
+
+    const searchableUsers = (db.users || []).filter(u => {
+        if (!u || !u.username) return false;
+        const uKey = _normAppUserKey(u.username);
+        if (uKey === myKey) return false;
+        if (!isFounderViewer) {
+            if (u.status && u.status !== "Aktif") return false;
+            if (myBlocked.includes(uKey) || u.blockedViewer) return false;
+            const priv = typeof getUserPrivacy === "function" ? getUserPrivacy(u) : { allowSearchDiscovery: true };
+            if (!priv.allowSearchDiscovery && u.role !== "master" && u.role !== "administrasi") return false;
+        }
+        return true;
+    });
+
+    if (!q) {
+        const recentKeys = _getRecentUserSearches();
+        const recentUsers = recentKeys.map(k => searchableUsers.find(u => _normAppUserKey(u.username) === k)).filter(Boolean);
+        const suggestedOfficial = searchableUsers.filter(u => (u.role === "master" || u.role === "administrasi") && !recentKeys.includes(_normAppUserKey(u.username))).slice(0, 3);
+        const combined = [...recentUsers, ...suggestedOfficial];
+
+        if (!combined.length) {
+            resBox.classList.add("hide");
+            resBox.innerHTML = "";
+            return;
+        }
+        resBox.classList.remove("hide");
+        resBox.innerHTML = `
+            <span class="text-[9.5px] uppercase font-extrabold app-muted px-1 block">${recentUsers.length ? "Pencarian Terakhir & Akun Resmi" : "Rekomendasi Akun Resmi"}</span>
+            ${combined.map(u => _buildEcoSearchUserRowHtml(u, myU, myFollowing, myFollowers)).join("")}
+        `;
+        return;
+    }
+
+    const matches = searchableUsers.filter(u => {
+        const nm = String(u.name || "").toLowerCase();
+        const un = String(u.username || "").toLowerCase();
+        const canSeeHandle = typeof canSeeUserHandle !== "function" || canSeeUserHandle(u);
+        return nm.includes(q) || (canSeeHandle && un.includes(q));
+    }).slice(0, 12);
+
+    resBox.classList.remove("hide");
+    if (!matches.length) {
+        resBox.innerHTML = `<p class="text-[11px] app-muted text-center py-4 app-card-soft border border-dashed rounded-2xl">Pengguna "${escHtml(q)}" tidak ditemukan.</p>`;
+        return;
+    }
+    resBox.innerHTML = matches.map(u => _buildEcoSearchUserRowHtml(u, myU, myFollowing, myFollowers)).join("");
+}
+
+function openUserFromEcoSearch(uname) {
+    _saveRecentUserSearch(uname);
+    toggleEcosystemDrawer(false);
+    if (typeof viewUserProfileModal === "function") {
+        viewUserProfileModal(uname);
+    }
+}
+
+async function toggleFollowFromEcoSearch(ev, uname) {
+    if (ev) ev.stopPropagation();
+    await toggleFollowTargetUser(uname);
+    onEcoUserSearchInput();
+}
+
+// ================= 15. BAGIKAN LINK PROFIL (?user=username) =================
+function shareOwnProfileLink() {
+    const u = getCurrentUserObj();
+    if (!u || !u.username) return showToast("Masuk akun terlebih dahulu untuk membagikan profil.", "info");
+    const url = `${getCleanBaseUrl()}?user=${encodeURIComponent(u.username)}`;
+    const title = `Profil ${u.name || u.username} di Lembarku`;
+    const text = `Ikuti profil *${u.name || u.username}* di aplikasi Lembarku ✨\nLihat portofolio & saling terhubung langsung di sini:\n${url}`;
+    if (typeof openDemoSocialShare === "function") {
+        openDemoSocialShare({ title, text, url, subtitle: `Bagikan Profil • ${u.name || u.username}` });
+    } else {
+        navigator.clipboard?.writeText(url);
+        showToast("Link profil disalin!");
     }
 }
 

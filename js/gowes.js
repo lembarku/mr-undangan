@@ -6,6 +6,8 @@
 let activeBookingBike = null;
 let bookingSelectedBikeIds = [];
 let gowesKtpDraft = "";
+let gowesBookingVoucherCode = "";
+let gowesBookingVoucherDiscount = 0;
 let gowesBannerIdx = 0;
 let gowesShowcaseIdx = 0;
 let gowesBannerTimer = null;
@@ -1006,10 +1008,21 @@ function updateGowesBookingPriceCalc() {
 
     const durRadio = document.querySelector('input[name="gw_duration"]:checked');
     const durVal = durRadio ? durRadio.value : "2_hours";
-    const total = durVal === "6_hours" ? sum6h : durVal === "full_day" ? sumFull : sum2h;
+    const rawTotal = durVal === "6_hours" ? sum6h : durVal === "full_day" ? sumFull : sum2h;
+    if (gowesBookingVoucherCode && typeof evaluateVoucherCode === "function") {
+        const reval = evaluateVoucherCode(gowesBookingVoucherCode, "gowes", rawTotal);
+        gowesBookingVoucherDiscount = reval.ok ? reval.discount : 0;
+    } else {
+        gowesBookingVoucherDiscount = 0;
+    }
+    const total = Math.max(1000, rawTotal - gowesBookingVoucherDiscount);
 
     const calcEl = document.getElementById("gw-book-total-calc");
-    if (calcEl) calcEl.innerText = `${fmtRp(total)} (${selectedObjs.length} Sepeda)`;
+    if (calcEl) {
+        calcEl.innerHTML = gowesBookingVoucherDiscount > 0
+            ? `<span class="text-xs line-through app-muted mr-1.5">${fmtRp(rawTotal)}</span>${fmtRp(total)} <span class="text-[10px] font-bold">(${selectedObjs.length} Sepeda)</span>`
+            : `${fmtRp(total)} (${selectedObjs.length} Sepeda)`;
+    }
 
     updateGowesReturnEstimate();
 
@@ -1036,6 +1049,11 @@ function openGowesBookingModal(bikeId = null) {
     bookingSelectedBikeIds = [activeBookingBike.id];
     openBookingBikePickerIdx = -1;
     gowesKtpDraft = "";
+    gowesBookingVoucherCode = "";
+    gowesBookingVoucherDiscount = 0;
+    const gvInp = document.getElementById("gw-book-voucher"); if (gvInp) gvInp.value = "";
+    const gvClr = document.getElementById("btn-gw-clear-voucher"); if (gvClr) gvClr.classList.add("hide");
+    const gvStat = document.getElementById("gw-book-voucher-status"); if (gvStat) { gvStat.className = "hide text-[11px] font-semibold"; gvStat.innerText = ""; }
 
     _refreshBookingBranchBadge();
 
@@ -1083,6 +1101,8 @@ function closeGowesBookingModal() {
     bookingSelectedBikeIds = [];
     openBookingBikePickerIdx = -1;
     gowesKtpDraft = "";
+    gowesBookingVoucherCode = "";
+    gowesBookingVoucherDiscount = 0;
     document.getElementById("modal-gowes-booking")?.classList.add("hide");
     if (typeof _mrDropTopModalById === "function") _mrDropTopModalById("modal-gowes-booking");
 }
@@ -1173,6 +1193,8 @@ async function submitGowesRentalBooking(e) {
         branchCity: currentBranch.city || "Samarinda",
         pickupLocation: currentBranch.name || "Titik Gowes Shelter Utama",
         ktpImage: gowesKtpDraft,
+        voucherCode: gowesBookingVoucherCode || "",
+        voucherDiscount: Number(gowesBookingVoucherDiscount || 0),
         note
     };
 
@@ -1750,13 +1772,34 @@ async function openGowesRentalPayment(rentalId) {
     const viewPay = document.getElementById("view-payment");
     if (viewPay) viewPay.classList.remove("hide");
 
+    const baseGwPrice = Number(rental.basePrice || Math.max(0, Number(rental.totalPrice || 0) - Number(rental.uniqueCode || 0)));
     if (typeof activePaymentState !== "undefined") {
         activePaymentState.kind = "gowes_rental";
         activePaymentState.id = rental.id;
+        activePaymentState.basePrice = baseGwPrice;
+        activePaymentState.origPrice = 0;
+        activePaymentState.voucherCode = rental.voucherCode || "";
+        activePaymentState.voucherDiscount = Number(rental.voucherDiscount || 0);
         activePaymentState.totalPay = Number(rental.totalPrice || 0);
         activePaymentState.uniqueCode = Number(rental.uniqueCode || 0);
         activePaymentState.title = `Sewa Sepeda: ${rental.bikeName}`;
         activePaymentState.qrisDataUrl = "";
+    }
+    const pvWrap = document.getElementById("pay-voucher-wrap");
+    const pvInp = document.getElementById("pay-voucher-code");
+    const pvClr = document.getElementById("btn-pay-clear-voucher");
+    const pvStat = document.getElementById("pay-voucher-status");
+    if (pvWrap) pvWrap.classList.remove("hide");
+    if (pvInp) pvInp.value = rental.voucherCode || "";
+    if (pvClr) pvClr.classList.toggle("hide", !rental.voucherCode);
+    if (pvStat) {
+        if (rental.voucherCode && Number(rental.voucherDiscount || 0) > 0) {
+            pvStat.className = "text-[11px] font-semibold text-emerald-600";
+            pvStat.innerText = `✓ Voucher ${rental.voucherCode} aktif (-${fmtRp(rental.voucherDiscount)})`;
+        } else {
+            pvStat.className = "hide text-[11px] font-semibold";
+            pvStat.innerText = "";
+        }
     }
 
     const statusBadge = document.getElementById("pay-status-badge");
@@ -1961,4 +2004,38 @@ function openGowesRentalDetail(rentalId) {
 
     modal.classList.remove("hide");
     if (typeof mrNavPush === "function") mrNavPush({ type: "modal", id: "modal-gowes-rental-detail" });
+}
+
+function applyGowesBookingVoucher() {
+    const inp = document.getElementById("gw-book-voucher");
+    const stat = document.getElementById("gw-book-voucher-status");
+    const clr = document.getElementById("btn-gw-clear-voucher");
+    const code = (inp && inp.value || "").trim();
+    const selectedObjs = getSelectedBookingBikesObjects();
+    if (!selectedObjs.length) return showToast("Pilih unit sepeda terlebih dahulu.", "error");
+    const durVal = document.querySelector('input[name="gw_duration"]:checked')?.value || "2_hours";
+    const rawTotal = selectedObjs.reduce((s, b) => s + Number(durVal === "6_hours" ? (b.price6Hours || 75000) : durVal === "full_day" ? (b.priceFullDay || 120000) : (b.price2Hours || 40000)), 0);
+
+    if (typeof evaluateVoucherCode !== "function") return;
+    const res = evaluateVoucherCode(code, "gowes", rawTotal);
+    if (!res.ok) {
+        if (stat) { stat.className = "text-[11px] font-semibold text-red-500"; stat.innerText = res.message; }
+        return showToast(res.message, "error");
+    }
+    gowesBookingVoucherCode = res.code;
+    gowesBookingVoucherDiscount = res.discount;
+    if (inp) inp.value = res.code;
+    if (clr) clr.classList.remove("hide");
+    if (stat) { stat.className = "text-[11px] font-semibold text-emerald-600"; stat.innerText = `✓ ${res.message}`; }
+    updateGowesBookingPriceCalc();
+    showToast(res.message);
+}
+
+function clearGowesBookingVoucher() {
+    gowesBookingVoucherCode = "";
+    gowesBookingVoucherDiscount = 0;
+    const inp = document.getElementById("gw-book-voucher"); if (inp) inp.value = "";
+    const clr = document.getElementById("btn-gw-clear-voucher"); if (clr) clr.classList.add("hide");
+    const stat = document.getElementById("gw-book-voucher-status"); if (stat) { stat.className = "hide text-[11px] font-semibold"; stat.innerText = ""; }
+    updateGowesBookingPriceCalc();
 }

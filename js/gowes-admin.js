@@ -6,23 +6,45 @@
 let mgbTempPhotoUrl = "";
 let mghTempPhotoUrl = "";
 let gwBannerTempImg = "";
-let _gowesFleetAdminTab = "shelters"; // 'shelters' | 'banners'
-let _expandedGowesBranchIds = {};
+let _gowesFleetPage = "home"; // 'home' | 'branch' | 'shared' | 'banners' | 'banner_form'
+let _gowesSelectedBranchId = "";
+let _gowesEditingBannerIdx = -1;
 
-function switchGowesFleetAdminTab(tab) {
-    _gowesFleetAdminTab = (tab === "banners") ? "banners" : "shelters";
-    if (typeof renderMasterWorkspaceContent === "function") {
-        renderMasterWorkspaceContent();
+function resetGowesFleetDrillDown() {
+    _gowesFleetPage = "home";
+    _gowesSelectedBranchId = "";
+    _gowesEditingBannerIdx = -1;
+}
+
+function openGowesFleetSubPage(page, param = "") {
+    _gowesFleetPage = page || "home";
+    if (page === "branch") _gowesSelectedBranchId = String(param || "");
+    if (page === "banner_form") _gowesEditingBannerIdx = (param === "" || param === null || param === undefined) ? -1 : Number(param);
+    if (typeof renderMasterWorkspaceContent === "function") renderMasterWorkspaceContent();
+    if (page === "banner_form" && _gowesEditingBannerIdx >= 0) {
+        setTimeout(() => editGowesBannerItem(_gowesEditingBannerIdx), 40);
     }
 }
 
-function toggleGowesBranchBikesAccordion(branchId) {
-    const key = String(branchId || "");
-    const curState = _expandedGowesBranchIds[key] !== false; // default terbuka
-    _expandedGowesBranchIds[key] = !curState;
-    if (typeof renderMasterWorkspaceContent === "function") {
-        renderMasterWorkspaceContent();
+function handleGowesFleetStepBack() {
+    if (_gowesFleetPage === "banner_form") {
+        _gowesFleetPage = "banners";
+        _gowesEditingBannerIdx = -1;
+        if (typeof renderMasterWorkspaceContent === "function") renderMasterWorkspaceContent();
+        return true;
     }
+    if (_gowesFleetPage !== "home") {
+        _gowesFleetPage = "home";
+        _gowesSelectedBranchId = "";
+        if (typeof renderMasterWorkspaceContent === "function") renderMasterWorkspaceContent();
+        return true;
+    }
+    return false;
+}
+
+function switchGowesFleetAdminTab(tab) {
+    if (tab === "banners") openGowesFleetSubPage("banners");
+    else openGowesFleetSubPage("home");
 }
 
 function _getAdminSheltersList() {
@@ -37,6 +59,126 @@ function _getBranchLabelById(branchId) {
     return found ? (found.city || found.name) : "Cabang Khusus";
 }
 
+function getGowesScheduleStatusInfo(rental) {
+    if (!rental || !rental.startDate || !rental.startTime) {
+        return { state: "upcoming", badge: "Terjadwal", cls: "bg-blue-500/15 text-blue-600 border-blue-500/35", remainingMins: 999, deadlineLabel: "-" };
+    }
+    const allBikes = Array.isArray(db.gowesBikes) && db.gowesBikes.length ? db.gowesBikes : DEFAULT_GOWES_BIKES;
+    const refBike = allBikes.find(b => String(b.id) === String(rental.bikeId)) || null;
+    const iv = typeof getBookingIntervalMinutes === "function"
+        ? getBookingIntervalMinutes(rental.startTime, rental.durationKey, refBike, rental.durationLabel)
+        : { startMin: 480, endMin: 1200, endColon: "20:00", nextDay: false };
+
+    const dParts = String(rental.startDate).split("-");
+    if (dParts.length !== 3) {
+        return { state: "upcoming", badge: "Terjadwal", cls: "bg-blue-500/15 text-blue-600 border-blue-500/35", remainingMins: 999, deadlineLabel: iv.endColon };
+    }
+    const deadlineDt = new Date(parseInt(dParts[0], 10), parseInt(dParts[1], 10) - 1, parseInt(dParts[2], 10), 0, iv.endMin, 0);
+    const diffMins = Math.round((deadlineDt.getTime() - Date.now()) / 60000);
+
+    if (rental.status === "Terkonfirmasi") {
+        return { state: "upcoming", badge: `Ambil ${rental.startTime}`, cls: "bg-blue-500/15 text-blue-600 border-blue-500/35", remainingMins: diffMins, deadlineLabel: iv.endColon };
+    }
+    if (rental.status === "Sedang Digunakan") {
+        if (diffMins < 0) {
+            const over = Math.abs(diffMins);
+            const h = Math.floor(over / 60), m = over % 60;
+            return {
+                state: "overdue",
+                badge: h > 0 ? `LEWAT ${h}J ${m}M` : `LEWAT ${m} MNT`,
+                cls: "bg-red-600 text-white border-red-500 gowes-overdue-badge",
+                remainingMins: diffMins,
+                deadlineLabel: iv.endColon
+            };
+        }
+        if (diffMins <= 15) {
+            return {
+                state: "warning",
+                badge: `SISA ${Math.max(1, diffMins)} MNT`,
+                cls: "bg-amber-400 text-black border-amber-500 font-extrabold",
+                remainingMins: diffMins,
+                deadlineLabel: iv.endColon
+            };
+        }
+        const rh = Math.floor(diffMins / 60), rm = diffMins % 60;
+        return {
+            state: "active",
+            badge: rh > 0 ? `Sisa ${rh}j ${rm}m` : `Sisa ${rm} mnt`,
+            cls: "bg-emerald-500/18 text-emerald-600 border-emerald-500/35",
+            remainingMins: diffMins,
+            deadlineLabel: iv.endColon
+        };
+    }
+    return { state: "pending", badge: rental.status || "Proses", cls: "bg-zinc-500/15 app-muted border-zinc-400/30", remainingMins: diffMins, deadlineLabel: iv.endColon };
+}
+
+function buildGowesTodayScheduleBoardHtml() {
+    const todayStr = new Date().toISOString().split("T")[0];
+    const rentals = (Array.isArray(db.gowesRentals) ? db.gowesRentals : []).filter(r => {
+        if (!r || r.status === "Selesai" || r.status === "Dibatalkan") return false;
+        const isToday = String(r.startDate || "") === todayStr;
+        const isInUse = r.status === "Sedang Digunakan";
+        return isToday || isInUse;
+    });
+
+    const items = rentals.map(r => {
+        const info = getGowesScheduleStatusInfo(r);
+        const rank = info.state === "overdue" ? 0 : info.state === "warning" ? 1 : info.state === "active" ? 2 : 3;
+        return { r, info, rank };
+    }).sort((a, b) => (a.rank - b.rank) || String(a.r.startTime || "").localeCompare(String(b.r.startTime || "")));
+
+    if (!items.length) {
+        return `
+            <div class="app-card border rounded-3xl p-4 shadow-sm flex items-center justify-between gap-3">
+                <div class="flex items-center gap-3">
+                    <span class="w-10 h-10 rounded-2xl bg-emerald-500/15 text-emerald-600 flex items-center justify-center text-base shrink-0"><i class="fa-regular fa-calendar-check"></i></span>
+                    <div>
+                        <strong class="text-xs sm:text-sm block">Jadwal Sewa Hari Ini</strong>
+                        <span class="text-[11px] app-muted block">Belum ada jadwal aktif hari ini — semua unit siap jalan.</span>
+                    </div>
+                </div>
+                <button type="button" onclick="if(typeof openGowesOfflinePosModal==='function')openGowesOfflinePosModal()" class="gowes-pill-btn px-3 py-1.5 rounded-xl text-[11px] shrink-0">+ Kasir</button>
+            </div>
+        `;
+    }
+
+    const alertCnt = items.filter(x => x.info.state === "overdue" || x.info.state === "warning").length;
+    return `
+        <div class="app-card border rounded-3xl p-4 space-y-3 shadow-sm ${alertCnt > 0 ? "border-amber-500/60" : ""}">
+            <div class="flex items-center justify-between gap-2">
+                <div class="flex items-center gap-2">
+                    <span class="w-8 h-8 rounded-xl ${alertCnt > 0 ? "bg-red-500/15 text-red-500" : "bg-emerald-500/15 text-emerald-600"} flex items-center justify-center text-sm shrink-0"><i class="fa-solid fa-stopwatch"></i></span>
+                    <div>
+                        <h4 class="text-xs sm:text-sm font-extrabold leading-tight">Jadwal Sewa Hari Ini (${items.length})</h4>
+                        <p class="text-[10px] app-muted">Urut jam ambil &amp; pengingat batas kembali otomatis</p>
+                    </div>
+                </div>
+                <button type="button" onclick="if(typeof openGowesOfflinePosModal==='function')openGowesOfflinePosModal()" class="px-3 py-1.5 rounded-xl bg-emerald-600/15 border border-emerald-500/35 text-emerald-700 text-[11px] font-extrabold shrink-0"><i class="fa-solid fa-cash-register mr-1"></i>Kasir</button>
+            </div>
+            <div class="space-y-2 max-h-60 overflow-y-auto pr-0.5">
+                ${items.map(({ r, info }) => `
+                    <div class="app-card-soft border rounded-2xl p-2.5 flex items-center justify-between gap-2.5 text-xs">
+                        <div class="min-w-0 flex-1 space-y-0.5">
+                            <div class="flex items-center gap-1.5 flex-wrap">
+                                <span class="text-[9px] px-2 py-0.5 rounded-full border font-extrabold ${info.cls}">${escHtml(info.badge)}</span>
+                                <span class="text-[10px] font-bold app-muted">${escHtml(r.startTime || "-")} → ${escHtml(info.deadlineLabel)} WITA</span>
+                            </div>
+                            <strong class="block truncate text-xs">${escHtml(r.bikeName)} • ${escHtml(r.customerName || r.customerUsername)}</strong>
+                            <span class="block text-[10px] app-muted truncate">${escHtml(r.branchCity || r.pickupLocation || "Shelter")} • ${escHtml(r.durationLabel || "")}</span>
+                        </div>
+                        <div class="flex items-center gap-1.5 shrink-0">
+                            ${(info.state === "overdue" || info.state === "warning")
+                                ? `<button type="button" onclick="sendGowesOverdueReminderWA('${esc(r.id)}')" class="px-2.5 py-1.5 rounded-xl bg-red-600 text-white text-[10px] font-bold shadow"><i class="fa-brands fa-whatsapp mr-1"></i>WA</button>`
+                                : ""}
+                            <button type="button" onclick="openGowesRentalDetail('${esc(r.id)}')" class="px-2.5 py-1.5 rounded-xl app-card border text-[10px] font-bold">Detail</button>
+                        </div>
+                    </div>
+                `).join("")}
+            </div>
+        </div>
+    `;
+}
+
 function _renderSingleBikeAdminRowHtml(b, isMaster, showBranchTag = false) {
     const isAvail = b.status === "Tersedia";
     const isInUse = b.status === "Sedang Disewa";
@@ -44,7 +186,7 @@ function _renderSingleBikeAdminRowHtml(b, isMaster, showBranchTag = false) {
     const brLbl = _getBranchLabelById(b.branchId);
 
     return `
-        <div class="app-card-soft border rounded-2xl p-3 flex flex-col sm:flex-row sm:items-center justify-between gap-2.5">
+        <div class="app-card border rounded-2xl p-3 flex flex-col sm:flex-row sm:items-center justify-between gap-2.5 shadow-sm">
             <div class="flex items-center gap-3 min-w-0">
                 <img src="${b.image || 'https://images.unsplash.com/photo-1485965120184-e220f721d03e?auto=format&fit=crop&w=800&q=75'}" class="w-16 h-12 rounded-xl object-cover bg-black border gold-border shrink-0">
                 <div class="min-w-0 space-y-0.5">
@@ -60,7 +202,7 @@ function _renderSingleBikeAdminRowHtml(b, isMaster, showBranchTag = false) {
 
             <div class="flex items-center gap-1.5 self-end sm:self-center shrink-0">
                 ${b.status !== "Servis" ? `
-                    <button type="button" onclick="toggleGowesBikeStatusQuick('${esc(b.id)}','Servis')" class="px-2.5 py-1.5 rounded-xl app-card border text-[10.5px] font-bold text-zinc-500 hover:text-amber-500" title="Tandai Sedang Servis">
+                    <button type="button" onclick="toggleGowesBikeStatusQuick('${esc(b.id)}','Servis')" class="px-2.5 py-1.5 rounded-xl app-card-soft border text-[10.5px] font-bold text-zinc-500 hover:text-amber-500" title="Tandai Sedang Servis">
                         <i class="fa-solid fa-wrench mr-1"></i>Servis
                     </button>
                 ` : `
@@ -68,7 +210,7 @@ function _renderSingleBikeAdminRowHtml(b, isMaster, showBranchTag = false) {
                         <i class="fa-solid fa-check mr-1"></i>Siap
                     </button>
                 `}
-                <button type="button" onclick="openMasterGowesBikeModal('${esc(b.id)}')" class="px-3 py-1.5 rounded-xl app-card border app-accent text-[10.5px] font-bold">
+                <button type="button" onclick="openMasterGowesBikeModal('${esc(b.id)}')" class="px-3 py-1.5 rounded-xl app-card-soft border app-accent text-[10.5px] font-bold">
                     <i class="fa-solid fa-pen mr-1"></i>Edit
                 </button>
                 ${isMaster ? `
@@ -81,101 +223,41 @@ function _renderSingleBikeAdminRowHtml(b, isMaster, showBranchTag = false) {
     `;
 }
 
-// ================= 0. PUSAT PENGATURAN TITIK GOWES (GERAI & ARMADA TERPADU + BANNER 16:7) =================
+// ================= 0. PUSAT PENGATURAN TITIK GOWES (DRILL-DOWN LEMBAR TERPISAH) =================
 function renderGowesFleetWorkspaceHtml() {
     const curU = typeof getCurrentUserObj === "function" ? getCurrentUserObj() : null;
     const isMaster = !!(curU && curU.role === "master");
     const shelters = _getAdminSheltersList();
     const bikes = (Array.isArray(db.gowesBikes) && db.gowesBikes.length ? db.gowesBikes : DEFAULT_GOWES_BIKES).filter(b => b && b.status !== "Dihapus");
     const banners = Array.isArray(db.gowesBanners) && db.gowesBanners.length ? db.gowesBanners : DEFAULT_GOWES_BANNERS;
+    const shelterIdsSet = new Set(shelters.map(s => String(s.id)));
+    const sharedBikes = bikes.filter(b => !b.branchId || b.branchId === "all" || !shelterIdsSet.has(String(b.branchId)));
 
-    const tabsHtml = `
-        <div class="flex items-center justify-between gap-2 pb-2.5 border-b gold-border flex-wrap">
-            <div class="flex gap-1.5 overflow-x-auto no-scrollbar">
-                <button type="button" onclick="switchGowesFleetAdminTab('shelters')" class="px-3.5 py-2 rounded-xl text-xs font-extrabold whitespace-nowrap transition ${_gowesFleetAdminTab !== 'banners' ? 'gowes-pill-btn shadow' : 'app-btn-sec'}">
-                    <i class="fa-solid fa-store mr-1.5"></i>Gerai &amp; Armada (${shelters.length} Gerai • ${bikes.length} Unit)
-                </button>
-                ${isMaster ? `
-                    <button type="button" onclick="switchGowesFleetAdminTab('banners')" class="px-3.5 py-2 rounded-xl text-xs font-extrabold whitespace-nowrap transition ${_gowesFleetAdminTab === 'banners' ? 'gowes-pill-btn shadow' : 'app-btn-sec'}">
-                        <i class="fa-solid fa-rectangle-ad mr-1.5"></i>Banner 16:7 (${banners.length})
-                    </button>
-                ` : ""}
-            </div>
-            <button type="button" onclick="if(typeof openGowesOfflinePosModal==='function')openGowesOfflinePosModal()" class="px-3.5 py-2 rounded-xl bg-emerald-600/15 border border-emerald-500/35 text-emerald-700 text-xs font-extrabold shrink-0">
-                <i class="fa-solid fa-cash-register mr-1"></i>+ Kasir Offline
-            </button>
-        </div>
-    `;
+    const titleEl = document.getElementById("master-active-panel-title");
+    const subEl = document.getElementById("master-active-panel-sub");
 
-    let paneHtml = "";
-    if (_gowesFleetAdminTab === "banners" && isMaster) {
-        paneHtml = `
-            <div class="grid md:grid-cols-2 gap-5">
-                <form onsubmit="saveGowesBannerForm(event)" class="app-card border rounded-3xl p-4 space-y-2.5 shadow-sm">
-                    <div class="flex items-center justify-between">
-                        <h4 class="font-extrabold text-sm text-emerald-600">Tambah / Edit Banner 16:7</h4>
-                        <button type="button" onclick="resetGowesBannerForm()" class="text-[11px] app-muted hover:underline">Reset</button>
-                    </div>
-                    <input type="hidden" id="gwb-id">
-                    <div class="w-full rounded-xl overflow-hidden border gold-border bg-black" style="aspect-ratio:16/7;">
-                        <img id="gwb-preview-img" src="${(banners[0] && banners[0].img) || 'https://images.unsplash.com/photo-1541625602330-2277a4c46182?auto=format&fit=crop&w=1200&q=80'}" class="w-full h-full object-cover">
-                    </div>
-                    <label class="block gowes-pill-btn py-2 rounded-xl text-center cursor-pointer text-xs">
-                        <i class="fa-solid fa-crop-simple mr-1"></i>Pilih &amp; Crop Foto Banner (16 : 7)
-                        <input type="file" accept="image/*" class="hide" onchange="pickCroppedGowesBanner(this)">
-                    </label>
-                    <div class="grid grid-cols-2 gap-2">
-                        <input type="text" id="gwb-badge" placeholder="Label (TITIK GOWES)" class="app-input text-xs">
-                        <input type="text" id="gwb-cta" placeholder="Tombol (opsional)" class="app-input text-xs">
-                    </div>
-                    <input type="text" id="gwb-title" placeholder="Judul Banner Promosi" class="app-input text-xs" required>
-                    <input type="text" id="gwb-sub" placeholder="Deskripsi singkat banner..." class="app-input text-xs" required>
-                    <select id="gwb-target" class="app-input text-xs">
-                        <option value="gowes-showcase-track">Arahkan ke Pilihan Sepeda</option>
-                        <option value="open_booking">Buka Formulir Booking Langsung</option>
-                        <option value="sec-gowes-shelter">Arahkan ke Lokasi Garasi</option>
-                    </select>
-                    <input type="url" id="gwb-img-url" oninput="if(this.value.startsWith('http'))document.getElementById('gwb-preview-img').src=this.value;" placeholder="Atau tempel URL foto (https://...)" class="app-input text-xs">
-                    <button type="submit" id="btn-save-gwb" class="w-full gowes-pill-btn py-2.5 rounded-xl text-xs uppercase">Simpan Banner Gowes</button>
-                </form>
+    // LEMBAR ANAK 1: DETAIL 1 GERAI CABANG (HANYA ISI GERAI TERSEBUT)
+    if (_gowesFleetPage === "branch") {
+        const s = shelters.find(x => String(x.id) === String(_gowesSelectedBranchId)) || shelters[0];
+        if (!s) { _gowesFleetPage = "home"; return renderGowesFleetWorkspaceHtml(); }
+        const sClosed = !!s.isClosed;
+        const branchLink = `${getCleanBaseUrl()}?branch=${encodeURIComponent(s.city || s.id)}`;
+        const branchBikes = bikes.filter(b => String(b.branchId || "") === String(s.id));
 
-                <div class="space-y-2.5">
-                    <h4 class="font-bold text-xs text-emerald-600 uppercase">Daftar Banner Aktif (${banners.length})</h4>
-                    ${banners.map((b, i) => `
-                        <div class="app-card border rounded-2xl p-2.5 flex items-center gap-3 shadow-sm">
-                            <img src="${b.img}" class="w-24 h-11 rounded-lg object-cover bg-black shrink-0">
-                            <div class="flex-1 min-w-0">
-                                <strong class="text-xs block truncate">${escHtml(b.title)}</strong>
-                                <span class="text-[10px] app-muted block truncate">${escHtml(b.badge || "Promo")}</span>
-                            </div>
-                            <button type="button" onclick="editGowesBannerItem(${i})" class="px-2.5 py-1 rounded app-btn-sec text-[10px] font-bold">Edit</button>
-                            <button type="button" onclick="deleteGowesBannerItem(${i})" class="px-2.5 py-1 rounded bg-red-600/15 text-[10px] text-red-500"><i class="fa-solid fa-trash"></i></button>
-                        </div>
-                    `).join("")}
-                </div>
-            </div>
-        `;
-    } else {
-        const shelterIdsSet = new Set(shelters.map(s => String(s.id)));
-        const sharedBikes = bikes.filter(b => !b.branchId || b.branchId === "all" || !shelterIdsSet.has(String(b.branchId)));
+        if (titleEl) titleEl.innerText = `Gerai ${s.city || s.name}`;
+        if (subEl) subEl.innerText = `${branchBikes.length} unit sepeda khusus • ${sClosed ? "TUTUP" : "BUKA"}`;
 
-        const sheltersHtml = shelters.map(s => {
-            const sClosed = !!s.isClosed;
-            const branchLink = `${getCleanBaseUrl()}?branch=${encodeURIComponent(s.city || s.id)}`;
-            const branchBikes = bikes.filter(b => String(b.branchId || "") === String(s.id));
-            const isExpanded = _expandedGowesBranchIds[String(s.id)] !== false;
-
-            return `
+        return `
+            <div class="space-y-4">
                 <div class="app-card border rounded-3xl p-4 sm:p-5 space-y-3.5 shadow-sm">
                     <div class="flex items-start gap-3">
-                        <span class="w-11 h-11 rounded-2xl ${sClosed ? 'bg-red-500/18 text-red-500 border border-red-500/35' : 'bg-emerald-500/18 text-emerald-600 border border-emerald-500/35'} flex items-center justify-center text-lg shrink-0">
+                        <span class="w-12 h-12 rounded-2xl ${sClosed ? 'bg-red-500/18 text-red-500 border border-red-500/35' : 'bg-emerald-500/18 text-emerald-600 border border-emerald-500/35'} flex items-center justify-center text-lg shrink-0">
                             <i class="fa-solid ${sClosed ? 'fa-store-slash' : 'fa-store'}"></i>
                         </span>
                         <div class="min-w-0 flex-1 space-y-1">
                             <div class="flex items-center gap-1.5 flex-wrap">
                                 <span class="gowes-brand-tag !text-[8.5px]">${escHtml(s.city || "Cabang")}</span>
                                 <span class="text-[9px] font-extrabold uppercase px-2 py-0.5 rounded-full ${sClosed ? 'bg-red-500/15 text-red-500' : 'bg-emerald-500/15 text-emerald-600'}">● ${sClosed ? 'TUTUP' : 'BUKA'}</span>
-                                <span class="text-[9px] font-bold px-2 py-0.5 rounded-full bg-blue-500/12 text-blue-600">${branchBikes.length} Unit Khusus</span>
                             </div>
                             <strong class="text-sm sm:text-base font-extrabold block leading-snug">${escHtml(s.name)}</strong>
                             <p class="text-[11px] app-muted leading-snug">${escHtml(s.address)}</p>
@@ -183,81 +265,177 @@ function renderGowesFleetWorkspaceHtml() {
                         </div>
                     </div>
 
-                    <!-- Baris Aksi Gerai + Tombol Tambah Sepeda Langsung ke Gerai Ini -->
-                    <div class="flex flex-wrap items-center justify-between gap-2 pt-2.5 border-t gold-border">
-                        <div class="flex flex-wrap items-center gap-1.5">
-                            <button type="button" onclick="openMasterGowesBikeModal(null,'${esc(s.id)}')" class="gowes-pill-btn px-3 py-1.5 rounded-xl text-[11px] shadow-sm">
-                                <i class="fa-solid fa-plus mr-1"></i>Tambah Sepeda
-                            </button>
-                            <button type="button" onclick="openGowesShelterOpsModal('${esc(s.id)}', false)" class="px-3 py-1.5 rounded-xl app-card-soft border app-accent text-[11px] font-bold">
-                                <i class="fa-solid fa-pen mr-1"></i>Edit Gerai
-                            </button>
-                            <button type="button" onclick="navigator.clipboard.writeText('${esc(branchLink)}');showToast('Link khusus cabang ${esc(s.city || s.name)} disalin!');" class="px-2.5 py-1.5 rounded-xl app-card-soft border text-[11px] font-bold" title="Salin link cabang">
-                                <i class="fa-solid fa-link mr-1 text-emerald-600"></i>Link
-                            </button>
-                            ${isMaster && shelters.length > 1 ? `
-                                <button type="button" onclick="deleteGowesShelterBranch('${esc(s.id)}')" class="px-2.5 py-1.5 rounded-xl bg-red-600/15 text-red-500 text-[11px] font-bold" title="Hapus Cabang">
-                                    <i class="fa-solid fa-trash"></i>
-                                </button>
-                            ` : ""}
-                        </div>
-                        <button type="button" onclick="toggleGowesBranchBikesAccordion('${esc(s.id)}')" class="px-2.5 py-1.5 rounded-xl app-btn-sec text-[10.5px] font-bold flex items-center gap-1">
-                            <span>${isExpanded ? "Tutup Daftar" : `Lihat Sepeda (${branchBikes.length})`}</span>
-                            <i class="fa-solid fa-chevron-${isExpanded ? "up" : "down"} text-[9px]"></i>
+                    <div class="flex flex-wrap items-center gap-2 pt-3 border-t gold-border">
+                        <button type="button" onclick="openMasterGowesBikeModal(null,'${esc(s.id)}')" class="gowes-pill-btn px-3.5 py-2 rounded-xl text-xs shadow-sm">
+                            <i class="fa-solid fa-plus mr-1"></i>Tambah Sepeda
                         </button>
-                    </div>
-
-                    <!-- Daftar Unit Sepeda Khusus Gerai Ini -->
-                    <div class="${isExpanded ? "space-y-2 pt-1" : "hide"}">
-                        ${branchBikes.length
-                            ? branchBikes.map(b => _renderSingleBikeAdminRowHtml(b, isMaster, false)).join("")
-                            : `<div class="app-card-soft border border-dashed rounded-2xl p-3.5 text-center space-y-1.5">
-                                <p class="text-[11px] app-muted">Belum ada sepeda khusus di gerai <strong>${escHtml(s.city || s.name)}</strong>.${sharedBikes.length ? ` Saat ini memakai ${sharedBikes.length} unit umum.` : ""}</p>
-                                <button type="button" onclick="openMasterGowesBikeModal(null,'${esc(s.id)}')" class="inline-flex items-center gap-1 px-3 py-1.5 rounded-xl bg-emerald-600/15 text-emerald-700 text-[11px] font-bold">
-                                    <i class="fa-solid fa-bicycle"></i> + Input Sepeda untuk ${escHtml(s.city || "Gerai Ini")}
-                                </button>
-                               </div>`}
-                    </div>
-                </div>
-            `;
-        }).join("");
-
-        const sharedSectionHtml = sharedBikes.length ? `
-            <div class="app-card border rounded-3xl p-4 sm:p-5 space-y-3 shadow-sm">
-                <div class="flex flex-wrap items-center justify-between gap-2 border-b gold-border pb-2.5">
-                    <div>
-                        <span class="text-[9px] uppercase font-extrabold px-2 py-0.5 rounded-full bg-blue-500/15 text-blue-600">ARMADA UMUM (SEMUA CABANG)</span>
-                        <h4 class="text-xs sm:text-sm font-extrabold mt-1">Unit yang Tampil di Semua Gerai (${sharedBikes.length} Unit)</h4>
-                        <p class="text-[10.5px] app-muted">Klik <strong>Edit</strong> pada sepeda di bawah jika ingin memindahkannya khusus ke salah satu gerai saja.</p>
+                        <button type="button" onclick="openGowesShelterOpsModal('${esc(s.id)}', false)" class="px-3.5 py-2 rounded-xl app-card-soft border app-accent text-xs font-bold">
+                            <i class="fa-solid fa-pen mr-1"></i>Edit Gerai &amp; Buka/Tutup
+                        </button>
+                        <button type="button" onclick="navigator.clipboard.writeText('${esc(branchLink)}');showToast('Link khusus cabang ${esc(s.city || s.name)} disalin!');" class="px-3 py-2 rounded-xl app-card-soft border text-xs font-bold">
+                            <i class="fa-solid fa-link mr-1 text-emerald-600"></i>Link Cabang
+                        </button>
+                        ${isMaster && shelters.length > 1 ? `
+                            <button type="button" onclick="deleteGowesShelterBranch('${esc(s.id)}')" class="px-3 py-2 rounded-xl bg-red-600/15 text-red-500 text-xs font-bold ml-auto">
+                                <i class="fa-solid fa-trash mr-1"></i>Hapus Gerai
+                            </button>
+                        ` : ""}
                     </div>
                 </div>
-                <div class="space-y-2">
-                    ${sharedBikes.map(b => _renderSingleBikeAdminRowHtml(b, isMaster, true)).join("")}
-                </div>
-            </div>
-        ` : "";
 
-        paneHtml = `
-            <div class="space-y-4">
-                <div class="app-card border rounded-3xl p-4 flex flex-wrap items-center justify-between gap-3 shadow-sm bg-gradient-to-r from-emerald-500/10 via-transparent to-transparent">
-                    <div>
-                        <h4 class="text-sm font-extrabold text-emerald-600"><i class="fa-solid fa-map-location-dot mr-1.5"></i>Kelola Gerai &amp; Armada per Cabang</h4>
-                        <p class="text-[11px] app-muted">Atur sepeda masing-masing gerai secara terpisah, tambah cabang baru, atau buka/tutup operasional.</p>
+                <div class="space-y-2.5">
+                    <div class="flex items-center justify-between px-1">
+                        <h4 class="text-xs font-extrabold uppercase app-muted tracking-wider">Unit Sepeda Gerai ${escHtml(s.city || "")} (${branchBikes.length})</h4>
                     </div>
-                    <button type="button" onclick="openGowesShelterOpsModal(null, true)" class="gowes-pill-btn px-4 py-2 rounded-xl text-xs shadow">
-                        <i class="fa-solid fa-plus mr-1"></i>Tambah Gerai Cabang
-                    </button>
+                    ${branchBikes.length
+                        ? branchBikes.map(b => _renderSingleBikeAdminRowHtml(b, isMaster, false)).join("")
+                        : `<div class="app-card border border-dashed rounded-3xl p-7 text-center space-y-2.5">
+                            <i class="fa-solid fa-bicycle text-3xl text-emerald-600/50"></i>
+                            <p class="text-xs app-muted">Belum ada sepeda khusus di gerai <strong>${escHtml(s.city || s.name)}</strong>.${sharedBikes.length ? ` Saat ini pelanggan memakai ${sharedBikes.length} unit dari Armada Umum.` : ""}</p>
+                            <button type="button" onclick="openMasterGowesBikeModal(null,'${esc(s.id)}')" class="gowes-pill-btn px-4 py-2 rounded-xl text-xs shadow">
+                                <i class="fa-solid fa-plus mr-1"></i>Tambah Sepeda ke ${escHtml(s.city || "Gerai Ini")}
+                            </button>
+                           </div>`}
                 </div>
-
-                <div class="space-y-3.5">
-                    ${sheltersHtml}
-                </div>
-                ${sharedSectionHtml}
             </div>
         `;
     }
 
-    return `<div class="space-y-4">${tabsHtml}${paneHtml}</div>`;
+    // LEMBAR ANAK 2: ARMADA UMUM (LINTAS CABANG)
+    if (_gowesFleetPage === "shared") {
+        if (titleEl) titleEl.innerText = "Armada Umum (Lintas Cabang)";
+        if (subEl) subEl.innerText = `${sharedBikes.length} unit tampil di semua gerai`;
+        return `
+            <div class="space-y-3.5">
+                <div class="app-card border rounded-2xl p-4 flex flex-wrap items-center justify-between gap-2.5 shadow-sm">
+                    <p class="text-xs app-muted flex-1">Unit di bawah ini tampil di semua cabang. Klik <strong>Edit</strong> pada unit jika ingin memindahkannya khusus ke satu gerai.</p>
+                    <button type="button" onclick="openMasterGowesBikeModal(null,'all')" class="gowes-pill-btn px-3.5 py-2 rounded-xl text-xs shadow shrink-0"><i class="fa-solid fa-plus mr-1"></i>Tambah Unit Umum</button>
+                </div>
+                ${sharedBikes.length
+                    ? sharedBikes.map(b => _renderSingleBikeAdminRowHtml(b, isMaster, true)).join("")
+                    : `<div class="app-card border border-dashed rounded-3xl p-8 text-center text-xs app-muted">Semua sepeda sudah dipisahkan ke gerai masing-masing.</div>`}
+            </div>
+        `;
+    }
+
+    // LEMBAR ANAK 3: DAFTAR BANNER 16:7
+    if (_gowesFleetPage === "banners" && isMaster) {
+        if (titleEl) titleEl.innerText = "Banner Promosi Gowes (16:7)";
+        if (subEl) subEl.innerText = `${banners.length} banner aktif`;
+        return `
+            <div class="space-y-3.5">
+                <div class="flex justify-end">
+                    <button type="button" onclick="openGowesFleetSubPage('banner_form', -1)" class="gowes-pill-btn px-4 py-2 rounded-xl text-xs shadow"><i class="fa-solid fa-plus mr-1"></i>Tambah Banner 16:7</button>
+                </div>
+                <div class="space-y-2.5">
+                    ${banners.map((b, i) => `
+                        <div class="app-card border rounded-2xl p-3 flex items-center gap-3 shadow-sm">
+                            <img src="${b.img}" class="w-24 h-12 rounded-xl object-cover bg-black shrink-0 border gold-border">
+                            <div class="flex-1 min-w-0">
+                                <strong class="text-xs sm:text-sm block truncate">${escHtml(b.title)}</strong>
+                                <span class="text-[10px] app-muted block truncate">${escHtml(b.badge || "Promo")} • ${escHtml(b.subtitle || "")}</span>
+                            </div>
+                            <button type="button" onclick="openGowesFleetSubPage('banner_form', ${i})" class="px-3 py-1.5 rounded-xl app-btn-sec text-xs font-bold">Edit</button>
+                            <button type="button" onclick="deleteGowesBannerItem(${i})" class="px-2.5 py-1.5 rounded-xl bg-red-600/15 text-xs text-red-500"><i class="fa-solid fa-trash"></i></button>
+                        </div>
+                    `).join("")}
+                </div>
+            </div>
+        `;
+    }
+
+    // LEMBAR ANAK 4: FORM TAMBAH / EDIT BANNER 16:7
+    if (_gowesFleetPage === "banner_form" && isMaster) {
+        if (titleEl) titleEl.innerText = _gowesEditingBannerIdx >= 0 ? "Edit Banner Gowes 16:7" : "Tambah Banner Gowes 16:7";
+        if (subEl) subEl.innerText = "Atur gambar, judul & tujuan banner promosi";
+        return `
+            <form onsubmit="saveGowesBannerForm(event)" class="app-card border rounded-3xl p-5 space-y-3 shadow-sm max-w-xl mx-auto">
+                <input type="hidden" id="gwb-id">
+                <div class="w-full rounded-xl overflow-hidden border gold-border bg-black" style="aspect-ratio:16/7;">
+                    <img id="gwb-preview-img" src="${(banners[0] && banners[0].img) || 'https://images.unsplash.com/photo-1541625602330-2277a4c46182?auto=format&fit=crop&w=1200&q=80'}" class="w-full h-full object-cover">
+                </div>
+                <label class="block gowes-pill-btn py-2.5 rounded-xl text-center cursor-pointer text-xs">
+                    <i class="fa-solid fa-crop-simple mr-1"></i>Pilih &amp; Crop Foto Banner (16 : 7)
+                    <input type="file" accept="image/*" class="hide" onchange="pickCroppedGowesBanner(this)">
+                </label>
+                <div class="grid grid-cols-2 gap-2">
+                    <input type="text" id="gwb-badge" placeholder="Label (TITIK GOWES)" class="app-input text-xs">
+                    <input type="text" id="gwb-cta" placeholder="Tombol (opsional)" class="app-input text-xs">
+                </div>
+                <input type="text" id="gwb-title" placeholder="Judul Banner Promosi" class="app-input text-xs" required>
+                <input type="text" id="gwb-sub" placeholder="Deskripsi singkat banner..." class="app-input text-xs" required>
+                <select id="gwb-target" class="app-input text-xs">
+                    <option value="gowes-showcase-track">Arahkan ke Pilihan Sepeda</option>
+                    <option value="open_booking">Buka Formulir Booking Langsung</option>
+                    <option value="sec-gowes-shelter">Arahkan ke Lokasi Garasi</option>
+                </select>
+                <input type="url" id="gwb-img-url" oninput="if(this.value.startsWith('http'))document.getElementById('gwb-preview-img').src=this.value;" placeholder="Atau tempel URL foto (https://...)" class="app-input text-xs">
+                <button type="submit" id="btn-save-gwb" class="w-full gowes-pill-btn py-3 rounded-xl text-xs uppercase shadow">Simpan Banner Gowes</button>
+            </form>
+        `;
+    }
+
+    // LEMBAR UTAMA (HOME): JADWAL HARI INI + DAFTAR GERAI BERSIH (KLIK UNTUK MASUK LEMBAR MASING-MASING)
+    if (titleEl) titleEl.innerText = "Kelola Gerai & Armada Gowes";
+    if (subEl) subEl.innerText = `${shelters.length} Gerai Cabang • ${bikes.length} Unit Sepeda`;
+
+    const branchRowsHtml = shelters.map(s => {
+        const sClosed = !!s.isClosed;
+        const cnt = bikes.filter(b => String(b.branchId || "") === String(s.id)).length;
+        return `
+            <button type="button" onclick="openGowesFleetSubPage('branch','${esc(s.id)}')" class="menu-row-card">
+                <span class="menu-row-ic ${sClosed ? '!bg-red-500/15 !text-red-500' : '!bg-emerald-500/15 !text-emerald-600'}">
+                    <i class="fa-solid ${sClosed ? 'fa-store-slash' : 'fa-store'}"></i>
+                </span>
+                <div class="flex-1 min-w-0">
+                    <div class="flex items-center gap-1.5">
+                        <strong class="text-xs sm:text-sm truncate">${escHtml(s.city || s.name)}</strong>
+                        <span class="text-[8.5px] font-extrabold uppercase px-1.5 py-0.5 rounded-full ${sClosed ? 'bg-red-500/15 text-red-500' : 'bg-emerald-500/15 text-emerald-600'}">${sClosed ? 'TUTUP' : 'BUKA'}</span>
+                    </div>
+                    <span class="text-[10.5px] app-muted block truncate">${escHtml(s.name)} • ${cnt} unit sepeda khusus</span>
+                </div>
+                <i class="fa-solid fa-chevron-right text-[10px] app-muted shrink-0"></i>
+            </button>
+        `;
+    }).join("");
+
+    return `
+        <div class="space-y-4">
+            ${buildGowesTodayScheduleBoardHtml()}
+
+            <div class="space-y-2">
+                <div class="flex items-center justify-between px-1">
+                    <span class="text-[11px] font-extrabold uppercase tracking-wider app-muted">Pilih Gerai Cabang (${shelters.length})</span>
+                    <button type="button" onclick="openGowesShelterOpsModal(null, true)" class="text-xs font-extrabold text-emerald-600 hover:underline"><i class="fa-solid fa-plus mr-1"></i>Tambah Gerai</button>
+                </div>
+                <div class="space-y-2">
+                    ${branchRowsHtml}
+                </div>
+            </div>
+
+            <div class="space-y-2 pt-1">
+                <span class="text-[11px] font-extrabold uppercase tracking-wider app-muted px-1 block">Pengaturan Lainnya</span>
+                <button type="button" onclick="openGowesFleetSubPage('shared')" class="menu-row-card">
+                    <span class="menu-row-ic !bg-blue-500/15 !text-blue-600"><i class="fa-solid fa-globe"></i></span>
+                    <div class="flex-1 min-w-0">
+                        <strong class="text-xs sm:text-sm block">Armada Umum (Lintas Cabang)</strong>
+                        <span class="text-[10.5px] app-muted block">${sharedBikes.length} unit yang tampil di semua gerai</span>
+                    </div>
+                    <i class="fa-solid fa-chevron-right text-[10px] app-muted shrink-0"></i>
+                </button>
+                ${isMaster ? `
+                    <button type="button" onclick="openGowesFleetSubPage('banners')" class="menu-row-card">
+                        <span class="menu-row-ic !bg-amber-500/15 !text-amber-600"><i class="fa-solid fa-rectangle-ad"></i></span>
+                        <div class="flex-1 min-w-0">
+                            <strong class="text-xs sm:text-sm block">Banner Promosi Titik Gowes (16:7)</strong>
+                            <span class="text-[10.5px] app-muted block">${banners.length} slide banner aktif di beranda Gowes</span>
+                        </div>
+                        <i class="fa-solid fa-chevron-right text-[10px] app-muted shrink-0"></i>
+                    </button>
+                ` : ""}
+            </div>
+        </div>
+    `;
 }
 
 // ================= BANNER 16:7 HANDLERS =================
@@ -326,6 +504,8 @@ async function saveGowesBannerForm(e) {
 
     db.gowesBanners = res.banners || list;
     gwBannerTempImg = "";
+    _gowesFleetPage = "banners";
+    _gowesEditingBannerIdx = -1;
     if (typeof renderMasterWorkspaceContent === "function") renderMasterWorkspaceContent();
     if (typeof renderGowesBannerSlider === "function") renderGowesBannerSlider();
     showToast("Banner Titik Gowes tersimpan!");
@@ -471,6 +651,8 @@ async function deleteGowesShelterBranch(branchId) {
         ? res.shelters
         : shelters.filter(s => String(s.id) !== String(branchId));
     db.gowesShelter = db.gowesShelters[0];
+    _gowesFleetPage = "home";
+    _gowesSelectedBranchId = "";
     if (typeof renderGowesLandingPage === "function" && currentAppMode === "titik_gowes") renderGowesLandingPage();
     if (typeof renderMasterWorkspaceContent === "function") renderMasterWorkspaceContent();
     showToast("Gerai cabang dihapus.", "info");

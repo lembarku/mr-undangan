@@ -25,6 +25,7 @@ const DEFAULT_PRIVACY = {
     showFollowers: true,
     showFollowing: true,
     showUsername: true,
+    allowSearchDiscovery: true,
     showContact: false,
     showInChatContacts: true,
     allowDirectChat: true
@@ -639,6 +640,7 @@ function toggleEcosystemDrawer(show) {
     if (!el) return;
     if (show) {
         renderEcosystemDrawerUser();
+        if (typeof renderEcoUserSearchBox === "function") renderEcoUserSearchBox();
         el.classList.add("open");
         if (btn) btn.classList.add("is-active");
         if (typeof mrNavPush === "function") mrNavPush({ type: "modal", id: "drawer-ecosystem" });
@@ -764,6 +766,7 @@ function getUserPrivacy(uObj) {
         showFollowers: raw.showFollowers !== false,
         showFollowing: raw.showFollowing !== false,
         showUsername: raw.showUsername !== false,
+        allowSearchDiscovery: raw.allowSearchDiscovery !== false,
         showContact: raw.showContact === true,
         showInChatContacts: raw.showInChatContacts !== false,
         allowDirectChat: raw.allowDirectChat !== false
@@ -851,6 +854,135 @@ const DEFAULT_COIN_PACKAGES = [
     { id: "bisnis", name: "Bisnis (Terlaris)", paidCoins: 100, bonusCoins: 15, price: 500000, badge: "TERLARIS" },
     { id: "juragan", name: "Juragan (Grosir VIP)", paidCoins: 200, bonusCoins: 50, price: 1000000, badge: "HEMAT 20%" }
 ];
+
+const DEFAULT_PRO_UPGRADE = {
+    price: 49000,
+    bonusCoins: 5
+};
+
+const DEFAULT_PROMO_VOUCHERS = [
+    {
+        id: "vch_default_1",
+        code: "HEMAT10",
+        type: "percent", // 'percent' | 'fixed'
+        value: 10,
+        scope: "all", // 'all' | 'inv' | 'pf' | 'gowes'
+        maxUses: 100,
+        usedCount: 0,
+        expiresAt: "2027-12-31",
+        active: true,
+        label: "Diskon Pembukaan 10%"
+    }
+];
+
+function getProUpgradeConfig() {
+    const ms = (db && db.masterSettings) || {};
+    const price = Number(ms.proUpgradePrice);
+    const bonusCoins = Number(ms.proUpgradeBonusCoins);
+    return {
+        price: (!isNaN(price) && price >= 1000) ? Math.round(price) : DEFAULT_PRO_UPGRADE.price,
+        bonusCoins: (!isNaN(bonusCoins) && bonusCoins >= 0) ? Math.round(bonusCoins) : DEFAULT_PRO_UPGRADE.bonusCoins
+    };
+}
+
+function getVouchersList() {
+    const ms = (db && db.masterSettings) || {};
+    if (Array.isArray(ms.vouchers)) return ms.vouchers;
+    return DEFAULT_PROMO_VOUCHERS.map(v => Object.assign({}, v));
+}
+
+function evaluateVoucherCode(rawCode, scope, basePrice) {
+    const clean = String(rawCode || "").trim().toUpperCase();
+    if (!clean) return { ok: false, message: "Masukkan kode voucher terlebih dahulu." };
+    const list = getVouchersList();
+    const v = list.find(x => x && String(x.code || "").trim().toUpperCase() === clean);
+    if (!v) return { ok: false, message: `Kode voucher "${clean}" tidak ditemukan.` };
+    if (v.active === false) return { ok: false, message: `Kode voucher "${clean}" sedang tidak aktif.` };
+
+    const vScope = String(v.scope || "all").toLowerCase();
+    if (vScope !== "all" && vScope !== String(scope || "").toLowerCase()) {
+        const scopeMap = { inv: "Undangan Digital", pf: "CV & Surat Lamaran", gowes: "Titik Gowes" };
+        return { ok: false, message: `Voucher "${clean}" hanya berlaku untuk ${scopeMap[vScope] || vScope}.` };
+    }
+
+    if (v.expiresAt) {
+        const expDate = new Date(String(v.expiresAt) + "T23:59:59");
+        if (!isNaN(expDate.getTime()) && Date.now() > expDate.getTime()) {
+            return { ok: false, message: `Voucher "${clean}" sudah melewati masa berlaku.` };
+        }
+    }
+
+    const maxU = Number(v.maxUses || 0);
+    const usedU = Number(v.usedCount || 0);
+    if (maxU > 0 && usedU >= maxU) {
+        return { ok: false, message: `Kuota pemakaian voucher "${clean}" sudah habis.` };
+    }
+
+    const base = Math.max(0, Math.round(Number(basePrice || 0)));
+    let disc = 0;
+    if (v.type === "percent") {
+        const pct = Math.max(1, Math.min(90, Number(v.value || 0)));
+        disc = Math.round((base * pct) / 100);
+    } else {
+        disc = Math.max(0, Math.round(Number(v.value || 0)));
+    }
+    disc = Math.min(Math.max(0, base - 1000), disc);
+    const finalPrice = Math.max(1000, base - disc);
+
+    return {
+        ok: true,
+        voucher: v,
+        code: clean,
+        discount: disc,
+        finalPrice,
+        message: `Voucher ${clean} aktif! Hemat ${fmtRp(disc)}.`
+    };
+}
+
+function isSystemCoinOrder(doc) {
+    if (!doc) return false;
+    return doc.docType === "coin_topup" || doc.docType === "pro_upgrade";
+}
+
+function getCoinHistoryForUser(uObj) {
+    if (!uObj || !uObj.username) return [];
+    const key = String(uObj.username).trim().toLowerCase();
+    const cloudList = Array.isArray(uObj.coinHistory) ? uObj.coinHistory : [];
+    let localList = [];
+    try {
+        localList = JSON.parse(localStorage.getItem("LBK_COIN_HIST_" + key) || "[]");
+        if (!Array.isArray(localList)) localList = [];
+    } catch { localList = []; }
+
+    const map = new Map();
+    [...cloudList, ...localList].forEach(item => {
+        if (!item) return;
+        const id = String(item.id || `${item.ts}_${item.delta}_${item.title}`);
+        if (!map.has(id)) map.set(id, item);
+    });
+    return Array.from(map.values()).sort((a, b) => Number(b.ts || 0) - Number(a.ts || 0));
+}
+
+function recordCoinMutation(uObj, delta, title, note = "", balanceAfterOverride = null) {
+    if (!uObj || !uObj.username) return [];
+    const key = String(uObj.username).trim().toLowerCase();
+    const curList = getCoinHistoryForUser(uObj);
+    const bal = balanceAfterOverride !== null ? Number(balanceAfterOverride) : Number(uObj.quota || 0);
+    const entry = {
+        id: "cmut_" + Date.now() + "_" + Math.random().toString(36).slice(2, 6),
+        ts: Date.now(),
+        delta: Math.round(Number(delta || 0)),
+        balanceAfter: Math.max(0, Math.round(bal)),
+        title: String(title || (delta >= 0 ? "Isi Ulang Coin" : "Pemakaian Coin")),
+        note: String(note || "")
+    };
+    const nextList = [entry, ...curList].slice(0, 100);
+    uObj.coinHistory = nextList;
+    try {
+        localStorage.setItem("LBK_COIN_HIST_" + key, JSON.stringify(nextList));
+    } catch {}
+    return nextList;
+}
 
 function getCoinPackagesList() {
     const ms = (db && db.masterSettings) || {};

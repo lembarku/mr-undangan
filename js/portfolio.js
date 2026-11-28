@@ -1001,6 +1001,26 @@ function selectPortfolioTheme(themeId) {
     document.getElementById("pfw-badge-type").innerText = pfWizardState.docType === "lamaran" ? "Surat Lamaran Kerja" : "Curriculum Vitae";
     document.getElementById("pfw-badge-theme").innerText = tObj.name;
     document.getElementById("pfw-badge-price").innerText = pfWizardState.isCabangBypass ? `${coinCost} Coin` : fmtRp(tObj.price);
+
+    const curU = getCurrentUserObj();
+    const isProUser = !!(curU && curU.role === "user" && curU.isPro && !pfWizardState.isEdit && !pfWizardState.isCabangBypass);
+    const proWrap = document.getElementById("pfw-pro-paymode-wrap");
+    if (proWrap) {
+        proWrap.classList.toggle("hide", !isProUser);
+        if (isProUser) {
+            const bal = Number(curU.quota || 0);
+            const balEl = document.getElementById("pfw-pro-coin-bal");
+            const optEl = document.getElementById("pfw-pro-coin-opt-lbl");
+            if (balEl) balEl.innerText = `Saldo Anda: ${bal} Coin`;
+            if (optEl) optEl.innerText = `Potong ${coinCost} Coin`;
+            const coinRad = document.querySelector('input[name="pfw_pro_paymode"][value="coin"]');
+            const normRad = document.querySelector('input[name="pfw_pro_paymode"][value="normal"]');
+            if (coinRad && normRad) {
+                if (bal >= coinCost) { coinRad.checked = true; } else { normRad.checked = true; }
+            }
+            onPortfolioProPayModeChange();
+        }
+    }
     renderPortfolioFormFields();
     if (!pfWizardState.isEdit) {
         try {
@@ -1013,6 +1033,21 @@ function selectPortfolioTheme(themeId) {
     }
     bindPortfolioAutoSave();
     setPortfolioWizardStep(2);
+}
+
+function onPortfolioProPayModeChange() {
+    const mode = document.querySelector('input[name="pfw_pro_paymode"]:checked')?.value || "normal";
+    const tObj = getPortfolioThemeObj(pfWizardState.docType, pfWizardState.themeId);
+    const coinCost = getPortfolioCoinCost(pfWizardState.docType, tObj);
+    const btnEl = document.getElementById("btn-submit-pf");
+    const priceEl = document.getElementById("pfw-badge-price");
+    if (mode === "coin") {
+        if (btnEl) btnEl.innerText = `Buat & Aktifkan (-${coinCost} Coin)`;
+        if (priceEl) priceEl.innerText = `${coinCost} Coin`;
+    } else {
+        if (btnEl) btnEl.innerText = "Ajukan Berkas";
+        if (priceEl) priceEl.innerText = fmtRp(tObj.price);
+    }
 }
 
 function bindPortfolioAutoSave() {
@@ -1338,13 +1373,16 @@ async function submitPortfolioForm(e) {
 
     const tObjNow = getPortfolioThemeObj(pfWizardState.docType, pfWizardState.themeId);
     const coinCost = getPortfolioCoinCost(pfWizardState.docType, tObjNow);
+    const proWantsCoin = !!(curU && curU.role === "user" && curU.isPro && !pfWizardState.isCabangBypass && (document.querySelector('input[name="pfw_pro_paymode"]:checked')?.value === "coin"));
+    const useCoinInstant = pfWizardState.isCabangBypass || proWantsCoin;
+
     let beforeQuota = 0;
-    if (pfWizardState.isCabangBypass) {
-        const cabNow = getCurrentUserObj();
-        beforeQuota = Number((cabNow && cabNow.quota) || 0);
+    if (useCoinInstant) {
+        const uNow = getCurrentUserObj();
+        beforeQuota = Number((uNow && uNow.quota) || 0);
         if (beforeQuota < coinCost) {
             setBtnLoading("btn-submit-pf", false);
-            return showToast(`Saldo Coin tidak cukup! Desain ini butuh ${coinCost} Coin, saldo Anda ${beforeQuota} Coin.`, "error");
+            return showToast(`Saldo Coin tidak cukup! Desain ini butuh ${coinCost} Coin, saldo Anda ${beforeQuota} Coin. Silakan beli paket Coin dulu.`, "error");
         }
     }
 
@@ -1353,8 +1391,8 @@ async function submitPortfolioForm(e) {
         id: newId,
         createdAt: newId,
         owner: currentSessionUser,
-        status: pfWizardState.isCabangBypass ? "Aktif" : "Menunggu Pembayaran",
-        coinCost: pfWizardState.isCabangBypass ? coinCost : 0,
+        status: useCoinInstant ? "Aktif" : "Menunggu Pembayaran",
+        coinCost: useCoinInstant ? coinCost : 0,
         editCount: 0,
         uniqueCode: getDeterministicUniqueCode(newId),
         paymentProof: ""
@@ -1364,21 +1402,24 @@ async function submitPortfolioForm(e) {
     const res = await apiAction({
         action: "upsert_portfolio",
         portfolio: newPf,
-        deductQuotaFrom: pfWizardState.isCabangBypass ? currentSessionUser : "",
-        deductQuotaAmount: pfWizardState.isCabangBypass ? coinCost : 0
+        deductQuotaFrom: useCoinInstant ? currentSessionUser : "",
+        deductQuotaAmount: useCoinInstant ? coinCost : 0
     });
     if (!res || !res.ok) {
         setBtnLoading("btn-submit-pf", false);
         return showToast((res && res.message) || "Gagal menyimpan berkas.", "error");
     }
 
-    if (pfWizardState.isCabangBypass) {
+    if (useCoinInstant) {
         const expectedQuota = Math.max(0, beforeQuota - coinCost);
-        const cabAfter = getCurrentUserObj();
-        if (cabAfter && Number(cabAfter.quota) !== expectedQuota) {
-            const fixedCab = Object.assign({}, cabAfter, { quota: expectedQuota });
-            await apiAction({ action: "upsert_user", oldUsername: cabAfter.username, user: fixedCab });
-            if (typeof ensureUserInLocalDb === "function") ensureUserInLocalDb(fixedCab);
+        const uAfter = getCurrentUserObj();
+        if (uAfter) {
+            const fixedU = Object.assign({}, uAfter, { quota: expectedQuota });
+            if (typeof recordCoinMutation === "function") {
+                recordCoinMutation(fixedU, -coinCost, `${payload.docType === "lamaran" ? "Surat Lamaran" : "CV"}: ${payload.fullName || payload.title}`, `${tObjNow.name}`, expectedQuota);
+            }
+            await apiAction({ action: "upsert_user", oldUsername: uAfter.username, user: fixedU });
+            if (typeof ensureUserInLocalDb === "function") ensureUserInLocalDb(fixedU);
         }
     }
 
@@ -1390,8 +1431,10 @@ async function submitPortfolioForm(e) {
     }
     try { localStorage.removeItem(DRAFT_PF_KEY); } catch {}
 
-    if (pfWizardState.isCabangBypass) {
-        showToast(`Berkas klien langsung AKTIF (-${coinCost} Coin)!`);
+    if (useCoinInstant) {
+        showToast(pfWizardState.isCabangBypass
+            ? `Berkas klien langsung AKTIF (-${coinCost} Coin)!`
+            : `Berkas PRO langsung AKTIF (-${coinCost} Coin)! Siap unduh PDF.`);
         return routeDashboard();
     }
     openUnifiedPayment("portfolio", newPf.id);
