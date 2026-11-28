@@ -334,8 +334,8 @@ function startCreateInvitation(isCabang = false, preCat = null, preTheme = null)
         sections: { sesi2: true, story: true, bank: true, music: true, closing: true }
     };
     hideAllViews(); document.getElementById("view-wizard").classList.remove("hide");
-    document.getElementById("wiz-heading").innerText = isCabang ? "Buat Undangan Klien Instan (-1 Coin)" : "Buat Undangan Digital Baru";
-    document.getElementById("btn-submit-inv").innerText = isCabang ? "Buat & Aktifkan (-1 Coin)" : "Ajukan Undangan";
+    document.getElementById("wiz-heading").innerText = isCabang ? "Buat Undangan Klien Instan (Saldo Coin)" : "Buat Undangan Digital Baru";
+    document.getElementById("btn-submit-inv").innerText = isCabang ? "Buat & Aktifkan (Potong Coin)" : "Ajukan Undangan";
     document.getElementById("btn-change-theme-step").classList.remove("hide");
     renderHeaderActions(); pushBackGuard(); renderWizardStep1();
     if (preCat && preTheme) selectWizardTheme(preTheme);
@@ -359,7 +359,12 @@ function renderWizardStep1() {
         return `
             <div class="group rounded-2xl overflow-hidden border-2 ${isSel ? "border-blue-500 shadow-lg" : "border-black/15"} bg-black flex flex-col">
                 ${buildMiniCoverCardHtml(wizardState.category, t, false)}
-                ${buildPriceStripHtml(t, true)}
+                ${wizardState.isCabangBypass
+                    ? `<div class="px-2.5 py-2 bg-[#111115] text-white border-t border-white/10 flex items-center justify-between gap-1">
+                        <span class="text-[10px] font-bold truncate">${escHtml(t.name)}</span>
+                        <span class="inline-flex items-center gap-1 text-[11px] font-extrabold text-amber-400 shrink-0">${typeof buildGoldLembarkuCoinHtml === "function" ? buildGoldLembarkuCoinHtml("sm") : ""}${getThemeCoinCost(wizardState.category, t)} Coin</span>
+                       </div>`
+                    : buildPriceStripHtml(t, true)}
                 <div class="grid grid-cols-2 gap-1.5 p-2 bg-[#16161b]">
                     <button type="button" onclick="openThemeLivePreview('${esc(wizardState.category)}','${esc(t.name)}')" class="py-2 rounded-xl bg-white/15 hover:bg-white/25 text-white text-[11px] font-bold border border-white/20"><i class="fa-regular fa-eye mr-1"></i>Lihat Ini</button>
                     <button type="button" onclick="selectWizardTheme('${esc(t.name)}')" class="py-2 rounded-xl gold-pill-btn text-[11px] shadow">Pilih</button>
@@ -370,12 +375,30 @@ function renderWizardStep1() {
 }
 
 function selectWizardTheme(name) {
+    const prevTheme = wizardState.theme;
     wizardState.theme = name;
     const tObj = getSelectedThemeObj();
     const pr = getThemePricing(tObj);
+    const coinCost = getThemeCoinCost(wizardState.category, tObj);
+    wizardState.coinCost = coinCost;
+
+    if (wizardState.isCabangBypass) {
+        const cab = getCurrentUserObj();
+        const bal = Number((cab && cab.quota) || 0);
+        if (bal < coinCost) {
+            wizardState.theme = prevTheme;
+            showToast(`Saldo Coin belum cukup! Tema "${name}" butuh ${coinCost} Coin, saldo Anda ${bal} Coin.`, "error");
+            return;
+        }
+        const hEl = document.getElementById("wiz-heading");
+        const btnEl = document.getElementById("btn-submit-inv");
+        if (hEl) hEl.innerText = `Buat Undangan Klien Instan (-${coinCost} Coin)`;
+        if (btnEl) btnEl.innerText = `Buat & Aktifkan (-${coinCost} Coin)`;
+    }
+
     document.getElementById("form-badge-cat").innerText = wizardState.category;
     document.getElementById("form-badge-theme").innerText = name;
-    document.getElementById("form-badge-price").innerText = fmtRp(pr.price);
+    document.getElementById("form-badge-price").innerText = wizardState.isCabangBypass ? `${coinCost} Coin` : fmtRp(pr.price);
     wizardState.hiddenFields = [];
     wizardState.sections = { sesi2: wizardState.category === "Pernikahan", story: wizardState.category === "Pernikahan", bank: true, music: true, closing: true };
     document.getElementById("toggle-countdown").checked = true; document.getElementById("toggle-wishes").checked = true;
@@ -547,19 +570,50 @@ async function saveInvitationDraft(e) {
         return routeDashboard();
     }
 
+    const coinCost = getThemeCoinCost(wizardState.category, getSelectedThemeObj());
+    let beforeQuota = 0;
+    if (wizardState.isCabangBypass) {
+        const cabNow = getCurrentUserObj();
+        beforeQuota = Number((cabNow && cabNow.quota) || 0);
+        if (beforeQuota < coinCost) {
+            setBtnLoading("btn-submit-inv", false);
+            return showToast(`Saldo Coin tidak cukup! Butuh ${coinCost} Coin, saldo Anda ${beforeQuota} Coin.`, "error");
+        }
+    }
+
     const genKey = Math.random().toString(36).slice(2, 10);
     const newId = Date.now();
     const newInv = {
         id: newId, createdAt: newId, owner: currentSessionUser, clientKey: genKey,
         status: wizardState.isCabangBypass ? "Aktif" : "Menunggu Pembayaran",
+        coinCost: wizardState.isCabangBypass ? coinCost : 0,
         editCount: 0, uniqueCode: getDeterministicUniqueCode(newId),
         paymentProof: "", guests: ["Tamu Kehormatan"], sentGuests: [], waTemplate: "", wishes: [], ...payload
     };
     newInv.totalPay = Number(newInv.price || 99000) + newInv.uniqueCode;
 
-    const resInv = await apiAction({ action: "upsert_invitation", invitation: newInv, deductQuotaFrom: wizardState.isCabangBypass ? currentSessionUser : "" });
+    const resInv = await apiAction({
+        action: "upsert_invitation",
+        invitation: newInv,
+        deductQuotaFrom: wizardState.isCabangBypass ? currentSessionUser : "",
+        deductQuotaAmount: wizardState.isCabangBypass ? coinCost : 0
+    });
+    if (!resInv || !resInv.ok) {
+        setBtnLoading("btn-submit-inv", false);
+        return showToast((resInv && resInv.message) || "Gagal menyimpan undangan.", "error");
+    }
+
+    if (wizardState.isCabangBypass) {
+        const expectedQuota = Math.max(0, beforeQuota - coinCost);
+        const cabAfter = getCurrentUserObj();
+        if (cabAfter && Number(cabAfter.quota) !== expectedQuota) {
+            const fixedCab = Object.assign({}, cabAfter, { quota: expectedQuota });
+            await apiAction({ action: "upsert_user", oldUsername: cabAfter.username, user: fixedCab });
+            if (typeof ensureUserInLocalDb === "function") ensureUserInLocalDb(fixedCab);
+        }
+    }
+
     setBtnLoading("btn-submit-inv", false);
-    if (!resInv || !resInv.ok) return showToast((resInv && resInv.message) || "Gagal menyimpan undangan.", "error");
     if (!Array.isArray(db.invitations)) db.invitations = [];
     if (!db.invitations.some(i => String(i.id) === String(newInv.id))) {
         db.invitations.unshift(newInv);
@@ -567,7 +621,7 @@ async function saveInvitationDraft(e) {
     }
     try { localStorage.removeItem(DRAFT_INV_KEY); } catch {}
     if (wizardState.isCabangBypass) {
-        showToast("Undangan klien langsung AKTIF (-1 Coin)! Klik Link Klien untuk portal tamu.");
+        showToast(`Undangan klien langsung AKTIF (-${coinCost} Coin)! Klik Link Klien untuk portal tamu.`);
         return routeDashboard();
     }
     openUnifiedPayment("inv", newInv.id);

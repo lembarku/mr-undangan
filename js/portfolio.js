@@ -932,8 +932,8 @@ function startCreatePortfolio(isCabang = false, initType = "cv", initThemeId = n
     };
     hideAllViews();
     document.getElementById("view-portfolio-wizard").classList.remove("hide");
-    document.getElementById("pfw-heading").innerText = isCabang ? "Buat Berkas Klien Instan (-1 Coin)" : "Buat CV / Surat Lamaran Kerja";
-    document.getElementById("btn-submit-pf").innerText = isCabang ? "Buat & Aktifkan (-1 Coin)" : "Ajukan Berkas";
+    document.getElementById("pfw-heading").innerText = isCabang ? "Buat Berkas Klien Instan (Saldo Coin)" : "Buat CV / Surat Lamaran Kerja";
+    document.getElementById("btn-submit-pf").innerText = isCabang ? "Buat & Aktifkan (Potong Coin)" : "Ajukan Berkas";
     document.getElementById("pfw-btn-change-theme").classList.remove("hide");
     renderHeaderActions();
     pushBackGuard();
@@ -962,7 +962,12 @@ function setPortfolioWizardType(dt) {
         return `
             <div class="rounded-2xl overflow-hidden border-2 ${sel ? "border-blue-500 shadow-lg" : "border-black/15"} bg-black flex flex-col">
                 ${buildPortfolioMiniCardHtml(dt, obj, false)}
-                ${buildPriceStripHtml(obj, true)}
+                ${pfWizardState.isCabangBypass
+                    ? `<div class="px-2.5 py-2 bg-[#111115] text-white border-t border-white/10 flex items-center justify-between gap-1">
+                        <span class="text-[10px] font-bold truncate">${escHtml(obj.name)}</span>
+                        <span class="inline-flex items-center gap-1 text-[11px] font-extrabold text-amber-400 shrink-0">${typeof buildGoldLembarkuCoinHtml === "function" ? buildGoldLembarkuCoinHtml("sm") : ""}${getPortfolioCoinCost(dt, obj)} Coin</span>
+                       </div>`
+                    : buildPriceStripHtml(obj, true)}
                 <div class="grid grid-cols-2 gap-1.5 p-2 bg-[#16161b]">
                     <button type="button" onclick="openPortfolioDemoPreview('${dt}','${obj.id}')" class="py-2 rounded-xl bg-white/15 hover:bg-white/25 text-white text-[11px] font-bold border border-white/20"><i class="fa-regular fa-eye mr-1"></i>Lihat Ini</button>
                     <button type="button" onclick="selectPortfolioTheme('${obj.id}')" class="py-2 rounded-xl gold-pill-btn text-[11px] shadow">Pilih</button>
@@ -973,11 +978,29 @@ function setPortfolioWizardType(dt) {
 }
 
 function selectPortfolioTheme(themeId) {
+    const prevId = pfWizardState.themeId;
     pfWizardState.themeId = themeId;
     const tObj = getPortfolioThemeObj(pfWizardState.docType, themeId);
+    const coinCost = getPortfolioCoinCost(pfWizardState.docType, tObj);
+    pfWizardState.coinCost = coinCost;
+
+    if (pfWizardState.isCabangBypass) {
+        const cab = getCurrentUserObj();
+        const bal = Number((cab && cab.quota) || 0);
+        if (bal < coinCost) {
+            pfWizardState.themeId = prevId;
+            showToast(`Saldo Coin belum cukup! Desain "${tObj.name}" butuh ${coinCost} Coin, saldo Anda ${bal} Coin.`, "error");
+            return;
+        }
+        const hEl = document.getElementById("pfw-heading");
+        const btnEl = document.getElementById("btn-submit-pf");
+        if (hEl) hEl.innerText = `Buat Berkas Klien Instan (-${coinCost} Coin)`;
+        if (btnEl) btnEl.innerText = `Buat & Aktifkan (-${coinCost} Coin)`;
+    }
+
     document.getElementById("pfw-badge-type").innerText = pfWizardState.docType === "lamaran" ? "Surat Lamaran Kerja" : "Curriculum Vitae";
     document.getElementById("pfw-badge-theme").innerText = tObj.name;
-    document.getElementById("pfw-badge-price").innerText = fmtRp(tObj.price);
+    document.getElementById("pfw-badge-price").innerText = pfWizardState.isCabangBypass ? `${coinCost} Coin` : fmtRp(tObj.price);
     renderPortfolioFormFields();
     if (!pfWizardState.isEdit) {
         try {
@@ -1313,12 +1336,25 @@ async function submitPortfolioForm(e) {
         return routeDashboard();
     }
 
+    const tObjNow = getPortfolioThemeObj(pfWizardState.docType, pfWizardState.themeId);
+    const coinCost = getPortfolioCoinCost(pfWizardState.docType, tObjNow);
+    let beforeQuota = 0;
+    if (pfWizardState.isCabangBypass) {
+        const cabNow = getCurrentUserObj();
+        beforeQuota = Number((cabNow && cabNow.quota) || 0);
+        if (beforeQuota < coinCost) {
+            setBtnLoading("btn-submit-pf", false);
+            return showToast(`Saldo Coin tidak cukup! Desain ini butuh ${coinCost} Coin, saldo Anda ${beforeQuota} Coin.`, "error");
+        }
+    }
+
     const newId = Date.now();
     const newPf = Object.assign({
         id: newId,
         createdAt: newId,
         owner: currentSessionUser,
         status: pfWizardState.isCabangBypass ? "Aktif" : "Menunggu Pembayaran",
+        coinCost: pfWizardState.isCabangBypass ? coinCost : 0,
         editCount: 0,
         uniqueCode: getDeterministicUniqueCode(newId),
         paymentProof: ""
@@ -1328,11 +1364,25 @@ async function submitPortfolioForm(e) {
     const res = await apiAction({
         action: "upsert_portfolio",
         portfolio: newPf,
-        deductQuotaFrom: pfWizardState.isCabangBypass ? currentSessionUser : ""
+        deductQuotaFrom: pfWizardState.isCabangBypass ? currentSessionUser : "",
+        deductQuotaAmount: pfWizardState.isCabangBypass ? coinCost : 0
     });
-    setBtnLoading("btn-submit-pf", false);
-    if (!res || !res.ok) return showToast((res && res.message) || "Gagal menyimpan berkas.", "error");
+    if (!res || !res.ok) {
+        setBtnLoading("btn-submit-pf", false);
+        return showToast((res && res.message) || "Gagal menyimpan berkas.", "error");
+    }
 
+    if (pfWizardState.isCabangBypass) {
+        const expectedQuota = Math.max(0, beforeQuota - coinCost);
+        const cabAfter = getCurrentUserObj();
+        if (cabAfter && Number(cabAfter.quota) !== expectedQuota) {
+            const fixedCab = Object.assign({}, cabAfter, { quota: expectedQuota });
+            await apiAction({ action: "upsert_user", oldUsername: cabAfter.username, user: fixedCab });
+            if (typeof ensureUserInLocalDb === "function") ensureUserInLocalDb(fixedCab);
+        }
+    }
+
+    setBtnLoading("btn-submit-pf", false);
     if (!Array.isArray(db.portfolios)) db.portfolios = [];
     if (!db.portfolios.some(p => String(p.id) === String(newPf.id))) {
         db.portfolios.unshift(newPf);
@@ -1341,7 +1391,7 @@ async function submitPortfolioForm(e) {
     try { localStorage.removeItem(DRAFT_PF_KEY); } catch {}
 
     if (pfWizardState.isCabangBypass) {
-        showToast("Berkas klien langsung AKTIF (-1 Coin)!");
+        showToast(`Berkas klien langsung AKTIF (-${coinCost} Coin)!`);
         return routeDashboard();
     }
     openUnifiedPayment("portfolio", newPf.id);

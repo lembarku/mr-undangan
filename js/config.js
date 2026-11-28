@@ -845,12 +845,47 @@ function findThemeObject(cat, name) {
     return list.find(t => String(t.name).toLowerCase() === String(name || "").toLowerCase()) || list[0] || deepCloneSafe(THEME_CATALOG["Pernikahan"][0]);
 }
 
+const DEFAULT_COIN_PACKAGES = [
+    { id: "starter", name: "Starter (Coba Mitra)", paidCoins: 20, bonusCoins: 0, price: 100000, badge: "" },
+    { id: "reguler", name: "Reguler (Hemat)", paidCoins: 50, bonusCoins: 5, price: 250000, badge: "HEMAT 9%" },
+    { id: "bisnis", name: "Bisnis (Terlaris)", paidCoins: 100, bonusCoins: 15, price: 500000, badge: "TERLARIS" },
+    { id: "juragan", name: "Juragan (Grosir VIP)", paidCoins: 200, bonusCoins: 50, price: 1000000, badge: "HEMAT 20%" }
+];
+
+function getCoinPackagesList() {
+    const ms = (db && db.masterSettings) || {};
+    if (Array.isArray(ms.coinPackages) && ms.coinPackages.length) {
+        return ms.coinPackages.map((p, idx) => ({
+            id: p.id || ("pkg_" + idx),
+            name: p.name || ("Paket " + (idx + 1)),
+            paidCoins: Math.max(1, Math.round(Number(p.paidCoins || 10))),
+            bonusCoins: Math.max(0, Math.round(Number(p.bonusCoins || 0))),
+            price: Math.max(1000, Math.round(Number(p.price || 50000))),
+            badge: p.badge || ""
+        }));
+    }
+    return DEFAULT_COIN_PACKAGES.map(p => Object.assign({}, p));
+}
+
+function getThemeCoinCost(cat, tObj) {
+    if (tObj && Number(tObj.coinCost) > 0) return Math.max(1, Math.round(Number(tObj.coinCost)));
+    const resolvedCat = cat || (tObj && (tObj.cat || tObj.category)) || "Pernikahan";
+    return resolvedCat === "Pernikahan" ? 12 : 7;
+}
+
+function getPortfolioCoinCost(docType, tObj) {
+    if (tObj && Number(tObj.coinCost) > 0) return Math.max(1, Math.round(Number(tObj.coinCost)));
+    const dt = docType || (tObj && tObj.docType) || "cv";
+    return dt === "lamaran" ? 2 : 3;
+}
+
 function getThemePricing(tObj) {
     const price = Number((tObj && tObj.price) || 99000);
     const origPrice = Number((tObj && tObj.origPrice) || 0);
     const hasDisc = origPrice > price && price > 0;
     const discPct = hasDisc ? Math.round(((origPrice - price) / origPrice) * 100) : 0;
-    return { price, origPrice, hasDisc, discPct };
+    const coinCost = getThemeCoinCost(tObj && (tObj.cat || tObj.category), tObj);
+    return { price, origPrice, hasDisc, discPct, coinCost };
 }
 
 function getThemeCoverPair(cat, tObj) {
@@ -871,7 +906,9 @@ function getPortfolioThemeObj(docType, id) {
     const list = PORTFOLIO_CATALOG[docType] || PORTFOLIO_CATALOG.cv;
     const base = list.find(x => x.id === id) || list[0];
     const ov = (db.cvPriceOverrides && db.cvPriceOverrides[base.id]) || {};
-    return Object.assign({}, base, ov);
+    const merged = Object.assign({}, base, ov);
+    merged.coinCost = getPortfolioCoinCost(docType, merged);
+    return merged;
 }
 
 function isItemFavorited(favKey) {

@@ -820,7 +820,8 @@ function renderHeaderActions() {
     const isProfileMenu = ["profile", "master", "cabang", "staff"].includes(currentViewName);
     document.body.classList.toggle("in-home", !isProfileMenu);
 
-    document.getElementById("floating-chat-wrap")?.classList.remove("hide");
+    const u = typeof getCurrentUserObj === "function" ? getCurrentUserObj() : null;
+    document.getElementById("floating-chat-wrap")?.classList.toggle("hide", !u);
     if (dotsBtn) {
         if (isProfileMenu) {
             dotsBtn.classList.remove("hide");
@@ -831,7 +832,6 @@ function renderHeaderActions() {
         }
     }
 
-    const u = typeof getCurrentUserObj === "function" ? getCurrentUserObj() : null;
     if (footLoginBtn) footLoginBtn.classList.toggle("hide", !!u);
 
     // Lonceng selalu diposisikan tepat di sebelah kiri avatar
@@ -1993,6 +1993,7 @@ function handlePromoBannerClick(idx) {
     } else if (s.targetType === "login") {
         if (currentSessionUser) routeDashboard(); else openAuthModal();
     } else if (s.targetType === "chat" && typeof openFullChatOverlay === "function") {
+        if (!currentSessionUser) { showToast("Silakan masuk / daftar akun terlebih dahulu untuk menggunakan Live Chat.", "info"); return openAuthModal(); }
         openFullChatOverlay();
     } else {
         document.getElementById(s.targetSection || "sec-undangan")?.scrollIntoView({ behavior: "smooth" });
@@ -2439,7 +2440,7 @@ function renderCabangAdmin() {
     const shelf = document.getElementById("cabang-docs-shelf");
     if (shelf) {
         shelf.innerHTML = !docs.length
-            ? `<div class="w-full app-card border border-dashed rounded-3xl p-8 text-center space-y-3"><p class="text-xs app-muted">Belum ada berkas klien.</p><button onclick="openCreateChoiceModal(true)" class="gold-pill-btn px-5 py-2.5 rounded-xl text-xs">+ Buat Berkas Klien (-1 Coin)</button></div>`
+            ? `<div class="w-full app-card border border-dashed rounded-3xl p-8 text-center space-y-3"><p class="text-xs app-muted">Belum ada berkas klien.</p><button onclick="openCreateChoiceModal(true)" class="gold-pill-btn px-5 py-2.5 rounded-xl text-xs">+ Buat Berkas Klien (Pakai Coin)</button></div>`
             : docs.map(d => buildFilmPosterDocCardHtml(d, true)).join("");
     }
 
@@ -2880,6 +2881,53 @@ function openCabangCoinInfoModal(targetUsername = "") {
     }
     if (topupBtn) {
         topupBtn.classList.toggle("hide", !isSelfCabang);
+    }
+
+    const ratesBox = document.getElementById("cci-rates-and-pricelist");
+    if (ratesBox && typeof getCoinPackagesList === "function") {
+        const rangeLbl = (nums) => {
+            if (!nums.length) return "-";
+            const mn = Math.min(...nums), mx = Math.max(...nums);
+            return mn === mx ? `${mn} Coin` : `${mn}–${mx} Coin`;
+        };
+        const wedCoins = getMergedThemes("Pernikahan", false).map(t => getThemeCoinCost("Pernikahan", t));
+        const nonWedCoins = ["Ulang Tahun", "Aqiqah", "Syukuran", "Lainnya"].flatMap(c => getMergedThemes(c, false).map(t => getThemeCoinCost(c, t)));
+        const cvCoins = PORTFOLIO_CATALOG.cv.map(x => getPortfolioCoinCost("cv", getPortfolioThemeObj("cv", x.id)));
+        const lamCoins = PORTFOLIO_CATALOG.lamaran.map(x => getPortfolioCoinCost("lamaran", getPortfolioThemeObj("lamaran", x.id)));
+        const pkgs = getCoinPackagesList();
+
+        ratesBox.innerHTML = `
+            <div class="app-card-soft border rounded-2xl p-3.5 space-y-2">
+                <h4 class="font-extrabold text-[11px] uppercase tracking-wider text-amber-600"><i class="fa-solid fa-sliders mr-1.5"></i>Tarif Coin per Project</h4>
+                <div class="divide-y divide-black/10 text-[11.5px]">
+                    <div class="py-1.5 flex items-center justify-between gap-2"><span>Surat Lamaran Kerja</span><strong class="text-amber-600">${rangeLbl(lamCoins)}</strong></div>
+                    <div class="py-1.5 flex items-center justify-between gap-2"><span>Curriculum Vitae (CV)</span><strong class="text-amber-600">${rangeLbl(cvCoins)}</strong></div>
+                    <div class="py-1.5 flex items-center justify-between gap-2"><span>Undangan Ultah / Aqiqah / Syukuran</span><strong class="text-amber-600">${rangeLbl(nonWedCoins)}</strong></div>
+                    <div class="py-1.5 flex items-center justify-between gap-2"><span>Undangan Pernikahan</span><strong class="text-amber-600">${rangeLbl(wedCoins)}</strong></div>
+                </div>
+            </div>
+            <div class="app-card-soft border rounded-2xl p-3.5 space-y-2">
+                <h4 class="font-extrabold text-[11px] uppercase tracking-wider text-amber-600"><i class="fa-solid fa-coins mr-1.5"></i>Pricelist Paket Isi Ulang Coin</h4>
+                <div class="space-y-1.5">
+                    ${pkgs.map(pk => {
+                        const tot = pk.paidCoins + pk.bonusCoins;
+                        const eff = Math.round(pk.price / Math.max(1, tot));
+                        return `
+                            <div class="app-card border rounded-xl px-3 py-2 flex items-center justify-between gap-2">
+                                <div class="min-w-0">
+                                    <div class="flex items-center gap-1.5 flex-wrap">
+                                        <strong class="text-xs truncate">${escHtml(pk.name)}</strong>
+                                        ${pk.badge ? `<span class="text-[8.5px] px-1.5 py-0.5 rounded-full bg-amber-400 text-black font-extrabold">${escHtml(pk.badge)}</span>` : ""}
+                                    </div>
+                                    <span class="text-[10px] app-muted block">${pk.paidCoins}${pk.bonusCoins > 0 ? ` + ${pk.bonusCoins} Bonus` : ""} = <strong class="text-amber-600">${tot} Coin</strong> (${fmtRp(eff)}/Coin)</span>
+                                </div>
+                                <strong class="text-xs font-extrabold app-accent shrink-0">${fmtRp(pk.price)}</strong>
+                            </div>
+                        `;
+                    }).join("")}
+                </div>
+            </div>
+        `;
     }
 
     const modal = document.getElementById("modal-cabang-coin-info");

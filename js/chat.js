@@ -454,6 +454,12 @@ function _syncWaChatHeader(mode = "list", title = "", avatarUrl = "", profileUse
 }
 
 async function openFullChatOverlay(targetThread = null, skipHistoryPush = false) {
+    const curUserCheck = typeof getCurrentUserObj === "function" ? getCurrentUserObj() : null;
+    if (!curUserCheck) {
+        showToast("Silakan masuk / daftar akun terlebih dahulu untuk menggunakan Live Chat.", "info");
+        if (typeof openAuthModal === "function") openAuthModal();
+        return;
+    }
     const ov = document.getElementById("full-chat-overlay"); if (!ov) return;
     if (ov.classList.contains("hide") && typeof currentViewName !== "undefined") {
         window._chatOriginView = currentViewName;
@@ -840,9 +846,14 @@ function updateChatBadges() {
     }
     _lastKnownChatCount = count;
 
+    const floatWrap = document.getElementById("floating-chat-wrap");
+    if (floatWrap) {
+        const inPortal = typeof clientPortalState !== "undefined" && clientPortalState.active;
+        floatWrap.classList.toggle("hide", !u || inPortal);
+    }
     if (badge) {
         badge.innerText = count;
-        badge.classList.toggle("hide", count === 0);
+        badge.classList.toggle("hide", !u || count === 0);
     }
     if (staffPill) {
         staffPill.innerText = count;

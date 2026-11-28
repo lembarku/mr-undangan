@@ -703,7 +703,7 @@ function renderMasterThemesGridOnly() {
                         ${t.isHidden ? `<span class="text-[9px] px-1.5 py-0.5 rounded-full bg-red-500/20 text-red-500 font-bold">DISEMBUNYIKAN</span>` : ""}
                     </div>
                     <h4 class="font-bold text-xs truncate">${escHtml(t.name)}</h4>
-                    <p class="text-[11px] font-extrabold app-accent">${pr.hasDisc ? `<span class="line-through app-muted font-normal mr-1">${fmtRp(pr.origPrice)}</span>` : ""}${fmtRp(pr.price)}</p>
+                    <div class="flex items-center justify-between gap-1 flex-wrap"><p class="text-[11px] font-extrabold app-accent">${pr.hasDisc ? `<span class="line-through app-muted font-normal mr-1">${fmtRp(pr.origPrice)}</span>` : ""}${fmtRp(pr.price)}</p><span class="inline-flex items-center gap-1 px-1.5 py-0.5 rounded-full bg-amber-500/15 text-amber-600 text-[9.5px] font-extrabold">${typeof buildGoldLembarkuCoinHtml === "function" ? buildGoldLembarkuCoinHtml("sm") : ""}${pr.coinCost} Coin</span></div>
                     <p class="text-[10px] app-muted truncate">${(t.demoData && t.demoData.title) ? `Contoh: ${escHtml(t.demoData.title)}` : "Contoh bawaan"}</p>
                 </div>
             </div>
@@ -773,7 +773,51 @@ function renderMasterWorkspaceContent() {
     }
 
     if (currentMasterWorkspace === "themes") {
-        const cats = [...Object.keys(THEME_CATALOG), "CV & Lamaran"];
+        const cats = [...Object.keys(THEME_CATALOG), "CV & Lamaran", "Paket Coin"];
+        if (masterThemeCatFilter === "Paket Coin") {
+            const pkgs = typeof getCoinPackagesList === "function" ? getCoinPackagesList() : [];
+            box.innerHTML = `<div class="space-y-4">
+                <div class="flex flex-wrap gap-1.5">${cats.map(c => `<button type="button" onclick="masterThemeCatFilter='${c}';renderMasterWorkspaceContent();" class="px-3 py-1.5 rounded-xl text-[11px] font-bold ${masterThemeCatFilter===c?"gold-pill-btn":"app-btn-sec"}">${c}</button>`).join("")}</div>
+                <div class="app-card border rounded-3xl p-4 sm:p-5 space-y-3 shadow-sm">
+                    <div class="flex flex-wrap items-center justify-between gap-2 border-b gold-border pb-2.5">
+                        <div class="flex items-center gap-2.5">
+                            ${typeof buildGoldLembarkuCoinHtml === "function" ? buildGoldLembarkuCoinHtml("md") : ""}
+                            <div>
+                                <h4 class="font-extrabold text-sm">Pricelist Paket Top-Up Coin Cabang</h4>
+                                <p class="text-[10.5px] app-muted">Atur harga paket, jumlah Coin dasar, dan Bonus Coin. Langsung tampil di info Coin Admin Cabang.</p>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="grid sm:grid-cols-2 gap-3">
+                        ${pkgs.map((pk, idx) => {
+                            const totalC = pk.paidCoins + pk.bonusCoins;
+                            const eff = Math.round(pk.price / Math.max(1, totalC));
+                            return `
+                                <div class="app-card-soft border rounded-2xl p-3.5 space-y-2.5 coin-pkg-row" data-pkg-id="${esc(pk.id)}">
+                                    <div class="flex items-center justify-between gap-2">
+                                        <span class="text-[10px] font-extrabold uppercase text-amber-600">Paket #${idx + 1}</span>
+                                        <span class="text-[10px] app-muted font-bold">Total: ${totalC} Coin (${fmtRp(eff)}/Coin)</span>
+                                    </div>
+                                    <div class="grid grid-cols-2 gap-2">
+                                        <div><label class="text-[10px] app-muted block">Nama Paket</label><input type="text" value="${esc(pk.name)}" class="cpk-name app-input !py-1.5 text-xs font-bold"></div>
+                                        <div><label class="text-[10px] app-muted block">Label (Opsional)</label><input type="text" value="${esc(pk.badge || "")}" placeholder="TERLARIS" class="cpk-badge app-input !py-1.5 text-xs"></div>
+                                    </div>
+                                    <div class="grid grid-cols-3 gap-2">
+                                        <div><label class="text-[10px] app-muted block">Harga (Rp)</label><input type="number" value="${pk.price}" step="10000" min="1000" class="cpk-price app-input !py-1.5 text-xs font-bold"></div>
+                                        <div><label class="text-[10px] app-muted block">Coin Dasar</label><input type="number" value="${pk.paidCoins}" min="1" class="cpk-paid app-input !py-1.5 text-xs font-bold text-amber-600"></div>
+                                        <div><label class="text-[10px] app-muted block">Bonus Coin</label><input type="number" value="${pk.bonusCoins}" min="0" class="cpk-bonus app-input !py-1.5 text-xs font-bold text-emerald-600"></div>
+                                    </div>
+                                </div>
+                            `;
+                        }).join("")}
+                    </div>
+                    <div class="flex justify-end pt-1">
+                        <button type="button" id="btn-save-coin-pkgs" onclick="saveMasterCoinPackages(this)" class="gold-pill-btn px-6 py-2.5 rounded-xl text-xs uppercase shadow">Simpan Pricelist Coin</button>
+                    </div>
+                </div>
+            </div>`;
+            return;
+        }
         if (masterThemeCatFilter === "CV & Lamaran") {
             const allPf = [
                 ...PORTFOLIO_CATALOG.cv.map(x => Object.assign({}, getPortfolioThemeObj("cv", x.id), { _dt: "cv" })),
@@ -781,18 +825,19 @@ function renderMasterWorkspaceContent() {
             ];
             box.innerHTML = `<div class="space-y-4">
                 <div class="flex flex-wrap gap-1.5">${cats.map(c => `<button type="button" onclick="masterThemeCatFilter='${c}';renderMasterWorkspaceContent();" class="px-3 py-1.5 rounded-xl text-[11px] font-bold ${masterThemeCatFilter===c?"gold-pill-btn":"app-btn-sec"}">${c}</button>`).join("")}</div>
-                <p class="text-xs app-muted">Atur harga normal (coret) dan harga jual untuk 9 tema CV &amp; 3 tema Surat Lamaran:</p>
+                <p class="text-xs app-muted">Atur harga normal (coret), harga jual eceran, dan <strong>besaran Coin Cabang</strong> untuk tiap desain CV &amp; Surat Lamaran:</p>
                 <div class="grid sm:grid-cols-2 lg:grid-cols-3 gap-3">${allPf.map(p => `
                     <div class="app-card border rounded-2xl p-3.5 space-y-2.5 shadow-sm">
                         <div class="flex items-center justify-between gap-2">
                             <div><span class="text-[9px] px-2 py-0.5 rounded-full app-accent-bg app-accent font-extrabold uppercase">${p._dt === "lamaran" ? "Lamaran" : "CV"}</span><h4 class="font-bold text-xs mt-1">${escHtml(p.name)}</h4></div>
                             <button type="button" onclick="openPortfolioDemoPreview('${p._dt}','${p.id}')" class="px-2.5 py-1 rounded-lg app-btn-sec text-[10px] font-bold"><i class="fa-regular fa-eye"></i></button>
                         </div>
-                        <div class="grid grid-cols-2 gap-2">
+                        <div class="grid grid-cols-3 gap-2">
                             <div><label class="text-[10px] app-muted block">Harga Coret</label><input type="number" id="cvp-orig-${p.id}" value="${p.origPrice||35000}" step="1000" class="app-input !py-1.5 text-xs"></div>
                             <div><label class="text-[10px] app-muted block">Harga Jual</label><input type="number" id="cvp-sell-${p.id}" value="${p.price||20000}" step="1000" class="app-input !py-1.5 text-xs font-bold"></div>
+                            <div><label class="text-[10px] text-amber-600 font-bold block">Coin Cabang</label><input type="number" id="cvp-coin-${p.id}" value="${getPortfolioCoinCost(p._dt, p)}" min="1" step="1" class="app-input !py-1.5 text-xs font-extrabold text-amber-600"></div>
                         </div>
-                        <button type="button" onclick="saveCvThemePrice('${p.id}',this)" class="w-full gold-pill-btn py-1.5 rounded-xl text-[11px]">Simpan Harga</button>
+                        <button type="button" onclick="saveCvThemePrice('${p.id}','${p._dt}',this)" class="w-full gold-pill-btn py-1.5 rounded-xl text-[11px]">Simpan Harga &amp; Coin</button>
                     </div>
                 `).join("")}</div>
             </div>`;
@@ -1030,7 +1075,7 @@ function _renderSoloAccountCard(uItem, isFounderOwner = false) {
             <div class="flex flex-wrap items-center gap-1.5 text-[11px]">
                 ${isPending ? `<button type="button" onclick="event.stopPropagation();approveUserRealTime('${esc(uItem.username)}',this)" class="gold-pill-btn px-2.5 py-1 rounded-lg text-[10px] font-bold">✓ ACC Akun</button>` : ""}
                 ${uItem.role !== "administrasi" ? `<button type="button" onclick="event.stopPropagation();toggleUserProQuick('${esc(uItem.username)}',this)" class="px-2.5 py-1 rounded-lg ${uItem.isPro ? "bg-blue-600 text-white" : "app-btn-sec"} text-[10px] font-bold">${uItem.isPro ? "PRO ✓" : "+ Pro"}</button>` : ""}
-                ${uItem.role === "cabang" ? `<span class="inline-flex items-center gap-1 text-amber-600 font-extrabold px-1">${typeof buildGoldLembarkuCoinHtml === "function" ? buildGoldLembarkuCoinHtml("sm") : ""}${uItem.quota || 0} Coin</span><button type="button" onclick="event.stopPropagation();topUpCabangRealTime('${esc(uItem.username)}',5,this)" class="px-2 py-1 rounded-lg bg-emerald-600 text-white text-[10px] font-bold">+5 Coin</button><button type="button" onclick="event.stopPropagation();topUpCabangRealTime('${esc(uItem.username)}',10,this)" class="px-2 py-1 rounded-lg gold-pill-btn text-[10px]">+10 Coin</button>` : ""}
+                ${uItem.role === "cabang" ? `<span class="inline-flex items-center gap-1 text-amber-600 font-extrabold px-1">${typeof buildGoldLembarkuCoinHtml === "function" ? buildGoldLembarkuCoinHtml("sm") : ""}${uItem.quota || 0} Coin</span><button type="button" onclick="event.stopPropagation();topUpCabangRealTime('${esc(uItem.username)}',20,this)" class="px-2 py-1 rounded-lg bg-emerald-600 text-white text-[10px] font-bold">+20</button><button type="button" onclick="event.stopPropagation();topUpCabangRealTime('${esc(uItem.username)}',55,this)" class="px-2 py-1 rounded-lg gold-pill-btn text-[10px]">+55</button><button type="button" onclick="event.stopPropagation();topUpCabangRealTime('${esc(uItem.username)}',115,this)" class="px-2 py-1 rounded-lg bg-amber-600 text-white text-[10px] font-bold">+115</button>` : ""}
             </div>
             <div class="flex items-center gap-1.5 ml-auto">
                 <button type="button" onclick="event.stopPropagation();openMasterUserModal('${esc(uItem.username)}')" class="px-3 py-1 rounded-lg app-card-soft border text-[11px] font-bold"><i class="fa-solid fa-pen mr-1"></i>Edit</button>
@@ -1827,17 +1872,42 @@ async function deletePromoBannerItem(i) {
     hideLoading(); renderMasterWorkspaceContent();
 }
 
-async function saveCvThemePrice(themeId, btn) {
+async function saveCvThemePrice(themeId, docTypeOrBtn, maybeBtn) {
+    const btn = typeof docTypeOrBtn === "string" ? maybeBtn : docTypeOrBtn;
+    const docType = typeof docTypeOrBtn === "string" ? docTypeOrBtn : (String(themeId || "").startsWith("lam_") ? "lamaran" : "cv");
     const origPrice = Number(document.getElementById(`cvp-orig-${themeId}`)?.value || 0);
     const price = Number(document.getElementById(`cvp-sell-${themeId}`)?.value || 20000);
+    const defaultCoin = docType === "lamaran" ? 2 : 3;
+    const coinCost = Math.max(1, Math.round(Number(document.getElementById(`cvp-coin-${themeId}`)?.value || defaultCoin)));
     setBtnLoading(btn, true, "...");
     const ov = Object.assign({}, db.cvPriceOverrides || {});
-    ov[themeId] = { origPrice, price };
+    ov[themeId] = { origPrice, price, coinCost };
     db.cvPriceOverrides = ov;
     idbSet("db_snapshot", db);
     await apiAction({ action: "update_section", section: "cvPriceOverrides", value: ov });
     setBtnLoading(btn, false);
-    showToast("Harga desain CV / Lamaran diperbarui permanen!");
+    showToast(`Harga & tarif ${coinCost} Coin diperbarui permanen!`);
+}
+
+async function saveMasterCoinPackages(btn) {
+    const rows = Array.from(document.querySelectorAll(".coin-pkg-row"));
+    if (!rows.length) return;
+    const coinPackages = rows.map((row, idx) => ({
+        id: row.dataset.pkgId || ("pkg_" + idx),
+        name: (row.querySelector(".cpk-name")?.value || "").trim() || ("Paket " + (idx + 1)),
+        badge: (row.querySelector(".cpk-badge")?.value || "").trim(),
+        price: Math.max(1000, Math.round(Number(row.querySelector(".cpk-price")?.value || 100000))),
+        paidCoins: Math.max(1, Math.round(Number(row.querySelector(".cpk-paid")?.value || 20))),
+        bonusCoins: Math.max(0, Math.round(Number(row.querySelector(".cpk-bonus")?.value || 0)))
+    }));
+    setBtnLoading(btn, true, "Menyimpan...");
+    const nextMs = Object.assign({}, db.masterSettings || {}, { coinPackages });
+    db.masterSettings = nextMs;
+    idbSet("db_snapshot", db);
+    await apiAction({ action: "update_section", section: "masterSettings", value: nextMs });
+    setBtnLoading(btn, false);
+    renderMasterWorkspaceContent();
+    showToast("Pricelist Paket Coin tersimpan permanen!");
 }
 
 // ================= 8. VISUAL THEME BUILDER =================
@@ -1915,6 +1985,8 @@ function openThemeBuilderModal(cat = null, themeName = null, isDuplicate = false
     document.getElementById("tb-badge").value = (tObj && tObj.badge) || "";
     document.getElementById("tb-orig-price").value = (tObj && tObj.origPrice) ? tObj.origPrice : 175000;
     document.getElementById("tb-price").value = (tObj && tObj.price) ? tObj.price : 99000;
+    const tbCoinEl = document.getElementById("tb-coin-cost");
+    if (tbCoinEl) tbCoinEl.value = getThemeCoinCost(activeCat, tObj);
 
     const layoutVal = (tObj && (tObj.layout || tObj.style || tObj.coupleMode)) || "kalimantan_story";
     document.getElementById("tb-layout").value = ["kalimantan_story","premium_black","split","combined","sulawesi","classic_card"].includes(layoutVal) ? layoutVal : "kalimantan_story";
@@ -1990,6 +2062,7 @@ async function submitVisualThemeBuilder(e) {
     const themeData = {
         category: cat, name, badge: document.getElementById("tb-badge").value,
         origPrice: Number(document.getElementById("tb-orig-price").value || 0), price: Number(document.getElementById("tb-price").value || 99000),
+        coinCost: Math.max(1, Math.round(Number(document.getElementById("tb-coin-cost")?.value || (cat === "Pernikahan" ? 12 : 7)))),
         layout, style: layout, coupleMode: (layout === "combined") ? "combined" : "split",
         frame: document.getElementById("tb-frame").value, transition: document.getElementById("tb-transition").value,
         ornament: document.getElementById("tb-ornament").value, photoFilter: document.getElementById("tb-photo-filter").value,
