@@ -599,12 +599,7 @@
                             <p id="cabang-brand-badge" class="text-[11px] app-muted font-semibold"></p>
                         </div>
                     </div>
-                    <div class="flex items-center justify-center gap-2 mt-2.5 md:mt-0">
-                        <div class="app-card-soft px-4 py-2 rounded-2xl border text-center">
-                            <span class="text-[10px] uppercase app-muted font-bold block">Sisa Kuota</span>
-                            <span id="cabang-quota-badge" class="text-xl font-extrabold app-accent">0</span>
-                        </div>
-                    </div>
+
                 </div>
             </div>
 
@@ -619,7 +614,7 @@
             <div onclick="openCreateChoiceModal(true)" class="app-card border rounded-2xl p-3 shadow-sm flex items-center gap-2.5 cursor-pointer hover:brightness-95 transition">
                 <img id="cabang-composer-avatar" src="" class="w-9 h-9 rounded-full object-cover border gold-border shrink-0 bg-zinc-800">
                 <div class="flex-1 app-card-soft border rounded-full px-3.5 py-2 text-xs app-muted font-medium truncate">
-                    Buat berkas klien instan (-1 Kuota)... (Undangan, CV, Lamaran)
+                    Buat berkas klien instan (-1 Coin)... (Undangan, CV, Lamaran)
                 </div>
                 <span class="gold-pill-btn px-3.5 py-1.5 rounded-full text-xs shrink-0"><i class="fa-solid fa-bolt mr-1"></i>Buat</span>
             </div>
@@ -1792,6 +1787,14 @@
 
                             <div class="flex items-center justify-between gap-3 border-t gold-border pt-3">
                                 <div class="min-w-0">
+                                    <strong class="text-xs block">Tampilkan Username (@username)</strong>
+                                    <span class="text-[10px] app-muted block">Jika dimatikan, username Anda disembunyikan dari profil publik &amp; daftar kontak.</span>
+                                </div>
+                                <label class="lbk-switch"><input type="checkbox" id="priv-show-username" checked><span class="lbk-switch-track"></span></label>
+                            </div>
+
+                            <div class="flex items-center justify-between gap-3 border-t gold-border pt-3">
+                                <div class="min-w-0">
                                     <strong class="text-xs block">Tampilkan Daftar Followers</strong>
                                     <span class="text-[10px] app-muted block">Atur apakah daftar pengikut Anda boleh dilihat pengguna lain.</span>
                                 </div>
@@ -2536,7 +2539,7 @@
             </label>
             <div id="mmu-quota-wrap" class="hide space-y-2.5 app-accent-bg border gold-border p-3 rounded-2xl">
                 <div><label class="app-label app-accent">Label Brand Cabang</label><input type="text" id="mmu-brand" placeholder="Nama brand cabang" class="app-input"></div>
-                <div><label class="app-label">Kuota Deposit Admin Cabang</label><input type="number" id="mmu-quota" value="5" min="0" class="app-input"></div>
+                <div><label class="app-label">Saldo Coin Admin Cabang</label><input type="number" id="mmu-quota" value="5" min="0" class="app-input"></div>
             </div>
             <button type="submit" id="btn-mmu-save" class="w-full gold-pill-btn py-2.5 rounded-xl text-xs uppercase">Simpan Real-Time</button>
         </form>
@@ -2564,6 +2567,74 @@
                 <button onclick="launchSocialShare('tg')" class="bg-sky-600 text-white py-2.5 rounded-xl text-xs font-bold"><i class="fa-brands fa-telegram mr-1"></i>Telegram</button>
                 <button onclick="launchSocialShare('ig')" class="bg-pink-600 text-white py-2.5 rounded-xl text-xs font-bold"><i class="fa-brands fa-instagram mr-1"></i>Instagram</button>
                 <button onclick="launchSocialShare('fb')" class="bg-blue-600 text-white py-2.5 rounded-xl text-xs font-bold"><i class="fa-brands fa-facebook-messenger mr-1"></i>Messenger</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- MODAL PENJELASAN COIN ADMIN CABANG -->
+    <div id="modal-cabang-coin-info" class="hide fixed inset-0 z-[151] bg-black/82 backdrop-blur-sm flex items-center justify-center p-4" onclick="if(event.target===this)closeCabangCoinInfoModal()">
+        <div class="app-card border rounded-3xl max-w-md w-full overflow-hidden shadow-2xl" onclick="event.stopPropagation()">
+            <div class="relative p-6 text-center space-y-2.5 bg-gradient-to-b from-amber-500/20 via-amber-400/5 to-transparent border-b gold-border">
+                <button type="button" onclick="closeCabangCoinInfoModal()" class="absolute top-4 right-4 w-8 h-8 rounded-full app-btn-sec flex items-center justify-center text-xs"><i class="fa-solid fa-xmark"></i></button>
+                <div class="flex justify-center pt-1">
+                    <span class="lbk-gold-coin lbk-gold-coin-lg" aria-hidden="true">
+                        <img src="./lembarku-logo.png" alt="Lembarku Coin" class="lbk-gold-coin-logo" onerror="this.style.display='none';if(this.nextElementSibling)this.nextElementSibling.classList.remove('hide');">
+                        <span class="hide lbk-gold-coin-fallback text-3xl">L</span>
+                    </span>
+                </div>
+                <div>
+                    <span class="text-[10px] uppercase tracking-[0.22em] font-extrabold text-amber-600 block">Lembarku Partner Coin</span>
+                    <h3 class="text-2xl font-extrabold mt-0.5"><span id="cci-balance-num" class="text-amber-600">0</span> Coin</h3>
+                    <p id="cci-owner-sub" class="text-[11px] app-muted">Saldo Coin Resmi Mitra Cabang</p>
+                </div>
+            </div>
+
+            <div class="p-5 space-y-3.5 text-xs max-h-[58vh] overflow-y-auto">
+                <div class="app-card-soft border rounded-2xl p-3.5 space-y-1">
+                    <h4 class="font-extrabold text-xs text-amber-600"><i class="fa-solid fa-coins mr-1.5"></i>Apa Fungsi Coin Lembarku?</h4>
+                    <p class="text-[11.5px] app-muted leading-relaxed">
+                        <strong>Coin</strong> adalah saldo khusus Admin Cabang yang digunakan untuk membeli &amp; mengaktifkan project (Undangan Digital, CV, maupun Surat Lamaran) dengan <strong>harga grosir jauh lebih murah</strong> dibanding pembelian satuan biasa.
+                    </p>
+                </div>
+
+                <div class="space-y-2">
+                    <h4 class="font-extrabold text-[11px] uppercase tracking-wider app-muted px-1">Keuntungan Menggunakan Coin</h4>
+                    <div class="app-card-soft border rounded-2xl p-3 flex items-start gap-2.5">
+                        <span class="w-7 h-7 rounded-xl bg-amber-500/15 text-amber-600 flex items-center justify-center shrink-0 text-xs"><i class="fa-solid fa-tags"></i></span>
+                        <div>
+                            <strong class="block text-xs">Harga Lebih Murah &amp; Untung Besar</strong>
+                            <span class="text-[11px] app-muted leading-snug block">1 Coin = 1 Project penuh dengan tarif khusus mitra, sehingga Anda bebas menentukan harga jual ke klien.</span>
+                        </div>
+                    </div>
+                    <div class="app-card-soft border rounded-2xl p-3 flex items-start gap-2.5">
+                        <span class="w-7 h-7 rounded-xl bg-emerald-500/15 text-emerald-600 flex items-center justify-center shrink-0 text-xs"><i class="fa-solid fa-bolt"></i></span>
+                        <div>
+                            <strong class="block text-xs">Aktivasi Instan Tanpa Menunggu</strong>
+                            <span class="text-[11px] app-muted leading-snug block">Project klien langsung berstatus <strong>Aktif</strong> otomatis (-1 Coin) tanpa antre verifikasi pembayaran.</span>
+                        </div>
+                    </div>
+                    <div class="app-card-soft border rounded-2xl p-3 flex items-start gap-2.5">
+                        <span class="w-7 h-7 rounded-xl bg-blue-500/15 text-blue-600 flex items-center justify-center shrink-0 text-xs"><i class="fa-solid fa-crown"></i></span>
+                        <div>
+                            <strong class="block text-xs">Brand Sendiri &amp; Portal Tamu Mandiri</strong>
+                            <span class="text-[11px] app-muted leading-snug block">Undangan tampil dengan nama usaha Anda dan klien bisa input daftar tamu sendiri lewat link khusus.</span>
+                        </div>
+                    </div>
+                    <div class="app-card-soft border rounded-2xl p-3 flex items-start gap-2.5">
+                        <span class="w-7 h-7 rounded-xl bg-purple-500/15 text-purple-600 flex items-center justify-center shrink-0 text-xs"><i class="fa-solid fa-infinity"></i></span>
+                        <div>
+                            <strong class="block text-xs">Coin Tidak Hangus</strong>
+                            <span class="text-[11px] app-muted leading-snug block">Saldo Coin tersimpan permanen di akun cabang tanpa batas masa berlaku.</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="px-5 py-3.5 border-t gold-border flex gap-2">
+                <button type="button" onclick="closeCabangCoinInfoModal()" class="px-4 py-2.5 rounded-xl app-btn-sec text-xs font-bold">Tutup</button>
+                <button type="button" id="cci-topup-btn" onclick="requestTopUpCoinViaChat()" class="flex-1 gold-pill-btn py-2.5 rounded-xl text-xs shadow-lg flex items-center justify-center gap-1.5">
+                    <i class="fa-solid fa-comments"></i> Isi Ulang Coin (Chat Founder)
+                </button>
             </div>
         </div>
     </div>

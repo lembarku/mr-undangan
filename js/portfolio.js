@@ -911,7 +911,7 @@ function openSempurnakanFromPreview() {
 function startCreatePortfolio(isCabang = false, initType = "cv", initThemeId = null) {
     if (isCabang) {
         const cab = getCurrentUserObj();
-        if (!cab || (cab.quota || 0) <= 0) return showToast("Kuota deposit habis! Hubungi Founder.", "error");
+        if (!cab || (cab.quota || 0) <= 0) return showToast("Saldo Coin habis! Hubungi Founder untuk isi ulang Coin.", "error");
     }
     currentViewName = "portfolio_wizard";
     const list = PORTFOLIO_CATALOG[initType] || PORTFOLIO_CATALOG.cv;
@@ -932,8 +932,8 @@ function startCreatePortfolio(isCabang = false, initType = "cv", initThemeId = n
     };
     hideAllViews();
     document.getElementById("view-portfolio-wizard").classList.remove("hide");
-    document.getElementById("pfw-heading").innerText = isCabang ? "Buat Berkas Klien Instan (-1 Kuota)" : "Buat CV / Surat Lamaran Kerja";
-    document.getElementById("btn-submit-pf").innerText = isCabang ? "Buat & Aktifkan (-1 Kuota)" : "Ajukan Berkas";
+    document.getElementById("pfw-heading").innerText = isCabang ? "Buat Berkas Klien Instan (-1 Coin)" : "Buat CV / Surat Lamaran Kerja";
+    document.getElementById("btn-submit-pf").innerText = isCabang ? "Buat & Aktifkan (-1 Coin)" : "Ajukan Berkas";
     document.getElementById("pfw-btn-change-theme").classList.remove("hide");
     renderHeaderActions();
     pushBackGuard();
@@ -1341,7 +1341,7 @@ async function submitPortfolioForm(e) {
     try { localStorage.removeItem(DRAFT_PF_KEY); } catch {}
 
     if (pfWizardState.isCabangBypass) {
-        showToast("Berkas klien langsung AKTIF (-1 Kuota)!");
+        showToast("Berkas klien langsung AKTIF (-1 Coin)!");
         return routeDashboard();
     }
     openUnifiedPayment("portfolio", newPf.id);

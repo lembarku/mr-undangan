@@ -153,7 +153,8 @@ function renderMasterHeaderStats() {
     const nEl = document.getElementById("mprof-name");
     if (nEl) nEl.innerText = m.name || "Founder";
     const uEl = document.getElementById("mprof-username");
-    if (uEl) uEl.innerText = `@${m.username}`;
+    const mPriv = typeof getUserPrivacy === "function" ? getUserPrivacy(m) : { showUsername: true };
+    if (uEl) uEl.innerHTML = mPriv.showUsername ? `@${escHtml(m.username)}` : `@${escHtml(m.username)} <span class="text-[9px] px-1.5 py-0.5 rounded-full app-btn-sec app-muted ml-1"><i class="fa-solid fa-eye-slash mr-0.5"></i>Disembunyikan</span>`;
     const bioEl = document.getElementById("mprof-bio");
     if (bioEl) bioEl.innerText = m.bio || "Founder Lembarku & Titik Gowes";
 
@@ -474,7 +475,8 @@ function renderStaffAdmin() {
         avEl.classList.add("cursor-pointer", "active:scale-95", "transition");
     }
     const nmEl = document.getElementById("staff-name"); if (nmEl) nmEl.innerText = st.name || "Tim Administrasi";
-    const usEl = document.getElementById("staff-username"); if (usEl) usEl.innerText = `@${st.username}`;
+    const stPriv = typeof getUserPrivacy === "function" ? getUserPrivacy(st) : { showUsername: true };
+    const usEl = document.getElementById("staff-username"); if (usEl) usEl.innerHTML = stPriv.showUsername ? `@${escHtml(st.username)}` : `@${escHtml(st.username)} <span class="text-[9px] px-1.5 py-0.5 rounded-full app-btn-sec app-muted ml-1"><i class="fa-solid fa-eye-slash mr-0.5"></i>Disembunyikan</span>`;
 
     if (typeof _mountProfileIgStats === "function") {
         _mountProfileIgStats("view-staff-admin", "staff-ig-stats-mount", st);
@@ -1028,7 +1030,7 @@ function _renderSoloAccountCard(uItem, isFounderOwner = false) {
             <div class="flex flex-wrap items-center gap-1.5 text-[11px]">
                 ${isPending ? `<button type="button" onclick="event.stopPropagation();approveUserRealTime('${esc(uItem.username)}',this)" class="gold-pill-btn px-2.5 py-1 rounded-lg text-[10px] font-bold">✓ ACC Akun</button>` : ""}
                 ${uItem.role !== "administrasi" ? `<button type="button" onclick="event.stopPropagation();toggleUserProQuick('${esc(uItem.username)}',this)" class="px-2.5 py-1 rounded-lg ${uItem.isPro ? "bg-blue-600 text-white" : "app-btn-sec"} text-[10px] font-bold">${uItem.isPro ? "PRO ✓" : "+ Pro"}</button>` : ""}
-                ${uItem.role === "cabang" ? `<span class="app-accent font-bold px-1">Kuota: ${uItem.quota || 0}</span><button type="button" onclick="event.stopPropagation();topUpCabangRealTime('${esc(uItem.username)}',5,this)" class="px-2 py-1 rounded-lg bg-emerald-600 text-white text-[10px] font-bold">+5</button><button type="button" onclick="event.stopPropagation();topUpCabangRealTime('${esc(uItem.username)}',10,this)" class="px-2 py-1 rounded-lg gold-pill-btn text-[10px]">+10</button>` : ""}
+                ${uItem.role === "cabang" ? `<span class="inline-flex items-center gap-1 text-amber-600 font-extrabold px-1">${typeof buildGoldLembarkuCoinHtml === "function" ? buildGoldLembarkuCoinHtml("sm") : ""}${uItem.quota || 0} Coin</span><button type="button" onclick="event.stopPropagation();topUpCabangRealTime('${esc(uItem.username)}',5,this)" class="px-2 py-1 rounded-lg bg-emerald-600 text-white text-[10px] font-bold">+5 Coin</button><button type="button" onclick="event.stopPropagation();topUpCabangRealTime('${esc(uItem.username)}',10,this)" class="px-2 py-1 rounded-lg gold-pill-btn text-[10px]">+10 Coin</button>` : ""}
             </div>
             <div class="flex items-center gap-1.5 ml-auto">
                 <button type="button" onclick="event.stopPropagation();openMasterUserModal('${esc(uItem.username)}')" class="px-3 py-1 rounded-lg app-card-soft border text-[11px] font-bold"><i class="fa-solid fa-pen mr-1"></i>Edit</button>
@@ -1048,7 +1050,7 @@ function _renderSoloAccountCard(uItem, isFounderOwner = false) {
                         <span class="text-[9px] px-1.5 py-0.2 rounded-full font-bold uppercase ${uItem.role==="cabang"?"bg-blue-500/20 text-blue-600":uItem.role==="administrasi"?"bg-emerald-500/20 text-emerald-600":"bg-zinc-500/20 app-muted"}">${escHtml(roleLabel)}</span>
                         ${isPending ? `<span class="text-[9px] px-1.5 py-0.2 rounded-full bg-amber-500/20 text-amber-600 font-extrabold">Menunggu</span>` : ""}
                     </div>
-                    <p class="text-[11px] app-muted truncate">@${escHtml(uItem.username)}${uItem.role === "cabang" && uItem.brandName ? ` • ${escHtml(uItem.brandName)}` : ""}</p>
+                    <p class="text-[11px] app-muted truncate">${(typeof canSeeUserHandle !== "function" || canSeeUserHandle(uItem)) ? `@${escHtml(uItem.username)}` : escHtml(roleLabel)}${uItem.role === "cabang" && uItem.brandName ? ` • ${escHtml(uItem.brandName)}` : ""}</p>
                 </div>
                 <i class="fa-solid fa-chevron-right text-xs app-muted shrink-0"></i>
             </div>
@@ -1187,7 +1189,8 @@ function renderSoloStatsModal() {
     const subBar = document.getElementById("solo-stats-subbar");
     const bodyEl = document.getElementById("solo-stats-body");
 
-    if (subEl) subEl.innerText = `${targetObj.name || targetObj.username} (@${targetObj.username})`;
+    const canSeeTargetU = typeof canSeeUserHandle !== "function" || canSeeUserHandle(targetObj);
+    if (subEl) subEl.innerText = canSeeTargetU ? `${targetObj.name || targetObj.username} (@${targetObj.username})` : `${targetObj.name || "Pengguna"}`;
     if (subBar) { subBar.classList.add("hide"); subBar.innerHTML = ""; }
     if (!bodyEl) return;
 
@@ -1555,8 +1558,16 @@ function viewUserProfileModal(username, fromNav = false) {
            </button>`
         : "";
 
+    const canSeeProfileHandle = typeof canSeeUserHandle !== "function" || canSeeUserHandle(u);
+    const coinColHtml = isCabangProfile
+        ? `<button type="button" onclick="if(typeof openCabangCoinInfoModal==='function')openCabangCoinInfoModal('${esc(cleanU)}')" class="py-2 px-1 text-center rounded-xl hover:bg-amber-500/10 active:scale-98 transition">
+            <span class="inline-flex items-center justify-center gap-1.5 text-sm sm:text-base font-extrabold tracking-tight text-amber-600">${typeof buildGoldLembarkuCoinHtml === "function" ? buildGoldLembarkuCoinHtml("sm") : ""}${escHtml(String(u.quota || 0))}</span>
+            <span class="block text-[11px] app-muted font-semibold mt-0.5">Coin <i class="fa-solid fa-circle-info text-[9px] text-amber-500 ml-0.5"></i></span>
+        </button>`
+        : "";
+
     const followersColHtml = isCabangProfile
-        ? ""
+        ? coinColHtml
         : `<button type="button" onclick="openSoloFollowersModal('${esc(cleanU)}')" class="py-2 px-1 text-center rounded-xl hover:bg-black/5 active:scale-98 transition">
             <span class="block text-sm sm:text-base font-extrabold tracking-tight">${escHtml(String(followersCount))}</span>
             <span class="block text-[11px] app-muted font-medium">Followers</span>
@@ -1574,7 +1585,7 @@ function viewUserProfileModal(username, fromNav = false) {
         <span class="block text-[11px] app-muted font-medium">Project</span>
     </button>`;
 
-    const gridColsClass = isCabangProfile ? "grid-cols-1" : "grid-cols-3";
+    const gridColsClass = isCabangProfile ? "grid-cols-2" : "grid-cols-3";
 
     const canBlock = !isSelf && curU && curU.role !== "cabang" && u.role !== "master";
     const blockBtnHtml = canBlock ? `
@@ -1603,7 +1614,7 @@ function viewUserProfileModal(username, fromNav = false) {
                                     ${proBadgeHtml}
                                     ${roleBadgeHtml}
                                 </h2>
-                                <p class="text-xs app-accent font-semibold">@${escHtml(u.username)}</p>
+                                ${canSeeProfileHandle ? `<p class="text-xs app-accent font-semibold">@${escHtml(u.username)}</p>` : ""}
                                 ${u.bio ? `<p class="text-xs app-muted mt-1 leading-relaxed max-w-md">${escHtml(u.bio)}</p>` : ""}
                                 ${contactHtml}
                             </div>
@@ -1622,7 +1633,7 @@ function viewUserProfileModal(username, fromNav = false) {
 
                 ${canChat ? `<div class="pt-1">
                     <button type="button" onclick="closeUserProfileModalCustom();if(typeof openFullChatOverlay==='function')openFullChatOverlay('${esc(cleanU)}');" class="w-full py-3 rounded-2xl bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-bold transition shadow-sm flex items-center justify-center gap-2">
-                        <i class="fa-solid fa-comments"></i> Kirim Pesan ke @${escHtml(u.username)}
+                        <i class="fa-solid fa-comments"></i> Kirim Pesan ke ${escHtml(canSeeProfileHandle ? "@" + u.username : (u.name || "Pengguna"))}
                     </button>
                 </div>` : ""}
 
@@ -1743,7 +1754,7 @@ async function topUpCabangRealTime(uname, amt, btn, reopenModal = false) {
     renderMasterHeaderStats();
     if (window._soloStatsViewState && window._soloStatsViewState.open) renderSoloStatsModal();
     if (reopenModal) viewUserProfileModal(uname, true);
-    showToast(`+${amt} kuota ditambahkan!`);
+    showToast(`+${amt} Coin ditambahkan!`);
 }
 
 // ================= 7. BANNER PROMOSI & HARGA CV =================

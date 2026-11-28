@@ -319,7 +319,7 @@ function renderWizardRestoreBar() {
 }
 
 function startCreateInvitation(isCabang = false, preCat = null, preTheme = null) {
-    if (isCabang) { const cab = getCurrentUserObj(); if (!cab || (cab.quota || 0) <= 0) return showToast("Kuota deposit habis! Hubungi Founder.", "error"); }
+    if (isCabang) { const cab = getCurrentUserObj(); if (!cab || (cab.quota || 0) <= 0) return showToast("Saldo Coin habis! Hubungi Founder untuk isi ulang Coin.", "error"); }
     currentViewName = "wizard";
     const initCat = preCat || "Pernikahan";
     const activeList = getMergedThemes(initCat, false);
@@ -334,8 +334,8 @@ function startCreateInvitation(isCabang = false, preCat = null, preTheme = null)
         sections: { sesi2: true, story: true, bank: true, music: true, closing: true }
     };
     hideAllViews(); document.getElementById("view-wizard").classList.remove("hide");
-    document.getElementById("wiz-heading").innerText = isCabang ? "Buat Undangan Klien Instan (-1 Kuota)" : "Buat Undangan Digital Baru";
-    document.getElementById("btn-submit-inv").innerText = isCabang ? "Buat & Aktifkan (-1 Kuota)" : "Ajukan Undangan";
+    document.getElementById("wiz-heading").innerText = isCabang ? "Buat Undangan Klien Instan (-1 Coin)" : "Buat Undangan Digital Baru";
+    document.getElementById("btn-submit-inv").innerText = isCabang ? "Buat & Aktifkan (-1 Coin)" : "Ajukan Undangan";
     document.getElementById("btn-change-theme-step").classList.remove("hide");
     renderHeaderActions(); pushBackGuard(); renderWizardStep1();
     if (preCat && preTheme) selectWizardTheme(preTheme);
@@ -567,7 +567,7 @@ async function saveInvitationDraft(e) {
     }
     try { localStorage.removeItem(DRAFT_INV_KEY); } catch {}
     if (wizardState.isCabangBypass) {
-        showToast("Undangan klien langsung AKTIF (-1 Kuota)! Klik Link Klien untuk portal tamu.");
+        showToast("Undangan klien langsung AKTIF (-1 Coin)! Klik Link Klien untuk portal tamu.");
         return routeDashboard();
     }
     openUnifiedPayment("inv", newInv.id);

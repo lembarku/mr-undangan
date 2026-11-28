@@ -24,6 +24,7 @@ const DEFAULT_PRIVACY = {
     showProjects: true,
     showFollowers: true,
     showFollowing: true,
+    showUsername: true,
     showContact: false,
     showInChatContacts: true,
     allowDirectChat: true
@@ -762,10 +763,30 @@ function getUserPrivacy(uObj) {
         showProjects: raw.showProjects !== false,
         showFollowers: raw.showFollowers !== false,
         showFollowing: raw.showFollowing !== false,
+        showUsername: raw.showUsername !== false,
         showContact: raw.showContact === true,
         showInChatContacts: raw.showInChatContacts !== false,
         allowDirectChat: raw.allowDirectChat !== false
     };
+}
+
+function canSeeUserHandle(targetUserObj) {
+    if (!targetUserObj || !targetUserObj.username) return false;
+    const priv = getUserPrivacy(targetUserObj);
+    if (priv.showUsername) return true;
+    const curU = typeof getCurrentUserObj === "function" ? getCurrentUserObj() : null;
+    if (!curU || !curU.username) return false;
+    const myKey = String(curU.username).trim().toLowerCase();
+    const tKey = String(targetUserObj.username).trim().toLowerCase();
+    if (myKey === tKey) return true;
+    if (curU.role === "master") return true;
+    return false;
+}
+
+function buildGoldLembarkuCoinHtml(size = "sm") {
+    const szCls = size === "lg" ? "lbk-gold-coin-lg" : size === "md" ? "lbk-gold-coin-md" : "lbk-gold-coin-sm";
+    const fbTxtCls = size === "lg" ? "text-3xl" : size === "md" ? "text-sm" : "text-[11px]";
+    return `<span class="lbk-gold-coin ${szCls}" aria-hidden="true"><img src="./lembarku-logo.png" alt="Coin" class="lbk-gold-coin-logo" onerror="this.style.display='none';if(this.nextElementSibling)this.nextElementSibling.classList.remove('hide');"><span class="hide lbk-gold-coin-fallback ${fbTxtCls}">L</span></span>`;
 }
 
 function getBlockedUsersList(uObj) {

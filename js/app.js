@@ -444,6 +444,10 @@ function _mrCloseTransientOverlayIfAny() {
         if (typeof closeSecretPhotoLightbox === "function") closeSecretPhotoLightbox();
         return "ios-vault-lightbox";
     }
+    if (_isElVis("modal-cabang-coin-info")) {
+        closeCabangCoinInfoModal();
+        return "modal-cabang-coin-info";
+    }
     if (_isElVis("modal-share-demo")) {
         closeShareDemoModal();
         return "modal-share-demo";
@@ -1017,8 +1021,8 @@ function buildNotificationsForCurrentUser() {
                 unread: quota === 0,
                 icon: "fa-solid fa-coins",
                 accent: "text-amber-500",
-                title: quota === 0 ? "Kuota Deposit Habis" : `Sisa Kuota Cabang: ${quota}`,
-                desc: "Hubungi Founder melalui Live Chat untuk top-up kuota deposit cabang.",
+                title: quota === 0 ? "Saldo Coin Habis" : `Sisa Coin Cabang: ${quota} Coin`,
+                desc: "Hubungi Founder melalui Live Chat untuk isi ulang Coin cabang.",
                 actionJs: `closeNotificationsFullscreen(true);if(typeof openFullChatOverlay==='function')openFullChatOverlay();`
             });
         }
@@ -1233,7 +1237,7 @@ function openNotificationsFullscreen() {
         const subMap = {
             master: "Transaksi masuk, revisi, pendaftar baru & Live Chat",
             administrasi: "Antrean transaksi & pesan pelanggan terbaru",
-            cabang: "Status kuota, ucapan tamu klien & pesan Founder",
+            cabang: "Status Coin, ucapan tamu klien & pesan Founder",
             user: "Status pesanan berkas, sewa sepeda & balasan Admin"
         };
         sub.innerText = subMap[u.role] || "Aktivitas terbaru akun Anda";
@@ -1368,9 +1372,16 @@ function _buildIgStatsRowHtml(targetUserObj) {
     );
     const isFollowingThis = canFollowThis && _getFollowingListForUser(curU).includes(uname);
 
+    const coinColHtml = isCabangProfile
+        ? `<button type="button" onclick="openCabangCoinInfoModal('${esc(uname)}')" class="flex-1 py-2 px-1 text-center rounded-xl hover:bg-amber-500/10 active:scale-98 transition" title="Ketuk untuk info fungsi &amp; keuntungan Coin">
+            <span class="inline-flex items-center justify-center gap-1.5 text-sm sm:text-base font-extrabold tracking-tight text-amber-600">${typeof buildGoldLembarkuCoinHtml === "function" ? buildGoldLembarkuCoinHtml("sm") : ""}${escHtml(String(targetUserObj.quota || 0))}</span>
+            <span class="block text-[11px] app-muted font-semibold mt-0.5">Coin <i class="fa-solid fa-circle-info text-[9px] text-amber-500 ml-0.5"></i></span>
+        </button>`
+        : "";
+
     const followersClick = `onclick="if(typeof openSoloFollowersModal==='function')openSoloFollowersModal('${esc(uname)}')"`;
     const followersColHtml = isCabangProfile
-        ? ""
+        ? coinColHtml
         : `<button type="button" ${followersClick} class="flex-1 py-2 px-1 text-center rounded-xl hover:bg-black/5 active:scale-98 transition">
             <span class="block text-sm sm:text-base font-extrabold tracking-tight">${escHtml(followersDisplay)}</span>
             <span class="block text-[11px] app-muted font-medium">Followers</span>
@@ -1664,6 +1675,7 @@ function renderPrivacySubPanel() {
 
     const setChk = (id, val) => { const el = document.getElementById(id); if (el) el.checked = !!val; };
     setChk("priv-show-projects", priv.showProjects);
+    setChk("priv-show-username", priv.showUsername);
     setChk("priv-show-followers", priv.showFollowers);
     setChk("priv-show-following", priv.showFollowing);
     setChk("priv-show-contact", priv.showContact);
@@ -1705,6 +1717,7 @@ async function savePrivacySettings() {
 
     const privacy = {
         showProjects: !!document.getElementById("priv-show-projects")?.checked,
+        showUsername: !!document.getElementById("priv-show-username")?.checked,
         showFollowers: !!document.getElementById("priv-show-followers")?.checked,
         showFollowing: !!document.getElementById("priv-show-following")?.checked,
         showContact: !!document.getElementById("priv-show-contact")?.checked,
@@ -2378,7 +2391,8 @@ function renderUserProfile() {
     const caEl = document.getElementById("prof-composer-avatar"); if (caEl) caEl.src = u.avatar || defAv;
     const nEl = document.getElementById("prof-name"); if (nEl) nEl.innerText = u.name;
     document.getElementById("prof-pro-badge")?.classList.toggle("hide", !u.isPro);
-    const uEl = document.getElementById("prof-username"); if (uEl) uEl.innerText = `@${u.username}`;
+    const uPriv = typeof getUserPrivacy === "function" ? getUserPrivacy(u) : { showUsername: true };
+    const uEl = document.getElementById("prof-username"); if (uEl) uEl.innerHTML = uPriv.showUsername ? `@${escHtml(u.username)}` : `@${escHtml(u.username)} <span class="text-[9px] px-1.5 py-0.5 rounded-full app-btn-sec app-muted ml-1"><i class="fa-solid fa-eye-slash mr-0.5"></i>Disembunyikan</span>`;
     const bioEl = document.getElementById("prof-bio"); if (bioEl) bioEl.innerText = u.bio || "";
     const cEl = document.getElementById("prof-contact"); if (cEl) cEl.innerHTML = `${u.phone ? `<span><i class="fa-solid fa-phone app-accent mr-1"></i>${escHtml(u.phone)}</span>` : ""}${u.address ? `<span><i class="fa-solid fa-location-dot app-accent mr-1"></i>${escHtml(u.address)}</span>` : ""}`;
 
@@ -2425,7 +2439,7 @@ function renderCabangAdmin() {
     const shelf = document.getElementById("cabang-docs-shelf");
     if (shelf) {
         shelf.innerHTML = !docs.length
-            ? `<div class="w-full app-card border border-dashed rounded-3xl p-8 text-center space-y-3"><p class="text-xs app-muted">Belum ada berkas klien.</p><button onclick="openCreateChoiceModal(true)" class="gold-pill-btn px-5 py-2.5 rounded-xl text-xs">+ Buat Berkas Klien (-1 Kuota)</button></div>`
+            ? `<div class="w-full app-card border border-dashed rounded-3xl p-8 text-center space-y-3"><p class="text-xs app-muted">Belum ada berkas klien.</p><button onclick="openCreateChoiceModal(true)" class="gold-pill-btn px-5 py-2.5 rounded-xl text-xs">+ Buat Berkas Klien (-1 Coin)</button></div>`
             : docs.map(d => buildFilmPosterDocCardHtml(d, true)).join("");
     }
 
@@ -2712,25 +2726,7 @@ function initGlobalAppZoomLock() {
         return !!target.closest('[data-pinch-zoom="1"], .cropper-container, #modal-image-cropper');
     };
 
-    // Blokir gesture pinch-zoom bawaan iOS Safari di luar area foto/preview
-    ["gesturestart", "gesturechange", "gestureend"].forEach(evtName => {
-        document.addEventListener(evtName, (e) => {
-            if (!isZoomAllowedTarget(e.target)) {
-                e.preventDefault();
-            }
-        }, { passive: false });
-    });
-
-    function initGlobalAppZoomLock() {
-    if (window.__MR_ZOOM_LOCK_READY__) return;
-    window.__MR_ZOOM_LOCK_READY__ = true;
-
-    const isZoomAllowedTarget = (target) => {
-        if (!target || typeof target.closest !== "function") return false;
-        return !!target.closest('[data-pinch-zoom="1"], .cropper-container, #modal-image-cropper');
-    };
-
-    // Khusus Safari iOS: blokir gesture pinch zoom di luar area foto/preview
+    // Khusus Safari iOS: blokir gesture pinch-zoom di luar area foto/preview
     ["gesturestart", "gesturechange", "gestureend"].forEach(evtName => {
         document.addEventListener(evtName, (e) => {
             if (!isZoomAllowedTarget(e.target)) {
@@ -2740,14 +2736,6 @@ function initGlobalAppZoomLock() {
     });
 
     // Khusus PC: blokir Ctrl + Scroll wheel zoom di luar area foto/preview
-    window.addEventListener("wheel", (e) => {
-        if (e.ctrlKey && !isZoomAllowedTarget(e.target)) {
-            e.preventDefault();
-        }
-    }, { passive: false });
-}
-
-    // Blokir Ctrl + Scroll wheel zoom pada PC di luar area foto/preview
     window.addEventListener("wheel", (e) => {
         if (e.ctrlKey && !isZoomAllowedTarget(e.target)) {
             e.preventDefault();
@@ -2775,6 +2763,7 @@ function attachSelectivePinchZoom(stageEl, targetEl, opts = {}) {
             state.ty = 0;
         }
         stageEl.dataset.zoomScale = String(Number(state.scale.toFixed(2)));
+        stageEl.dataset.zooming = state.scale > 1.05 ? "1" : "0";
         targetEl.style.transform = state.scale === 1
             ? ""
             : `translate3d(${state.tx.toFixed(1)}px, ${state.ty.toFixed(1)}px, 0) scale(${state.scale.toFixed(3)})`;
@@ -2786,7 +2775,6 @@ function attachSelectivePinchZoom(stageEl, targetEl, opts = {}) {
         applyTransform();
     };
 
-    // Jika stage sudah pernah di-bind, cukup reset state ke 1x
     if (stageEl.dataset.pinchBound === "1") {
         const existing = _selectiveZoomRegistry.get(stageEl);
         if (existing) existing.reset();
@@ -2804,6 +2792,7 @@ function attachSelectivePinchZoom(stageEl, targetEl, opts = {}) {
     stageEl.addEventListener("touchstart", (e) => {
         if (e.touches.length === 2) {
             e.preventDefault();
+            stageEl.dataset.zooming = "1";
             isPanning = false;
             targetEl.classList.add("is-dragging");
             pinchStartDist = getDist(e.touches[0], e.touches[1]) || 1;
@@ -2854,7 +2843,6 @@ function attachSelectivePinchZoom(stageEl, targetEl, opts = {}) {
         if (state.scale < 1.05) reset();
     }, { passive: true });
 
-    // PC Mouse Wheel Zoom & Double-Click Zoom
     stageEl.addEventListener("wheel", (e) => {
         if (!e.ctrlKey && state.scale <= 1) return;
         e.preventDefault();
@@ -2872,6 +2860,52 @@ function attachSelectivePinchZoom(stageEl, targetEl, opts = {}) {
 
     _selectiveZoomRegistry.set(stageEl, { reset, getState: () => state });
     reset();
+}
+
+// ================= 12. MODAL INFO COIN ADMIN CABANG (V14.9) =================
+function openCabangCoinInfoModal(targetUsername = "") {
+    const cleanKey = _normAppUserKey(targetUsername || currentSessionUser || "");
+    const targetU = (db.users || []).find(u => _normAppUserKey(u.username) === cleanKey) || getCurrentUserObj();
+    const curU = getCurrentUserObj();
+    const isSelfCabang = !!(curU && curU.role === "cabang" && targetU && _normAppUserKey(curU.username) === _normAppUserKey(targetU.username));
+
+    const balEl = document.getElementById("cci-balance-num");
+    const subEl = document.getElementById("cci-owner-sub");
+    const topupBtn = document.getElementById("cci-topup-btn");
+
+    if (balEl) balEl.innerText = String((targetU && targetU.quota) || 0);
+    if (subEl) {
+        const brandLbl = targetU ? ((targetU.brandName && targetU.brandName.trim()) || targetU.name || "Mitra Cabang") : "Mitra Cabang";
+        subEl.innerText = `Saldo Coin Aktif • ${brandLbl}`;
+    }
+    if (topupBtn) {
+        topupBtn.classList.toggle("hide", !isSelfCabang);
+    }
+
+    const modal = document.getElementById("modal-cabang-coin-info");
+    if (modal) {
+        modal.classList.remove("hide");
+        mrNavPush({ type: "modal", id: "modal-cabang-coin-info" });
+    }
+}
+
+function closeCabangCoinInfoModal() {
+    document.getElementById("modal-cabang-coin-info")?.classList.add("hide");
+    _mrDropTopModalById("modal-cabang-coin-info");
+}
+
+function requestTopUpCoinViaChat() {
+    closeCabangCoinInfoModal();
+    if (typeof openFullChatOverlay === "function") {
+        openFullChatOverlay("admin_support");
+        setTimeout(() => {
+            const inp = document.getElementById("chat-input-text");
+            if (inp) {
+                inp.value = "Halo Founder, saya ingin isi ulang (Top-Up) Coin untuk akun Admin Cabang saya.";
+                inp.focus();
+            }
+        }, 250);
+    }
 }
 
 initGlobalAppZoomLock();
