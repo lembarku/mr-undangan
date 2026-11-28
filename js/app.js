@@ -1,6 +1,6 @@
 // =========================================================================
 // LEMBARKU & TITIK GOWES — MAIN APP CONTROLLER (js/app.js)
-// Versi: V14.3 (Steril, Aman & Modular — Sesi 1 dari 2)
+// Versi: V14.9 (Pengaturan Rapi, Konten & Media Beranda, Share Contoh & Kontrol Zoom Selektif)
 // =========================================================================
 const USER_CACHE_KEY = "MR_UNDANGAN_USER_OBJ";
 let deferredPwaPrompt = null;
@@ -444,8 +444,13 @@ function _mrCloseTransientOverlayIfAny() {
         if (typeof closeSecretPhotoLightbox === "function") closeSecretPhotoLightbox();
         return "ios-vault-lightbox";
     }
+    if (_isElVis("modal-share-demo")) {
+        closeShareDemoModal();
+        return "modal-share-demo";
+    }
     if (_isElVis("modal-portfolio-preview")) {
-        document.getElementById("modal-portfolio-preview")?.classList.add("hide");
+        if (typeof closePortfolioPreviewModal === "function") closePortfolioPreviewModal();
+        else document.getElementById("modal-portfolio-preview")?.classList.add("hide");
         return "modal-portfolio-preview";
     }
     if (_isElVis("modal-album-form")) {
@@ -1534,32 +1539,27 @@ function renderMainSlideMenuList() {
     } else if (u.role === "master") {
         html += menuRowItem("fa-chart-line", "Grafik & Analitik Bisnis", "Omzet, tren pesanan, rental sepeda & data PWA", "toggleSlideMenu(false);if(typeof openMasterWorkspace==='function')openMasterWorkspace('overview');");
         html += menuRowItem("fa-cash-register", "Kasir Sewa Offline (Walk-in)", "Daftarkan pelanggan datang langsung • Bayar Cash atau QRIS", "toggleSlideMenu(false);if(typeof openGowesOfflinePosModal==='function')openGowesOfflinePosModal();");
-        html += menuRowItem("fa-bicycle", "Kelola Armada Titik Gowes", "Unit sepeda, cabang garasi & banner promosi 16:7", "toggleSlideMenu(false);if(typeof openMasterWorkspace==='function')openMasterWorkspace('gowes_fleet');");
+        html += menuRowItem("fa-bicycle", "Kelola Gerai & Armada Gowes", "Atur gerai cabang, sepeda tiap gerai & banner 16:7", "toggleSlideMenu(false);if(typeof openMasterWorkspace==='function')openMasterWorkspace('gowes_fleet');");
         html += menuRowItem("fa-palette", "Kelola Tema & Harga", "Foto template, nama contoh & harga CV/Lamaran", "toggleSlideMenu(false);if(typeof openMasterWorkspace==='function')openMasterWorkspace('themes');");
-        html += menuRowItem("fa-rectangle-ad", "Edit Banner Promosi (12:4.4)", "Atur banner promosi utama beranda", "toggleSlideMenu(false);if(typeof openMasterWorkspace==='function')openMasterWorkspace('home_editor');");
-        html += menuRowItem("fa-music", "Stok Musik & Testimoni", "Upload lagu dari perangkat & ulasan beranda", "toggleSlideMenu(false);if(typeof openMasterWorkspace==='function')openMasterWorkspace('media');");
+        html += menuRowItem("fa-photo-film", "Konten & Media Beranda", "Banner promosi 12:4.4, stok lagu & testimoni", "toggleSlideMenu(false);if(typeof openMasterWorkspace==='function')openMasterWorkspace('content_media');");
         html += menuRowItem("fa-qrcode", "QRIS DANA & Rekening", "Mode QRIS Tetap / Dinamis & daftar rekening", "openSlideSub('qris')");
-        html += menuRowItem("fa-comments", "Live Chat Pelanggan", "Balas pesan, mulai chat baru & pengajuan PIN", "toggleSlideMenu(false);openFullChatOverlay();");
         html += menuRowItem("fa-user-shield", "Privasi & Blokir User", "Atur visibilitas profil, dokumen & akun diblokir", "openSlideSub('privacy')");
         html += menuRowItem("fa-user-pen", "Edit Profil Founder", "Foto profil, sampul & bio", "openSlideSub('profil')");
         html += menuRowItem("fa-shield-halved", "Keamanan Akun & Keluar", "Username, ganti password aman & logout", "openSlideSub('akun')");
     } else if (u.role === "administrasi") {
         html += menuRowItem("fa-cash-register", "Kasir Sewa Offline (Walk-in)", "Daftarkan pelanggan datang langsung • Bayar Cash atau QRIS", "toggleSlideMenu(false);if(typeof openGowesOfflinePosModal==='function')openGowesOfflinePosModal();");
-        html += menuRowItem("fa-bicycle", "Kelola Armada & Garasi Gowes", "Atur unit sepeda, cabang garasi & status servis", "toggleSlideMenu(false);if(typeof openMasterWorkspace==='function')openMasterWorkspace('gowes_fleet');");
+        html += menuRowItem("fa-bicycle", "Kelola Gerai & Armada Gowes", "Atur gerai cabang, sepeda tiap gerai & status servis", "toggleSlideMenu(false);if(typeof openMasterWorkspace==='function')openMasterWorkspace('gowes_fleet');");
         html += menuRowItem("fa-store", "Status Garasi (Buka / Tutup)", "Aktifkan mode toko tutup sementara Titik Gowes", "toggleSlideMenu(false);if(typeof openGowesShelterOpsModal==='function')openGowesShelterOpsModal();");
-        html += menuRowItem("fa-comments", "Live Chat Pelanggan", "Balas pesan & hubungi kontak user", "toggleSlideMenu(false);openFullChatOverlay();");
         html += menuRowItem("fa-user-shield", "Privasi & Blokir User", "Atur visibilitas profil, dokumen & akun diblokir", "openSlideSub('privacy')");
         html += menuRowItem("fa-user-pen", "Edit Profil Staf", "Foto profil & informasi kontak", "openSlideSub('profil')");
         html += menuRowItem("fa-shield-halved", "Keamanan Akun & Keluar", "Username, ganti password aman & logout", "openSlideSub('akun')");
     } else if (u.role === "cabang") {
         html += menuRowItem("fa-user-pen", "Profil & Label Brand Cabang", "Foto, sampul, nama brand & kontak", "openSlideSub('profil')");
         html += menuRowItem("fa-shield-halved", "Keamanan Akun & Keluar", "Username, ganti password aman & logout", "openSlideSub('akun')");
-        html += menuRowItem("fa-headset", "Live Chat Founder", "Bantuan, top-up kuota & kendala teknis", "toggleSlideMenu(false);openFullChatOverlay();");
     } else {
         html += menuRowItem("fa-user-pen", "Pengaturan Profil", "Foto, sampul, nama & kontak", "openSlideSub('profil')");
         html += menuRowItem("fa-user-shield", "Privasi & Blokir User", "Atur postingan, followers, following & blokir", "openSlideSub('privacy')");
         html += menuRowItem("fa-shield-halved", "Keamanan Akun & Keluar", "Username, ganti password aman & logout", "openSlideSub('akun')");
-        html += menuRowItem("fa-headset", "Live Chat Admin", "Bantuan, konfirmasi & upgrade Pro", "toggleSlideMenu(false);openFullChatOverlay();");
     }
 
     html += menuRowItem("fa-swatchbook", "Tampilan & Warna Aplikasi", "Gaya Pengaturan iOS & nuansa lainnya", "openSlideSub('theme')");
@@ -2465,7 +2465,7 @@ function refreshActiveViewSmart() {
         renderMasterHeaderStats();
     }
 
-    if (_isElVis("modal-master-workspace") && currentMasterWorkspace !== "home_editor" && currentMasterWorkspace !== "media" && !isUserTypingIn("master-workspace-body") && typeof renderMasterWorkspaceContent === "function") {
+    if (_isElVis("modal-master-workspace") && currentMasterWorkspace !== "content_media" && currentMasterWorkspace !== "home_editor" && currentMasterWorkspace !== "media" && !isUserTypingIn("master-workspace-body") && typeof renderMasterWorkspaceContent === "function") {
         renderMasterWorkspaceContent();
     }
     if (window._soloStatsViewState && window._soloStatsViewState.open && typeof renderSoloStatsModal === "function") {
@@ -2526,6 +2526,18 @@ async function bootMrUndanganApp() {
             if (typeof openThemeLivePreview === "function") openThemeLivePreview(p.get("demo"), p.get("theme"), false);
             if (typeof hideEnvelopeLoader === "function") hideEnvelopeLoader();
             goToLanding(true);
+            return;
+        }
+
+        if (p.has("demo_pf") && p.has("theme") && typeof fetchPublicCloud === "function") {
+            if (typeof hideHelloSplash === "function") hideHelloSplash();
+            showLoading("Menyiapkan Contoh Desain...");
+            await fetchPublicCloud();
+            hideLoading();
+            goToLanding(true);
+            if (typeof openPortfolioDemoPreview === "function") {
+                openPortfolioDemoPreview(p.get("demo_pf"), p.get("theme"));
+            }
             return;
         }
 
@@ -2619,3 +2631,241 @@ if (document.readyState === "loading") {
 } else {
     bootMrUndanganApp();
 }
+
+// ================= 10. BERBAGI CONTOH TEMA KE SELURUH MEDIA SOSIAL (V14.9) =================
+let _activeDemoShareData = { title: "", text: "", url: "", subtitle: "" };
+
+function openDemoSocialShare(data) {
+    _activeDemoShareData = Object.assign({ title: "Contoh Desain Lembarku", text: "", url: getCleanBaseUrl(), subtitle: "" }, data || {});
+    const subEl = document.getElementById("sd-subtitle");
+    const txtEl = document.getElementById("sd-preview-text");
+    if (subEl && _activeDemoShareData.subtitle) subEl.innerText = _activeDemoShareData.subtitle;
+    if (txtEl) txtEl.value = _activeDemoShareData.text || _activeDemoShareData.url;
+
+    const modal = document.getElementById("modal-share-demo");
+    if (modal) {
+        modal.classList.remove("hide");
+        mrNavPush({ type: "modal", id: "modal-share-demo" });
+    }
+}
+
+function closeShareDemoModal() {
+    document.getElementById("modal-share-demo")?.classList.add("hide");
+    _mrDropTopModalById("modal-share-demo");
+}
+
+async function triggerNativeShareDemo() {
+    const d = _activeDemoShareData;
+    if (!d || !d.url) return;
+    if (navigator.share) {
+        try {
+            await navigator.share({ title: d.title, text: d.text, url: d.url });
+            closeShareDemoModal();
+            showToast("Contoh desain siap dibagikan!");
+            return;
+        } catch (err) {
+            if (err && err.name === "AbortError") return;
+        }
+    }
+    launchDemoShareChannel("copy");
+}
+
+function launchDemoShareChannel(channel) {
+    const d = _activeDemoShareData;
+    if (!d || !d.url) return;
+    const encText = encodeURIComponent(d.text || d.url);
+    const encUrl = encodeURIComponent(d.url);
+    const encTitle = encodeURIComponent(d.title || "Contoh Desain Lembarku");
+
+    if (channel === "wa") {
+        window.open(`https://wa.me/?text=${encText}`, "_blank", "noopener,noreferrer");
+        closeShareDemoModal();
+    } else if (channel === "tg") {
+        window.open(`https://t.me/share/url?url=${encUrl}&text=${encTitle}`, "_blank", "noopener,noreferrer");
+        closeShareDemoModal();
+    } else if (channel === "fb") {
+        window.open(`https://www.facebook.com/sharer/sharer.php?u=${encUrl}`, "_blank", "noopener,noreferrer");
+        closeShareDemoModal();
+    } else if (channel === "x") {
+        window.open(`https://twitter.com/intent/tweet?text=${encText}`, "_blank", "noopener,noreferrer");
+        closeShareDemoModal();
+    } else if (channel === "ig") {
+        navigator.clipboard?.writeText(d.text || d.url);
+        closeShareDemoModal();
+        showToast("Link & caption disalin! Tinggal tempel (Paste) di Instagram / TikTok.", "info");
+    } else {
+        navigator.clipboard?.writeText(d.url);
+        closeShareDemoModal();
+        showToast("Link contoh berhasil disalin!");
+    }
+}
+
+// ================= 11. KUNCI ZOOM HALAMAN APLIKASI + ZOOM SELEKTIF FOTO/PREVIEW (V14.9) =================
+const _selectiveZoomRegistry = new Map();
+
+function initGlobalAppZoomLock() {
+    if (window.__MR_ZOOM_LOCK_READY__) return;
+    window.__MR_ZOOM_LOCK_READY__ = true;
+
+    const isZoomAllowedTarget = (target) => {
+        if (!target || typeof target.closest !== "function") return false;
+        return !!target.closest('[data-pinch-zoom="1"], .cropper-container, #modal-image-cropper');
+    };
+
+    // Blokir gesture pinch-zoom bawaan iOS Safari di luar area foto/preview
+    ["gesturestart", "gesturechange", "gestureend"].forEach(evtName => {
+        document.addEventListener(evtName, (e) => {
+            if (!isZoomAllowedTarget(e.target)) {
+                e.preventDefault();
+            }
+        }, { passive: false });
+    });
+
+    // Blokir pinch 2 jari bawaan browser Android/iOS pada halaman UI utama
+    document.addEventListener("touchmove", (e) => {
+        if (e.touches && e.touches.length > 1 && !isZoomAllowedTarget(e.target)) {
+            e.preventDefault();
+        }
+    }, { passive: false });
+
+    // Blokir double-tap zoom pada halaman UI utama (kecuali input/textarea & area zoom selektif)
+    let lastTouchEndTs = 0;
+    document.addEventListener("touchend", (e) => {
+        if (isZoomAllowedTarget(e.target)) return;
+        const tag = (e.target && e.target.tagName) || "";
+        if (["INPUT", "TEXTAREA", "SELECT"].includes(tag)) return;
+        const now = Date.now();
+        if (now - lastTouchEndTs <= 300) {
+            e.preventDefault();
+        }
+        lastTouchEndTs = now;
+    }, { passive: false });
+
+    // Blokir Ctrl + Scroll wheel zoom pada PC di luar area foto/preview
+    window.addEventListener("wheel", (e) => {
+        if (e.ctrlKey && !isZoomAllowedTarget(e.target)) {
+            e.preventDefault();
+        }
+    }, { passive: false });
+}
+
+function resetSelectiveZoom(stageIdOrEl) {
+    const stage = typeof stageIdOrEl === "string" ? document.getElementById(stageIdOrEl) : stageIdOrEl;
+    if (!stage) return;
+    const ctrl = _selectiveZoomRegistry.get(stage);
+    if (ctrl && typeof ctrl.reset === "function") ctrl.reset();
+}
+
+function attachSelectivePinchZoom(stageEl, targetEl, opts = {}) {
+    if (!stageEl || !targetEl) return;
+    const maxScale = Number(opts.maxScale || 4);
+    const onScaleChange = typeof opts.onScaleChange === "function" ? opts.onScaleChange : null;
+
+    let state = { scale: 1, tx: 0, ty: 0 };
+    const applyTransform = () => {
+        if (state.scale <= 1.01) {
+            state.scale = 1;
+            state.tx = 0;
+            state.ty = 0;
+        }
+        stageEl.dataset.zoomScale = String(Number(state.scale.toFixed(2)));
+        targetEl.style.transform = state.scale === 1
+            ? ""
+            : `translate3d(${state.tx.toFixed(1)}px, ${state.ty.toFixed(1)}px, 0) scale(${state.scale.toFixed(3)})`;
+        if (onScaleChange) onScaleChange(state.scale);
+    };
+
+    const reset = () => {
+        state = { scale: 1, tx: 0, ty: 0 };
+        applyTransform();
+    };
+
+    // Jika stage sudah pernah di-bind, cukup reset state ke 1x
+    if (stageEl.dataset.pinchBound === "1") {
+        const existing = _selectiveZoomRegistry.get(stageEl);
+        if (existing) existing.reset();
+        return;
+    }
+    stageEl.dataset.pinchBound = "1";
+
+    let pinchStartDist = 0, pinchStartScale = 1;
+    let panStartX = 0, panStartY = 0, panOrigTx = 0, panOrigTy = 0;
+    let isPanning = false;
+    let lastTapTs = 0;
+
+    const getDist = (t1, t2) => Math.hypot(t2.clientX - t1.clientX, t2.clientY - t1.clientY);
+
+    stageEl.addEventListener("touchstart", (e) => {
+        if (e.touches.length === 2) {
+            e.preventDefault();
+            isPanning = false;
+            targetEl.classList.add("is-dragging");
+            pinchStartDist = getDist(e.touches[0], e.touches[1]) || 1;
+            pinchStartScale = state.scale;
+        } else if (e.touches.length === 1) {
+            const now = Date.now();
+            if (now - lastTapTs < 280) {
+                e.preventDefault();
+                state.scale = state.scale > 1.2 ? 1 : 2.2;
+                if (state.scale === 1) { state.tx = 0; state.ty = 0; }
+                applyTransform();
+                lastTapTs = 0;
+                return;
+            }
+            lastTapTs = now;
+            if (state.scale > 1.05) {
+                isPanning = true;
+                targetEl.classList.add("is-dragging");
+                panStartX = e.touches[0].clientX;
+                panStartY = e.touches[0].clientY;
+                panOrigTx = state.tx;
+                panOrigTy = state.ty;
+            }
+        }
+    }, { passive: false });
+
+    stageEl.addEventListener("touchmove", (e) => {
+        if (e.touches.length === 2) {
+            e.preventDefault();
+            const d = getDist(e.touches[0], e.touches[1]);
+            const next = Math.max(1, Math.min(maxScale, pinchStartScale * (d / pinchStartDist)));
+            state.scale = next;
+            applyTransform();
+        } else if (e.touches.length === 1 && isPanning && state.scale > 1.05) {
+            e.preventDefault();
+            const dx = e.touches[0].clientX - panStartX;
+            const dy = e.touches[0].clientY - panStartY;
+            const maxPan = 220 * (state.scale - 1);
+            state.tx = Math.max(-maxPan, Math.min(maxPan, panOrigTx + dx));
+            state.ty = Math.max(-maxPan, Math.min(maxPan, panOrigTy + dy));
+            applyTransform();
+        }
+    }, { passive: false });
+
+    stageEl.addEventListener("touchend", () => {
+        isPanning = false;
+        targetEl.classList.remove("is-dragging");
+        if (state.scale < 1.05) reset();
+    }, { passive: true });
+
+    // PC Mouse Wheel Zoom & Double-Click Zoom
+    stageEl.addEventListener("wheel", (e) => {
+        if (!e.ctrlKey && state.scale <= 1) return;
+        e.preventDefault();
+        const delta = e.deltaY < 0 ? 0.22 : -0.22;
+        state.scale = Math.max(1, Math.min(maxScale, state.scale + delta));
+        applyTransform();
+    }, { passive: false });
+
+    stageEl.addEventListener("dblclick", (e) => {
+        e.preventDefault();
+        state.scale = state.scale > 1.2 ? 1 : 2.1;
+        if (state.scale === 1) { state.tx = 0; state.ty = 0; }
+        applyTransform();
+    });
+
+    _selectiveZoomRegistry.set(stageEl, { reset, getState: () => state });
+    reset();
+}
+
+initGlobalAppZoomLock();

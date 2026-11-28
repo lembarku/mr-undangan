@@ -921,6 +921,98 @@ function usePreviewedThemeNow() {
     }
 }
 
+function sharePreviewedInvitationDemo() {
+    if (!activeGuestInv) return;
+    const cat = activeGuestInv.category || "Pernikahan";
+    const theme = activeGuestInv.theme || "Adat Kalimantan";
+    const url = `${getCleanBaseUrl()}?demo=${encodeURIComponent(cat)}&theme=${encodeURIComponent(theme)}`;
+    const title = `Contoh Undangan ${cat} — ${theme}`;
+    const text = `Lihat contoh desain undangan digital *${theme}* (${cat}) di Lembarku ✨\nBisa langsung dibuka & dicoba di sini:\n${url}`;
+    if (typeof openDemoSocialShare === "function") {
+        openDemoSocialShare({ title, text, url, subtitle: `Contoh Undangan • ${cat} — ${theme}` });
+    } else {
+        navigator.clipboard?.writeText(url);
+        showToast("Link contoh undangan disalin!");
+    }
+}
+
+// ================= SMART AUTO-FRAMING POSISI KEPALA FOTO UNDANGAN =================
+let _sharedFaceDetector = null;
+function _getBrowserFaceDetector() {
+    if (_sharedFaceDetector !== null) return _sharedFaceDetector;
+    try {
+        if (typeof window !== "undefined" && "FaceDetector" in window) {
+            _sharedFaceDetector = new window.FaceDetector({ fastMode: true, maxDetectedFaces: 3 });
+            return _sharedFaceDetector;
+        }
+    } catch {}
+    _sharedFaceDetector = false;
+    return false;
+}
+
+function _applyRatioFallbackPosition(img) {
+    if (!img || !img.naturalWidth || !img.naturalHeight) return;
+    const natRatio = img.naturalWidth / img.naturalHeight;
+    const rect = img.getBoundingClientRect();
+    const boxRatio = (rect.width > 0 && rect.height > 0) ? (rect.width / rect.height) : 1;
+    // Jika foto lebih vertikal dibanding kotaknya (misal potret orang di lingkaran/polaroid), geser ke atas agar kepala aman
+    if (natRatio < boxRatio * 0.92) {
+        img.style.objectPosition = "50% 14%";
+    } else if (natRatio <= 1.15) {
+        img.style.objectPosition = "50% 18%";
+    } else {
+        img.style.objectPosition = "50% 22%";
+    }
+}
+
+async function autoFramePortraitImage(img) {
+    if (!img || img.dataset.smartFramed === "1") return;
+    if (!img.complete || !img.naturalWidth || !img.naturalHeight) return;
+    img.dataset.smartFramed = "1";
+    _applyRatioFallbackPosition(img);
+
+    const detector = _getBrowserFaceDetector();
+    if (!detector) return;
+
+    try {
+        const faces = await detector.detect(img);
+        if (!Array.isArray(faces) || !faces.length) return;
+        let minTop = Infinity, maxBottom = 0, sumCenterX = 0;
+        faces.forEach(f => {
+            const bb = f.boundingBox || {};
+            if (typeof bb.top === "number") {
+                minTop = Math.min(minTop, bb.top);
+                maxBottom = Math.max(maxBottom, bb.top + (bb.height || 0));
+                sumCenterX += (bb.left || 0) + (bb.width || 0) * 0.5;
+            }
+        });
+        if (!isFinite(minTop) || maxBottom <= 0) return;
+        const avgX = sumCenterX / faces.length;
+        const faceHeight = Math.max(1, maxBottom - minTop);
+        // Beri ruang di atas kepala (~35% tinggi wajah) agar rambut & dahi utuh
+        const idealTopY = Math.max(0, minTop - faceHeight * 0.38);
+        const pctX = Math.max(22, Math.min(78, Math.round((avgX / img.naturalWidth) * 100)));
+        const pctY = Math.max(4, Math.min(44, Math.round((idealTopY / img.naturalHeight) * 100)));
+        img.style.objectPosition = `${pctX}% ${pctY}%`;
+    } catch {
+        // Fallback aman bila gambar lintas-origin tanpa CORS
+        _applyRatioFallbackPosition(img);
+    }
+}
+
+function runSmartPortraitFraming(rootEl) {
+    const scope = rootEl || document.getElementById("gv-dynamic-root");
+    if (!scope) return;
+    scope.querySelectorAll("img.inv-portrait-smart").forEach(img => {
+        if (img.complete && img.naturalWidth) {
+            autoFramePortraitImage(img);
+        } else if (!img.dataset.smartBound) {
+            img.dataset.smartBound = "1";
+            img.addEventListener("load", () => autoFramePortraitImage(img), { once: true });
+        }
+    });
+}
+
 function wrapPaperTurnLeaf(innerHtml, hintLabel = "Geser ➔ Buka Lembaran") {
     return `<div class="pt-stage"><div class="pt-sticky"><div class="pt-leaf">${innerHtml}<div class="pt-paper-shade"></div><span class="pt-edge-hint"><i class="fa-solid fa-book-open mr-1"></i>${hintLabel}</span></div></div></div>`;
 }
@@ -1027,7 +1119,12 @@ function openGuestViewWithObject(inv, guestName, isDirectLink = false) {
     const openingQuote = inv.introText || defOpen.quote;
 
     document.getElementById("gv-music-btn").classList.toggle("hide", !effectiveAudio);
-    document.getElementById("gv-use-theme-btn").classList.toggle("hide", inv.id !== "demo");
+    const demoBarEl = document.getElementById("gv-demo-actions-bar");
+    if (demoBarEl) demoBarEl.classList.toggle("hide", inv.id !== "demo");
+    const useBtnEl = document.getElementById("gv-use-theme-btn");
+    if (useBtnEl) useBtnEl.classList.toggle("hide", inv.id !== "demo");
+    const shareBtnEl = document.getElementById("gv-share-demo-btn");
+    if (shareBtnEl) shareBtnEl.classList.toggle("hide", inv.id !== "demo");
 
     const safeTitle = escHtml(inv.title || "");
     const safeAge = escHtml(inv.age || "");
@@ -1052,8 +1149,8 @@ function openGuestViewWithObject(inv, guestName, isDirectLink = false) {
 
     const coverHtml = `
         <div id="gv-cover-stage" class="fixed inset-0 z-50 max-w-[430px] mx-auto overflow-hidden bg-black flex flex-col justify-between">
-            <div class="curtain-l absolute inset-0 pointer-events-none" style="clip-path:inset(0 49.8% 0 0);"><img src="${mainPhoto}" ${imgFbAttr(mainPhotoFb)} class="inv-photo w-full h-full object-cover object-center"><div class="absolute inset-0" style="background:${preset.coverOverlay}"></div></div>
-            <div class="curtain-r absolute inset-0 pointer-events-none" style="clip-path:inset(0 0 0 49.8%);"><img src="${mainPhoto}" ${imgFbAttr(mainPhotoFb)} class="inv-photo w-full h-full object-cover object-center"><div class="absolute inset-0" style="background:${preset.coverOverlay}"></div></div>
+            <div class="curtain-l absolute inset-0 pointer-events-none" style="clip-path:inset(0 49.8% 0 0);"><img src="${mainPhoto}" ${imgFbAttr(mainPhotoFb)} class="inv-photo inv-portrait-smart w-full h-full object-cover"><div class="absolute inset-0" style="background:${preset.coverOverlay}"></div></div>
+            <div class="curtain-r absolute inset-0 pointer-events-none" style="clip-path:inset(0 0 0 49.8%);"><img src="${mainPhoto}" ${imgFbAttr(mainPhotoFb)} class="inv-photo inv-portrait-smart w-full h-full object-cover"><div class="absolute inset-0" style="background:${preset.coverOverlay}"></div></div>
             ${coverDecor}
             <div class="cover-inner relative z-20 flex-1 flex flex-col justify-between p-7 text-center text-white">
                 <div class="pt-4"><span class="text-[9px] uppercase tracking-[0.35em] text-white/80 font-semibold">${escHtml(brand.topLabel)}</span></div>
@@ -1099,7 +1196,7 @@ function openGuestViewWithObject(inv, guestName, isDirectLink = false) {
             const combinedInner = `
                 <div class="w-full h-full flex flex-col bg-[var(--th-bg)]">
                     <div class="relative w-full h-[54vh] overflow-hidden shrink-0">
-                        <img src="${cImg}" ${imgFbAttr(cFb)} class="inv-photo w-full h-full object-cover object-center">
+                        <img src="${cImg}" ${imgFbAttr(cFb)} class="inv-photo inv-portrait-smart w-full h-full object-cover">
                         <div class="absolute inset-x-0 bottom-0 h-28" style="background:linear-gradient(to top, var(--th-bg) 8%, transparent 100%);"></div>
                     </div>
                     <div class="flex-1 px-7 pb-12 -mt-6 relative z-10 text-center space-y-3 flex flex-col justify-center">
@@ -1114,14 +1211,14 @@ function openGuestViewWithObject(inv, guestName, isDirectLink = false) {
         } else if (inv.groomName || inv.brideName) {
             let leaf1Html = "", slide2Html = "";
             if (isPremiumBlack) {
-                leaf1Html = `<div class="w-full h-full flex flex-col justify-center items-center text-center px-7 py-12 space-y-5 bg-[#070709] relative">${SVG_ROSES_MONO}<div class="w-48 h-48 rounded-full overflow-hidden border-2 border-white/75 shadow-2xl"><img src="${gImg}" ${imgFbAttr(gFb)} class="inv-photo w-full h-full object-cover"></div><span class="text-[10px] uppercase tracking-[0.35em] text-zinc-400 font-bold">The Groom</span><h2 class="font-script text-5xl text-white">${escHtml(inv.groomName)}</h2>${inv.groomParents?`<p class="text-xs text-zinc-300 max-w-xs leading-relaxed">${escHtml(inv.groomParents)}</p>`:""}${gIgClean?`<a href="https://instagram.com/${encodeURIComponent(gIgClean)}" target="_blank" class="px-4 py-1.5 rounded-full border border-white/30 text-[11px] text-white"><i class="fa-brands fa-instagram mr-1.5"></i>@${escHtml(gIgClean)}</a>`:""}</div>`;
-                slide2Html = `<section class="min-h-screen flex flex-col justify-center items-center text-center px-7 py-14 space-y-5 bg-[#070709] relative"><div class="scrub-el w-48 h-48 rounded-full overflow-hidden border-2 border-white/75 shadow-2xl" data-scrub="zoom"><img src="${bImg}" ${imgFbAttr(bFb)} class="inv-photo w-full h-full object-cover"></div><span class="scrub-el text-[10px] uppercase tracking-[0.35em] text-zinc-400 font-bold" data-scrub="up">The Bride</span><h2 class="scrub-el font-script text-5xl text-white" data-scrub="blur">${escHtml(inv.brideName)}</h2>${inv.brideParents?`<p class="scrub-el text-xs text-zinc-300 max-w-xs leading-relaxed" data-scrub="up">${escHtml(inv.brideParents)}</p>`:""}${bIgClean?`<a href="https://instagram.com/${encodeURIComponent(bIgClean)}" target="_blank" class="px-4 py-1.5 rounded-full border border-white/30 text-[11px] text-white"><i class="fa-brands fa-instagram mr-1.5"></i>@${escHtml(bIgClean)}</a>`:""}</section>`;
+                leaf1Html = `<div class="w-full h-full flex flex-col justify-center items-center text-center px-7 py-12 space-y-5 bg-[#070709] relative">${SVG_ROSES_MONO}<div class="w-48 h-48 rounded-full overflow-hidden border-2 border-white/75 shadow-2xl"><img src="${gImg}" ${imgFbAttr(gFb)} class="inv-photo inv-portrait-smart w-full h-full object-cover"></div><span class="text-[10px] uppercase tracking-[0.35em] text-zinc-400 font-bold">The Groom</span><h2 class="font-script text-5xl text-white">${escHtml(inv.groomName)}</h2>${inv.groomParents?`<p class="text-xs text-zinc-300 max-w-xs leading-relaxed">${escHtml(inv.groomParents)}</p>`:""}${gIgClean?`<a href="https://instagram.com/${encodeURIComponent(gIgClean)}" target="_blank" class="px-4 py-1.5 rounded-full border border-white/30 text-[11px] text-white"><i class="fa-brands fa-instagram mr-1.5"></i>@${escHtml(gIgClean)}</a>`:""}</div>`;
+                slide2Html = `<section class="min-h-screen flex flex-col justify-center items-center text-center px-7 py-14 space-y-5 bg-[#070709] relative"><div class="scrub-el w-48 h-48 rounded-full overflow-hidden border-2 border-white/75 shadow-2xl" data-scrub="zoom"><img src="${bImg}" ${imgFbAttr(bFb)} class="inv-photo inv-portrait-smart w-full h-full object-cover"></div><span class="scrub-el text-[10px] uppercase tracking-[0.35em] text-zinc-400 font-bold" data-scrub="up">The Bride</span><h2 class="scrub-el font-script text-5xl text-white" data-scrub="blur">${escHtml(inv.brideName)}</h2>${inv.brideParents?`<p class="scrub-el text-xs text-zinc-300 max-w-xs leading-relaxed" data-scrub="up">${escHtml(inv.brideParents)}</p>`:""}${bIgClean?`<a href="https://instagram.com/${encodeURIComponent(bIgClean)}" target="_blank" class="px-4 py-1.5 rounded-full border border-white/30 text-[11px] text-white"><i class="fa-brands fa-instagram mr-1.5"></i>@${escHtml(bIgClean)}</a>`:""}</section>`;
             } else if (isStoryEditorial) {
-                leaf1Html = `<div class="w-full h-full flex flex-col justify-center px-6 py-10 space-y-5 bg-[var(--th-bg)]"><div class="relative text-center py-1"><span class="font-serif-ed text-7xl opacity-20 absolute inset-0 flex items-center justify-center pointer-events-none">&amp;</span><h2 class="font-serif-ed text-3xl text-white tracking-wide relative z-10 leading-tight">Groom &amp; Bride</h2></div><div class="relative w-[80%] mr-auto -rotate-2"><div class="editorial-polaroid"><div class="aspect-[4/5] w-full overflow-hidden bg-black"><img src="${gImg}" ${imgFbAttr(gFb)} class="inv-photo w-full h-full object-cover object-center"></div>${gIgClean?`<div class="mt-2.5 text-center text-xs font-semibold text-zinc-800"><i class="fa-brands fa-instagram mr-1"></i>${escHtml(gIgClean)}</div>`:`<div class="mt-2.5 text-center text-[11px] font-semibold text-zinc-500 tracking-widest uppercase">The Groom</div>`}</div><span class="font-script text-4xl text-white drop-shadow-[0_3px_10px_rgba(0,0,0,0.85)] absolute -right-4 bottom-12 rotate-2">${escHtml(gShort)}</span></div><div class="text-left space-y-1 px-1"><h3 class="font-serif-ed text-3xl font-bold th-accent">${escHtml(inv.groomName)}</h3>${inv.groomParents?`<p class="text-xs text-white/90 leading-relaxed max-w-xs">${escHtml(inv.groomParents)}</p>`:""}</div></div>`;
-                slide2Html = `<section class="min-h-screen flex flex-col justify-center px-6 py-12 space-y-6"><div class="scrub-el text-center" data-scrub="zoom"><span class="font-serif-ed text-5xl text-white/75">&amp;</span></div><div class="scrub-el relative w-[82%] ml-auto rotate-2" data-scrub="${randScrubType()}"><div class="editorial-polaroid"><div class="aspect-[4/5] w-full overflow-hidden bg-black"><img src="${bImg}" ${imgFbAttr(bFb)} class="inv-photo w-full h-full object-cover object-center"></div>${bIgClean?`<a href="https://instagram.com/${encodeURIComponent(bIgClean)}" target="_blank" class="mt-3 flex items-center justify-center gap-1.5 text-xs font-semibold text-zinc-800"><i class="fa-brands fa-instagram text-sm"></i>${escHtml(bIgClean)}</a>`:`<div class="mt-3 text-center text-[11px] font-semibold text-zinc-500 tracking-widest uppercase">The Bride</div>`}</div><span class="font-script text-4xl text-white drop-shadow-[0_3px_10px_rgba(0,0,0,0.85)] absolute -left-4 bottom-12 -rotate-2">${escHtml(bShort)}</span></div><div class="scrub-el text-right space-y-1 pt-2 px-1" data-scrub="right"><h3 class="font-serif-ed text-4xl font-bold th-accent">${escHtml(inv.brideName)}</h3>${inv.brideParents?`<p class="text-xs text-white/90 leading-relaxed max-w-xs ml-auto">${escHtml(inv.brideParents)}</p>`:""}</div></section>`;
+                leaf1Html = `<div class="w-full h-full flex flex-col justify-center px-6 py-10 space-y-5 bg-[var(--th-bg)]"><div class="relative text-center py-1"><span class="font-serif-ed text-7xl opacity-20 absolute inset-0 flex items-center justify-center pointer-events-none">&amp;</span><h2 class="font-serif-ed text-3xl text-white tracking-wide relative z-10 leading-tight">Groom &amp; Bride</h2></div><div class="relative w-[80%] mr-auto -rotate-2"><div class="editorial-polaroid"><div class="aspect-[4/5] w-full overflow-hidden bg-black"><img src="${gImg}" ${imgFbAttr(gFb)} class="inv-photo inv-portrait-smart w-full h-full object-cover"></div>${gIgClean?`<div class="mt-2.5 text-center text-xs font-semibold text-zinc-800"><i class="fa-brands fa-instagram mr-1"></i>${escHtml(gIgClean)}</div>`:`<div class="mt-2.5 text-center text-[11px] font-semibold text-zinc-500 tracking-widest uppercase">The Groom</div>`}</div><span class="font-script text-4xl text-white drop-shadow-[0_3px_10px_rgba(0,0,0,0.85)] absolute -right-4 bottom-12 rotate-2">${escHtml(gShort)}</span></div><div class="text-left space-y-1 px-1"><h3 class="font-serif-ed text-3xl font-bold th-accent">${escHtml(inv.groomName)}</h3>${inv.groomParents?`<p class="text-xs text-white/90 leading-relaxed max-w-xs">${escHtml(inv.groomParents)}</p>`:""}</div></div>`;
+                slide2Html = `<section class="min-h-screen flex flex-col justify-center px-6 py-12 space-y-6"><div class="scrub-el text-center" data-scrub="zoom"><span class="font-serif-ed text-5xl text-white/75">&amp;</span></div><div class="scrub-el relative w-[82%] ml-auto rotate-2" data-scrub="${randScrubType()}"><div class="editorial-polaroid"><div class="aspect-[4/5] w-full overflow-hidden bg-black"><img src="${bImg}" ${imgFbAttr(bFb)} class="inv-photo inv-portrait-smart w-full h-full object-cover"></div>${bIgClean?`<a href="https://instagram.com/${encodeURIComponent(bIgClean)}" target="_blank" class="mt-3 flex items-center justify-center gap-1.5 text-xs font-semibold text-zinc-800"><i class="fa-brands fa-instagram text-sm"></i>${escHtml(bIgClean)}</a>`:`<div class="mt-3 text-center text-[11px] font-semibold text-zinc-500 tracking-widest uppercase">The Bride</div>`}</div><span class="font-script text-4xl text-white drop-shadow-[0_3px_10px_rgba(0,0,0,0.85)] absolute -left-4 bottom-12 -rotate-2">${escHtml(bShort)}</span></div><div class="scrub-el text-right space-y-1 pt-2 px-1" data-scrub="right"><h3 class="font-serif-ed text-4xl font-bold th-accent">${escHtml(inv.brideName)}</h3>${inv.brideParents?`<p class="text-xs text-white/90 leading-relaxed max-w-xs ml-auto">${escHtml(inv.brideParents)}</p>`:""}</div></section>`;
             } else {
-                leaf1Html = `<div class="relative w-full h-full flex flex-col justify-end overflow-hidden bg-black"><img src="${gImg}" ${imgFbAttr(gFb)} class="inv-photo absolute inset-0 w-full h-full object-cover object-center"><div class="absolute inset-0" style="background:linear-gradient(to top, rgba(255,255,255,0.97) 0%, rgba(255,255,255,0.85) 26%, rgba(255,255,255,0.18) 54%, transparent 72%);"></div><div class="relative z-10 px-7 pb-14 pt-20 text-center text-zinc-900 space-y-1.5"><span class="text-[10px] uppercase tracking-[0.3em] text-amber-700 font-extrabold block">Mempelai Pria</span><h2 class="text-4xl font-bold text-zinc-900" style="font-family:var(--th-font-heading);">${escHtml(inv.groomName)}</h2>${inv.groomParents?`<p class="text-xs text-zinc-700 font-medium max-w-xs mx-auto leading-relaxed">${escHtml(inv.groomParents)}</p>`:""}</div></div>`;
-                slide2Html = `<section class="relative w-full min-h-screen flex flex-col justify-end overflow-hidden bg-black"><img src="${bImg}" ${imgFbAttr(bFb)} class="inv-photo absolute inset-0 w-full h-full object-cover object-center"><div class="absolute inset-0" style="background:linear-gradient(to top, rgba(255,255,255,0.97) 0%, rgba(255,255,255,0.85) 26%, rgba(255,255,255,0.18) 54%, transparent 72%);"></div><div class="scrub-el relative z-10 px-7 pb-14 pt-20 text-center text-zinc-900 space-y-1.5" data-scrub="up"><span class="text-[10px] uppercase tracking-[0.3em] text-amber-700 font-extrabold block">Mempelai Wanita</span><h2 class="text-4xl font-bold text-zinc-900" style="font-family:var(--th-font-heading);">${escHtml(inv.brideName)}</h2>${inv.brideParents?`<p class="text-xs text-zinc-700 font-medium max-w-xs mx-auto leading-relaxed">${escHtml(inv.brideParents)}</p>`:""}</div></section>`;
+                leaf1Html = `<div class="relative w-full h-full flex flex-col justify-end overflow-hidden bg-black"><img src="${gImg}" ${imgFbAttr(gFb)} class="inv-photo inv-portrait-smart absolute inset-0 w-full h-full object-cover"><div class="absolute inset-0" style="background:linear-gradient(to top, rgba(255,255,255,0.97) 0%, rgba(255,255,255,0.85) 26%, rgba(255,255,255,0.18) 54%, transparent 72%);"></div><div class="relative z-10 px-7 pb-14 pt-20 text-center text-zinc-900 space-y-1.5"><span class="text-[10px] uppercase tracking-[0.3em] text-amber-700 font-extrabold block">Mempelai Pria</span><h2 class="text-4xl font-bold text-zinc-900" style="font-family:var(--th-font-heading);">${escHtml(inv.groomName)}</h2>${inv.groomParents?`<p class="text-xs text-zinc-700 font-medium max-w-xs mx-auto leading-relaxed">${escHtml(inv.groomParents)}</p>`:""}</div></div>`;
+                slide2Html = `<section class="relative w-full min-h-screen flex flex-col justify-end overflow-hidden bg-black"><img src="${bImg}" ${imgFbAttr(bFb)} class="inv-photo inv-portrait-smart absolute inset-0 w-full h-full object-cover"><div class="absolute inset-0" style="background:linear-gradient(to top, rgba(255,255,255,0.97) 0%, rgba(255,255,255,0.85) 26%, rgba(255,255,255,0.18) 54%, transparent 72%);"></div><div class="scrub-el relative z-10 px-7 pb-14 pt-20 text-center text-zinc-900 space-y-1.5" data-scrub="up"><span class="text-[10px] uppercase tracking-[0.3em] text-amber-700 font-extrabold block">Mempelai Wanita</span><h2 class="text-4xl font-bold text-zinc-900" style="font-family:var(--th-font-heading);">${escHtml(inv.brideName)}</h2>${inv.brideParents?`<p class="text-xs text-zinc-700 font-medium max-w-xs mx-auto leading-relaxed">${escHtml(inv.brideParents)}</p>`:""}</div></section>`;
             }
             coupleSlidesHtml = `<div class="relative z-10"><div class="scrub-el" data-scrub="${randScrubType()}">${wrapPaperTurnLeaf(leaf1Html, "Geser ➔ Mempelai Wanita")}</div><div class="pt-reveal-target">${slide2Html}</div></div>`;
         }
@@ -1163,7 +1260,7 @@ function openGuestViewWithObject(inv, guestName, isDirectLink = false) {
         ` : buildCountdownAndLoc(inv, dp, styleKey === "jawa", dpResepsi);
 
         const storyHtml = (inv.stories && inv.stories.length) ? (isPremiumBlack
-            ? `<section class="scrub-el th-card p-6 text-center space-y-4 relative overflow-hidden" data-scrub="${randScrubType()}"><div class="scrub-el w-28 h-28 mx-auto rounded-full overflow-hidden border border-white/60" data-scrub="zoom"><img src="${mainPhoto}" ${imgFbAttr(mainPhotoFb)} class="inv-photo w-full h-full object-cover"></div><h2 class="scrub-el font-script text-4xl text-white" data-scrub="blur">Our Love Story</h2><div class="space-y-4">${inv.stories.map(s => `<div class="scrub-el space-y-1" data-scrub="${randScrubType()}"><h4 class="font-serif-ed text-lg font-bold text-white">${escHtml(s.title)}</h4>${s.year?`<span class="text-[11px] text-zinc-400 font-semibold block">${escHtml(s.year)}</span>`:""}<p class="text-xs text-zinc-300 leading-relaxed">${escHtml(s.desc)}</p></div>`).join("")}</div></section>`
+            ? `<section class="scrub-el th-card p-6 text-center space-y-4 relative overflow-hidden" data-scrub="${randScrubType()}"><div class="scrub-el w-28 h-28 mx-auto rounded-full overflow-hidden border border-white/60" data-scrub="zoom"><img src="${mainPhoto}" ${imgFbAttr(mainPhotoFb)} class="inv-photo inv-portrait-smart w-full h-full object-cover"></div><h2 class="scrub-el font-script text-4xl text-white" data-scrub="blur">Our Love Story</h2><div class="space-y-4">${inv.stories.map(s => `<div class="scrub-el space-y-1" data-scrub="${randScrubType()}"><h4 class="font-serif-ed text-lg font-bold text-white">${escHtml(s.title)}</h4>${s.year?`<span class="text-[11px] text-zinc-400 font-semibold block">${escHtml(s.year)}</span>`:""}<p class="text-xs text-zinc-300 leading-relaxed">${escHtml(s.desc)}</p></div>`).join("")}</div></section>`
             : `<section class="scrub-el th-card p-6 text-center space-y-4" data-scrub="${randScrubType()}"><h2 class="th-heading text-3xl">Our Love Story</h2><div class="space-y-3 text-left">${inv.stories.map(s=>`<div class="scrub-el border-l-2 th-border-accent pl-3" data-scrub="${randScrubType()}"><h4 class="font-bold text-xs th-accent">${escHtml(s.title)}${s.year?` (${escHtml(s.year)})`:""}</h4><p class="text-xs opacity-85">${escHtml(s.desc)}</p></div>`).join("")}</div></section>`) : "";
 
         bodyInner = `${scheduleHtml}${storyHtml}`;
@@ -1171,16 +1268,16 @@ function openGuestViewWithObject(inv, guestName, isDirectLink = false) {
         const sym = tObj.faith === "islami" ? `<p class="font-arab text-3xl th-accent">بِسْمِ اللَّهِ الرَّحْمَنِ الرَّحِيمِ</p>` : tObj.faith === "kristen" ? `<i class="fa-solid fa-cross text-2xl th-accent"></i>` : tObj.faith === "hindu_buddha" ? `<i class="fa-solid fa-spa text-2xl th-accent"></i>` : `<i class="fa-solid fa-leaf text-xl th-accent"></i>`;
         bodyInner = `<section class="scrub-el bg-white/95 text-zinc-900 rounded-2xl border-2 th-border-accent p-6 text-center space-y-4 shadow-xl" data-scrub="${randScrubType()}"><div class="border th-border-accent rounded-xl p-5 space-y-3.5"><span class="text-[10px] uppercase tracking-[0.25em] th-accent font-extrabold">${tObj.isKhitan?"Walimatul Khitan":"Undangan Syukuran"}</span><h1 class="th-heading text-3xl font-bold">${escHtml(inv.title)}</h1>${inv.subTitle?`<p class="text-xs text-zinc-600 italic">${escHtml(inv.subTitle)}</p>`:""}${sym}<div class="bg-amber-50/60 border th-border-accent rounded-xl p-3.5 text-left text-xs space-y-1 text-zinc-800"><div class="grid grid-cols-[70px_10px_1fr]"><strong>Hari</strong><span>:</span><span>${dp.day}</span></div><div class="grid grid-cols-[70px_10px_1fr]"><strong>Tanggal</strong><span>:</span><span>${dp.num} ${dp.monthYear}</span></div><div class="grid grid-cols-[70px_10px_1fr]"><strong>Pukul</strong><span>:</span><span>${escHtml(inv.akadTime)}</span></div><div class="grid grid-cols-[70px_10px_1fr]"><strong>Tempat</strong><span>:</span><span>${escHtml([inv.akadVenue, inv.akadAddress].filter(Boolean).join(", "))}</span></div></div>${inv.groomParents?`<div class="text-xs pt-1"><p class="text-zinc-500">Hormat kami,</p><h4 class="font-bold text-sm th-accent">${escHtml(inv.groomParents)}</h4></div>`:""}<div class="flex gap-2 pt-2">${inv.akadMap?`<button onclick="openEventMap('akad')" class="flex-1 th-btn-primary py-2.5 text-xs">Peta Lokasi</button>`:""}<button onclick="saveEventToGoogleCalendar()" class="flex-1 th-btn-outline py-2.5 text-xs">Kalender</button></div></div></section>${inv.showCountdown!==false?buildCountdownOnly(dp):""}`;
     } else if (inv.category === "Ulang Tahun") {
-        bodyInner = `<section class="scrub-el bg-white/95 text-zinc-800 rounded-3xl border-2 th-border-accent p-6 text-center space-y-4 shadow-xl" data-scrub="${randScrubType()}"><div class="scrub-el w-36 h-36 mx-auto rounded-full overflow-hidden border-4 th-border-accent shadow-lg" data-scrub="zoom"><img src="${mainPhoto}" ${imgFbAttr(mainPhotoFb)} class="inv-photo w-full h-full object-cover"></div><div class="inline-block px-6 py-2 rounded-full bg-black/5 border th-border-accent"><h2 class="font-cute text-2xl font-bold th-accent">${escHtml(inv.title)}</h2>${inv.age?`<span class="text-xs font-bold text-zinc-700 block">Ke - ${escHtml(inv.age)}</span>`:""}</div>${inv.groomParents?`<p class="text-xs text-zinc-600">${escHtml(inv.groomParents)}</p>`:""}<div class="grid grid-cols-3 items-center gap-2 max-w-xs mx-auto"><div class="border-y-2 th-border-accent py-1.5 text-xs font-bold text-zinc-700">${dp.day}</div><div class="font-cute text-4xl font-bold th-accent">${dp.num}</div><div class="border-y-2 th-border-accent py-1.5 text-[11px] font-bold text-zinc-700">${escHtml((inv.akadTime||"").split(" ")[0])}</div></div><p class="text-sm font-bold th-accent">${dp.monthYear}</p></section>${buildCountdownAndLoc(inv, dp)}`;
+        bodyInner = `<section class="scrub-el bg-white/95 text-zinc-800 rounded-3xl border-2 th-border-accent p-6 text-center space-y-4 shadow-xl" data-scrub="${randScrubType()}"><div class="scrub-el w-36 h-36 mx-auto rounded-full overflow-hidden border-4 th-border-accent shadow-lg" data-scrub="zoom"><img src="${mainPhoto}" ${imgFbAttr(mainPhotoFb)} class="inv-photo inv-portrait-smart w-full h-full object-cover"></div><div class="inline-block px-6 py-2 rounded-full bg-black/5 border th-border-accent"><h2 class="font-cute text-2xl font-bold th-accent">${escHtml(inv.title)}</h2>${inv.age?`<span class="text-xs font-bold text-zinc-700 block">Ke - ${escHtml(inv.age)}</span>`:""}</div>${inv.groomParents?`<p class="text-xs text-zinc-600">${escHtml(inv.groomParents)}</p>`:""}<div class="grid grid-cols-3 items-center gap-2 max-w-xs mx-auto"><div class="border-y-2 th-border-accent py-1.5 text-xs font-bold text-zinc-700">${dp.day}</div><div class="font-cute text-4xl font-bold th-accent">${dp.num}</div><div class="border-y-2 th-border-accent py-1.5 text-[11px] font-bold text-zinc-700">${escHtml((inv.akadTime||"").split(" ")[0])}</div></div><p class="text-sm font-bold th-accent">${dp.monthYear}</p></section>${buildCountdownAndLoc(inv, dp)}`;
     } else if (inv.category === "Aqiqah") {
-        bodyInner = `<section class="scrub-el bg-white/95 text-zinc-800 rounded-t-[160px] rounded-b-3xl border-2 th-border-accent p-6 pt-10 text-center space-y-4 shadow-xl" data-scrub="${randScrubType()}"><h2 class="th-heading text-4xl leading-tight">Tasyakuran<br>Aqiqah</h2><div class="scrub-el w-36 h-36 mx-auto rounded-full overflow-hidden scalloped-frame my-2" data-scrub="zoom"><img src="${mainPhoto}" ${imgFbAttr(mainPhotoFb)} class="inv-photo w-full h-full object-cover"></div><div><h3 class="text-2xl font-extrabold th-accent">${escHtml(inv.title)}</h3>${inv.birthDate?`<p class="text-[11px] text-zinc-500">Lahir: ${escHtml(inv.birthDate)}</p>`:""}</div><div class="bg-amber-50/50 border th-border-accent rounded-2xl p-3.5 grid grid-cols-[90px_1fr] items-center gap-3 text-left"><div class="text-center border-r th-border-accent pr-2"><span class="text-[10px] font-bold uppercase text-zinc-500 block">${dp.day}</span><span class="text-3xl font-extrabold th-accent leading-none my-1 block">${dp.num}</span><span class="text-[10px] font-bold uppercase text-zinc-700">${dp.monthYear}</span></div><div class="space-y-1.5 text-[11px] text-zinc-700"><p><i class="fa-regular fa-clock th-accent mr-1"></i><strong>${escHtml(inv.akadTime)}</strong></p><p><i class="fa-solid fa-location-dot th-accent mr-1"></i>${escHtml([inv.akadVenue, inv.akadAddress].filter(Boolean).join(", "))}</p></div></div>${inv.groomParents?`<div class="text-xs"><p class="text-[11px] text-zinc-500">Kami yang berbahagia:</p><p class="font-bold th-accent text-sm">${escHtml(inv.groomParents)}</p></div>`:""}</section>${buildCountdownAndLoc(inv, dp)}`;
+        bodyInner = `<section class="scrub-el bg-white/95 text-zinc-800 rounded-t-[160px] rounded-b-3xl border-2 th-border-accent p-6 pt-10 text-center space-y-4 shadow-xl" data-scrub="${randScrubType()}"><h2 class="th-heading text-4xl leading-tight">Tasyakuran<br>Aqiqah</h2><div class="scrub-el w-36 h-36 mx-auto rounded-full overflow-hidden scalloped-frame my-2" data-scrub="zoom"><img src="${mainPhoto}" ${imgFbAttr(mainPhotoFb)} class="inv-photo inv-portrait-smart w-full h-full object-cover"></div><div><h3 class="text-2xl font-extrabold th-accent">${escHtml(inv.title)}</h3>${inv.birthDate?`<p class="text-[11px] text-zinc-500">Lahir: ${escHtml(inv.birthDate)}</p>`:""}</div><div class="bg-amber-50/50 border th-border-accent rounded-2xl p-3.5 grid grid-cols-[90px_1fr] items-center gap-3 text-left"><div class="text-center border-r th-border-accent pr-2"><span class="text-[10px] font-bold uppercase text-zinc-500 block">${dp.day}</span><span class="text-3xl font-extrabold th-accent leading-none my-1 block">${dp.num}</span><span class="text-[10px] font-bold uppercase text-zinc-700">${dp.monthYear}</span></div><div class="space-y-1.5 text-[11px] text-zinc-700"><p><i class="fa-regular fa-clock th-accent mr-1"></i><strong>${escHtml(inv.akadTime)}</strong></p><p><i class="fa-solid fa-location-dot th-accent mr-1"></i>${escHtml([inv.akadVenue, inv.akadAddress].filter(Boolean).join(", "))}</p></div></div>${inv.groomParents?`<div class="text-xs"><p class="text-[11px] text-zinc-500">Kami yang berbahagia:</p><p class="font-bold th-accent text-sm">${escHtml(inv.groomParents)}</p></div>`:""}</section>${buildCountdownAndLoc(inv, dp)}`;
     } else {
         bodyInner = `<section class="scrub-el th-card p-6 text-center space-y-3" data-scrub="${randScrubType()}"><h2 class="th-heading text-3xl font-extrabold">${escHtml(inv.title)}</h2>${inv.subTitle?`<p class="text-xs font-bold opacity-85 uppercase">${escHtml(inv.subTitle)}</p>`:""}${inv.groomParents?`<p class="text-xs font-semibold th-accent pt-1">${escHtml(inv.groomParents)}</p>`:""}</section>${buildCountdownAndLoc(inv, dp)}`;
     }
 
     const closingText = inv.closingText !== undefined ? inv.closingText : getDefaultClosingText(inv.category).text;
     const closingTitle = inv.closingTitle || getDefaultClosingText(inv.category).title;
-    const closingHtml = (inv.sections?.closing !== false && closingText) ? `<section class="scrub-el th-card p-7 text-center space-y-4" data-scrub="${randScrubType()}"><div class="scrub-el w-20 h-20 mx-auto rounded-full overflow-hidden border border-white/40 shadow-lg" data-scrub="zoom"><img src="${mainPhoto}" ${imgFbAttr(mainPhotoFb)} class="inv-photo w-full h-full object-cover"></div><h2 class="th-heading text-4xl leading-snug">${escHtml(closingTitle)}</h2><p class="text-xs leading-relaxed opacity-90">${escHtml(closingText)}</p><div class="pt-2 border-t border-current/15"><span class="text-[10px] uppercase tracking-[0.25em] opacity-70 block">Kami yang berbahagia</span><h4 class="th-heading text-3xl mt-1">${escHtml(inv.title)}</h4></div></section>` : "";
+    const closingHtml = (inv.sections?.closing !== false && closingText) ? `<section class="scrub-el th-card p-7 text-center space-y-4" data-scrub="${randScrubType()}"><div class="scrub-el w-20 h-20 mx-auto rounded-full overflow-hidden border border-white/40 shadow-lg" data-scrub="zoom"><img src="${mainPhoto}" ${imgFbAttr(mainPhotoFb)} class="inv-photo inv-portrait-smart w-full h-full object-cover"></div><h2 class="th-heading text-4xl leading-snug">${escHtml(closingTitle)}</h2><p class="text-xs leading-relaxed opacity-90">${escHtml(closingText)}</p><div class="pt-2 border-t border-current/15"><span class="text-[10px] uppercase tracking-[0.25em] opacity-70 block">Kami yang berbahagia</span><h4 class="th-heading text-3xl mt-1">${escHtml(inv.title)}</h4></div></section>` : "";
 
     const bankHtml = (inv.banks && inv.banks.length) ? `<section class="scrub-el th-card p-6 space-y-3 text-center" data-scrub="${randScrubType()}"><h2 class="th-heading text-3xl">Amplop Digital</h2><div class="space-y-2.5 text-left">${inv.banks.map(b => { const lg = BANK_LOGOS[b.bank] || { bg:"#333", text:"#fff", label:b.bank }; return `<div class="scrub-el bg-black/15 border border-white/15 rounded-2xl p-3.5 flex items-center justify-between gap-2" data-scrub="${randScrubType()}"><div><span style="background:${lg.bg};color:${lg.text}" class="inline-block px-2.5 py-0.5 rounded text-[10px] font-extrabold">${lg.label}</span><p class="text-sm font-mono font-bold pt-1">${escHtml(b.no)}</p><p class="text-[11px] opacity-75">a.n. ${escHtml(b.holder)}</p></div><button onclick="navigator.clipboard.writeText('${esc(b.no)}');showToast('Nomor rekening disalin!');" class="th-btn-primary px-3 py-1.5 text-[11px]">Salin</button></div>`; }).join("")}</div></section>` : "";
 
@@ -1208,6 +1305,7 @@ function openGuestViewWithObject(inv, guestName, isDirectLink = false) {
     `;
 
     renderPolaroidStack(); renderGuestWishes();
+    runSmartPortraitFraming(document.getElementById("gv-dynamic-root"));
     if (inv.showCountdown !== false) startCountdown(countdownTargetDate);
     const ov = document.getElementById("guest-invitation-overlay");
     ov.classList.remove("hide"); ov.style.overflowY = "hidden"; ov.scrollTo(0, 0);
@@ -1286,9 +1384,10 @@ function renderPolaroidStack() {
         const idx = (polaroidIndex + offset) % total, item = polaroidPhotos[idx];
         const rot = offset === 0 ? -1.2 : offset === 1 ? 4.8 : offset === 2 ? -5.2 : 7.5;
         const ty = offset * 7, tx = offset === 1 ? 6 : offset === 2 ? -6 : 0, sc = 1 - offset * 0.04;
-        html += `<div class="polaroid-card" data-top="${offset===0?1:0}" onclick="${offset===0?"flipPolaroidCard(1)":""}" style="z-index:${showCount-offset};transform:translate3d(${tx}px,${ty}px,0) scale(${sc}) rotate(${rot}deg);opacity:${offset===3?0.65:1};"><img src="${item.src}" ${imgFbAttr(item.fb)} loading="lazy" class="inv-photo"><div class="polaroid-cap">${escHtml(activeGuestInv.title)} • #${idx+1}</div></div>`;
+        html += `<div class="polaroid-card" data-top="${offset===0?1:0}" onclick="${offset===0?"flipPolaroidCard(1)":""}" style="z-index:${showCount-offset};transform:translate3d(${tx}px,${ty}px,0) scale(${sc}) rotate(${rot}deg);opacity:${offset===3?0.65:1};"><img src="${item.src}" ${imgFbAttr(item.fb)} loading="lazy" class="inv-photo inv-portrait-smart"><div class="polaroid-cap">${escHtml(activeGuestInv.title)} • #${idx+1}</div></div>`;
     }
     stack.innerHTML = html;
+    runSmartPortraitFraming(stack);
     const cnt = document.getElementById("polaroid-counter"); if (cnt) cnt.innerText = `${polaroidIndex + 1} / ${total}`;
     if (!stack.dataset.swipeBound) {
         stack.dataset.swipeBound = "1";

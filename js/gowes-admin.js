@@ -1,15 +1,25 @@
 // =========================================================================
 // TITIK GOWES — ADMIN FLEET, CABANG UNIT, BANNER 16:7, OVERDUE & KASIR
-// File: js/gowes-admin.js (V14.8)
+// File: js/gowes-admin.js (V14.9 — Armada per Gerai, Cabang & Banner 16:7)
 // =========================================================================
 
 let mgbTempPhotoUrl = "";
 let mghTempPhotoUrl = "";
 let gwBannerTempImg = "";
-let _gowesFleetAdminTab = "bikes"; // 'bikes' | 'ops' | 'banners'
+let _gowesFleetAdminTab = "shelters"; // 'shelters' | 'banners'
+let _expandedGowesBranchIds = {};
 
 function switchGowesFleetAdminTab(tab) {
-    _gowesFleetAdminTab = (tab === "ops" || tab === "banners") ? tab : "bikes";
+    _gowesFleetAdminTab = (tab === "banners") ? "banners" : "shelters";
+    if (typeof renderMasterWorkspaceContent === "function") {
+        renderMasterWorkspaceContent();
+    }
+}
+
+function toggleGowesBranchBikesAccordion(branchId) {
+    const key = String(branchId || "");
+    const curState = _expandedGowesBranchIds[key] !== false; // default terbuka
+    _expandedGowesBranchIds[key] = !curState;
     if (typeof renderMasterWorkspaceContent === "function") {
         renderMasterWorkspaceContent();
     }
@@ -27,28 +37,67 @@ function _getBranchLabelById(branchId) {
     return found ? (found.city || found.name) : "Cabang Khusus";
 }
 
-// ================= 0. PUSAT PENGATURAN TITIK GOWES (3 TAB BERSIH: ARMADA, GERAI, BANNER) =================
+function _renderSingleBikeAdminRowHtml(b, isMaster, showBranchTag = false) {
+    const isAvail = b.status === "Tersedia";
+    const isInUse = b.status === "Sedang Disewa";
+    const statusCls = isAvail ? "bg-emerald-500/15 text-emerald-600" : isInUse ? "bg-amber-500/15 text-amber-600" : "bg-zinc-500/15 text-zinc-400";
+    const brLbl = _getBranchLabelById(b.branchId);
+
+    return `
+        <div class="app-card-soft border rounded-2xl p-3 flex flex-col sm:flex-row sm:items-center justify-between gap-2.5">
+            <div class="flex items-center gap-3 min-w-0">
+                <img src="${b.image || 'https://images.unsplash.com/photo-1485965120184-e220f721d03e?auto=format&fit=crop&w=800&q=75'}" class="w-16 h-12 rounded-xl object-cover bg-black border gold-border shrink-0">
+                <div class="min-w-0 space-y-0.5">
+                    <div class="flex items-center gap-1.5 flex-wrap">
+                        <span class="gowes-brand-tag !text-[8px]">${escHtml(b.type || "MTB")}</span>
+                        ${showBranchTag ? `<span class="text-[8px] font-extrabold px-2 py-0.5 rounded-full bg-blue-500/12 text-blue-600"><i class="fa-solid fa-globe mr-0.5"></i>${escHtml(brLbl)}</span>` : ""}
+                        <span class="text-[8.5px] font-extrabold uppercase px-2 py-0.5 rounded-full ${statusCls}">● ${escHtml(b.status)}</span>
+                    </div>
+                    <h5 class="font-extrabold text-xs sm:text-sm truncate pt-0.5">${escHtml(b.name)}</h5>
+                    <p class="text-[10px] app-muted truncate">${escHtml(b.label2Hours || "2 Jam")}: ${fmtRp(b.price2Hours)} • ${escHtml(b.label6Hours || "6 Jam")}: ${fmtRp(b.price6Hours)} • ${escHtml(b.labelFullDay || "Full")}: ${fmtRp(b.priceFullDay)}</p>
+                </div>
+            </div>
+
+            <div class="flex items-center gap-1.5 self-end sm:self-center shrink-0">
+                ${b.status !== "Servis" ? `
+                    <button type="button" onclick="toggleGowesBikeStatusQuick('${esc(b.id)}','Servis')" class="px-2.5 py-1.5 rounded-xl app-card border text-[10.5px] font-bold text-zinc-500 hover:text-amber-500" title="Tandai Sedang Servis">
+                        <i class="fa-solid fa-wrench mr-1"></i>Servis
+                    </button>
+                ` : `
+                    <button type="button" onclick="toggleGowesBikeStatusQuick('${esc(b.id)}','Tersedia')" class="px-2.5 py-1.5 rounded-xl bg-emerald-600/15 text-emerald-600 border border-emerald-500/30 text-[10.5px] font-bold" title="Tandai Siap Sewa">
+                        <i class="fa-solid fa-check mr-1"></i>Siap
+                    </button>
+                `}
+                <button type="button" onclick="openMasterGowesBikeModal('${esc(b.id)}')" class="px-3 py-1.5 rounded-xl app-card border app-accent text-[10.5px] font-bold">
+                    <i class="fa-solid fa-pen mr-1"></i>Edit
+                </button>
+                ${isMaster ? `
+                    <button type="button" onclick="deleteGowesBike('${esc(b.id)}')" class="px-2.5 py-1.5 rounded-xl bg-red-600/15 text-red-500 text-[10.5px] font-bold" title="Hapus Unit">
+                        <i class="fa-solid fa-trash"></i>
+                    </button>
+                ` : ""}
+            </div>
+        </div>
+    `;
+}
+
+// ================= 0. PUSAT PENGATURAN TITIK GOWES (GERAI & ARMADA TERPADU + BANNER 16:7) =================
 function renderGowesFleetWorkspaceHtml() {
     const curU = typeof getCurrentUserObj === "function" ? getCurrentUserObj() : null;
     const isMaster = !!(curU && curU.role === "master");
     const shelters = _getAdminSheltersList();
-    const activeSh = typeof getActiveShelterObject === "function" ? getActiveShelterObject() : shelters[0];
-    const isClosed = !!(activeSh && activeSh.isClosed);
     const bikes = (Array.isArray(db.gowesBikes) && db.gowesBikes.length ? db.gowesBikes : DEFAULT_GOWES_BIKES).filter(b => b && b.status !== "Dihapus");
     const banners = Array.isArray(db.gowesBanners) && db.gowesBanners.length ? db.gowesBanners : DEFAULT_GOWES_BANNERS;
 
     const tabsHtml = `
-        <div class="flex items-center justify-between gap-2 pb-2 border-b gold-border flex-wrap">
+        <div class="flex items-center justify-between gap-2 pb-2.5 border-b gold-border flex-wrap">
             <div class="flex gap-1.5 overflow-x-auto no-scrollbar">
-                <button type="button" onclick="switchGowesFleetAdminTab('bikes')" class="px-3.5 py-2 rounded-xl text-xs font-extrabold whitespace-nowrap transition ${_gowesFleetAdminTab === 'bikes' ? 'gowes-pill-btn shadow' : 'app-btn-sec'}">
-                    <i class="fa-solid fa-bicycle mr-1"></i>Armada (${bikes.length})
-                </button>
-                <button type="button" onclick="switchGowesFleetAdminTab('ops')" class="px-3.5 py-2 rounded-xl text-xs font-extrabold whitespace-nowrap transition ${_gowesFleetAdminTab === 'ops' ? 'gowes-pill-btn shadow' : 'app-btn-sec'}">
-                    <i class="fa-solid fa-store mr-1"></i>Gerai &amp; Cabang (${shelters.length})
+                <button type="button" onclick="switchGowesFleetAdminTab('shelters')" class="px-3.5 py-2 rounded-xl text-xs font-extrabold whitespace-nowrap transition ${_gowesFleetAdminTab !== 'banners' ? 'gowes-pill-btn shadow' : 'app-btn-sec'}">
+                    <i class="fa-solid fa-store mr-1.5"></i>Gerai &amp; Armada (${shelters.length} Gerai • ${bikes.length} Unit)
                 </button>
                 ${isMaster ? `
                     <button type="button" onclick="switchGowesFleetAdminTab('banners')" class="px-3.5 py-2 rounded-xl text-xs font-extrabold whitespace-nowrap transition ${_gowesFleetAdminTab === 'banners' ? 'gowes-pill-btn shadow' : 'app-btn-sec'}">
-                        <i class="fa-solid fa-rectangle-ad mr-1"></i>Banner 16:7 (${banners.length})
+                        <i class="fa-solid fa-rectangle-ad mr-1.5"></i>Banner 16:7 (${banners.length})
                     </button>
                 ` : ""}
             </div>
@@ -59,61 +108,7 @@ function renderGowesFleetWorkspaceHtml() {
     `;
 
     let paneHtml = "";
-    if (_gowesFleetAdminTab === "ops") {
-        paneHtml = `
-            <div class="space-y-3.5">
-                <div class="app-card border rounded-2xl p-4 flex flex-wrap items-center justify-between gap-3 shadow-sm bg-gradient-to-r from-emerald-500/10 via-transparent to-transparent">
-                    <div>
-                        <h4 class="text-sm font-extrabold text-emerald-600"><i class="fa-solid fa-map-location-dot mr-1.5"></i>Daftar Gerai / Cabang Daerah</h4>
-                        <p class="text-[11px] app-muted">Tambah cabang kota baru, edit link Google Maps, atau buka/tutup tiap gerai.</p>
-                    </div>
-                    <button type="button" onclick="openGowesShelterOpsModal(null, true)" class="gowes-pill-btn px-4 py-2 rounded-xl text-xs shadow">
-                        <i class="fa-solid fa-plus mr-1"></i>Tambah Gerai Cabang
-                    </button>
-                </div>
-
-                <div class="space-y-2.5">
-                    ${shelters.map(s => {
-                        const sClosed = !!s.isClosed;
-                        const branchLink = `${getCleanBaseUrl()}?branch=${encodeURIComponent(s.city || s.id)}`;
-                        return `
-                            <div class="app-card border rounded-2xl p-4 space-y-2.5 shadow-sm">
-                                <div class="flex flex-wrap items-start justify-between gap-3">
-                                    <div class="flex items-start gap-3 min-w-0 flex-1">
-                                        <span class="w-10 h-10 rounded-2xl ${sClosed ? 'bg-red-500/20 text-red-500 border border-red-500/40' : 'bg-emerald-500/20 text-emerald-600 border border-emerald-500/40'} flex items-center justify-center text-base shrink-0">
-                                            <i class="fa-solid ${sClosed ? 'fa-store-slash' : 'fa-store'}"></i>
-                                        </span>
-                                        <div class="min-w-0">
-                                            <div class="flex items-center gap-1.5 flex-wrap">
-                                                <span class="gowes-brand-tag !text-[8.5px]">${escHtml(s.city || "Cabang")}</span>
-                                                <span class="text-[9px] font-extrabold uppercase px-2 py-0.5 rounded-full ${sClosed ? 'bg-red-500/15 text-red-500' : 'bg-emerald-500/15 text-emerald-600'}">● ${sClosed ? 'TUTUP' : 'BUKA'}</span>
-                                            </div>
-                                            <strong class="text-sm block truncate mt-0.5">${escHtml(s.name)}</strong>
-                                            <p class="text-[11px] app-muted line-clamp-1">${escHtml(s.address)}</p>
-                                            <p class="text-[10px] app-muted mt-0.5"><i class="fa-regular fa-clock text-emerald-600 mr-1"></i>${escHtml(s.operationalHours || "05.30 - 20.00 WITA")} • WA: ${escHtml(s.csPhone || "-")}</p>
-                                        </div>
-                                    </div>
-                                    <div class="flex flex-wrap items-center gap-1.5 shrink-0">
-                                        <button type="button" onclick="navigator.clipboard.writeText('${esc(branchLink)}');showToast('Link khusus cabang ${esc(s.city || s.name)} disalin!');" class="px-2.5 py-1.5 rounded-xl app-card-soft border text-[11px] font-bold" title="Salin link langsung halaman cabang ini">
-                                            <i class="fa-solid fa-link mr-1 text-emerald-600"></i>Link
-                                        </button>
-                                        <button type="button" onclick="openGowesShelterOpsModal('${esc(s.id)}', false)" class="px-3 py-1.5 rounded-xl app-card-soft border app-accent text-[11px] font-bold">
-                                            <i class="fa-solid fa-pen mr-1"></i>Edit
-                                        </button>
-                                        ${isMaster && shelters.length > 1 ? `
-                                            <button type="button" onclick="deleteGowesShelterBranch('${esc(s.id)}')" class="px-2.5 py-1.5 rounded-xl bg-red-600/15 text-red-500 text-[11px] font-bold" title="Hapus Cabang">
-                                                <i class="fa-solid fa-trash"></i>
-                                            </button>
-                                        ` : ""}
-                                    </div>
-                                </div>
-                            </div>
-                        `;
-                    }).join("")}
-                </div>
-            </div>
-        `;
-    } else if (_gowesFleetAdminTab === "banners" && isMaster) {
+    if (_gowesFleetAdminTab === "banners" && isMaster) {
         paneHtml = `
             <div class="grid md:grid-cols-2 gap-5">
                 <form onsubmit="saveGowesBannerForm(event)" class="app-card border rounded-3xl p-4 space-y-2.5 shadow-sm">
@@ -161,30 +156,103 @@ function renderGowesFleetWorkspaceHtml() {
             </div>
         `;
     } else {
-        paneHtml = `
-            <div class="space-y-3.5">
-                <div class="app-card border rounded-2xl p-3.5 flex flex-wrap items-center justify-between gap-2.5 bg-gradient-to-r from-emerald-500/10 via-transparent to-transparent">
-                    <div class="flex items-center gap-2.5">
-                        <span class="w-9 h-9 rounded-xl ${isClosed ? 'bg-red-500/20 text-red-500' : 'bg-emerald-500/20 text-emerald-600'} flex items-center justify-center text-sm">
-                            <i class="fa-solid ${isClosed ? 'fa-store-slash' : 'fa-store'}"></i>
+        const shelterIdsSet = new Set(shelters.map(s => String(s.id)));
+        const sharedBikes = bikes.filter(b => !b.branchId || b.branchId === "all" || !shelterIdsSet.has(String(b.branchId)));
+
+        const sheltersHtml = shelters.map(s => {
+            const sClosed = !!s.isClosed;
+            const branchLink = `${getCleanBaseUrl()}?branch=${encodeURIComponent(s.city || s.id)}`;
+            const branchBikes = bikes.filter(b => String(b.branchId || "") === String(s.id));
+            const isExpanded = _expandedGowesBranchIds[String(s.id)] !== false;
+
+            return `
+                <div class="app-card border rounded-3xl p-4 sm:p-5 space-y-3.5 shadow-sm">
+                    <div class="flex items-start gap-3">
+                        <span class="w-11 h-11 rounded-2xl ${sClosed ? 'bg-red-500/18 text-red-500 border border-red-500/35' : 'bg-emerald-500/18 text-emerald-600 border border-emerald-500/35'} flex items-center justify-center text-lg shrink-0">
+                            <i class="fa-solid ${sClosed ? 'fa-store-slash' : 'fa-store'}"></i>
                         </span>
-                        <div>
-                            <strong class="text-xs block">${escHtml(activeSh.city || "Utama")}: ${isClosed ? '<span class="text-red-500">TUTUP SEMENTARA</span>' : '<span class="text-emerald-600">BUKA</span>'}</strong>
-                            <span class="text-[10px] app-muted block">${shelters.length} Gerai Terdaftar • ${escHtml(activeSh.operationalHours || "05.30 - 20.00 WITA")}</span>
+                        <div class="min-w-0 flex-1 space-y-1">
+                            <div class="flex items-center gap-1.5 flex-wrap">
+                                <span class="gowes-brand-tag !text-[8.5px]">${escHtml(s.city || "Cabang")}</span>
+                                <span class="text-[9px] font-extrabold uppercase px-2 py-0.5 rounded-full ${sClosed ? 'bg-red-500/15 text-red-500' : 'bg-emerald-500/15 text-emerald-600'}">● ${sClosed ? 'TUTUP' : 'BUKA'}</span>
+                                <span class="text-[9px] font-bold px-2 py-0.5 rounded-full bg-blue-500/12 text-blue-600">${branchBikes.length} Unit Khusus</span>
+                            </div>
+                            <strong class="text-sm sm:text-base font-extrabold block leading-snug">${escHtml(s.name)}</strong>
+                            <p class="text-[11px] app-muted leading-snug">${escHtml(s.address)}</p>
+                            <p class="text-[10px] app-muted"><i class="fa-regular fa-clock text-emerald-600 mr-1"></i>${escHtml(s.operationalHours || "05.30 - 20.00 WITA")} • WA: ${escHtml(s.csPhone || "-")}</p>
                         </div>
                     </div>
-                    <div class="flex flex-wrap gap-2">
-                        <button type="button" onclick="switchGowesFleetAdminTab('ops')" class="px-3 py-2 rounded-xl app-card-soft border text-xs font-bold">
-                            <i class="fa-solid fa-store mr-1 text-emerald-600"></i>Kelola Gerai
-                        </button>
-                        <button type="button" onclick="openMasterGowesBikeModal()" class="gowes-pill-btn px-4 py-2 rounded-xl text-xs shadow">
-                            <i class="fa-solid fa-plus mr-1"></i>Tambah Unit Sepeda
+
+                    <!-- Baris Aksi Gerai + Tombol Tambah Sepeda Langsung ke Gerai Ini -->
+                    <div class="flex flex-wrap items-center justify-between gap-2 pt-2.5 border-t gold-border">
+                        <div class="flex flex-wrap items-center gap-1.5">
+                            <button type="button" onclick="openMasterGowesBikeModal(null,'${esc(s.id)}')" class="gowes-pill-btn px-3 py-1.5 rounded-xl text-[11px] shadow-sm">
+                                <i class="fa-solid fa-plus mr-1"></i>Tambah Sepeda
+                            </button>
+                            <button type="button" onclick="openGowesShelterOpsModal('${esc(s.id)}', false)" class="px-3 py-1.5 rounded-xl app-card-soft border app-accent text-[11px] font-bold">
+                                <i class="fa-solid fa-pen mr-1"></i>Edit Gerai
+                            </button>
+                            <button type="button" onclick="navigator.clipboard.writeText('${esc(branchLink)}');showToast('Link khusus cabang ${esc(s.city || s.name)} disalin!');" class="px-2.5 py-1.5 rounded-xl app-card-soft border text-[11px] font-bold" title="Salin link cabang">
+                                <i class="fa-solid fa-link mr-1 text-emerald-600"></i>Link
+                            </button>
+                            ${isMaster && shelters.length > 1 ? `
+                                <button type="button" onclick="deleteGowesShelterBranch('${esc(s.id)}')" class="px-2.5 py-1.5 rounded-xl bg-red-600/15 text-red-500 text-[11px] font-bold" title="Hapus Cabang">
+                                    <i class="fa-solid fa-trash"></i>
+                                </button>
+                            ` : ""}
+                        </div>
+                        <button type="button" onclick="toggleGowesBranchBikesAccordion('${esc(s.id)}')" class="px-2.5 py-1.5 rounded-xl app-btn-sec text-[10.5px] font-bold flex items-center gap-1">
+                            <span>${isExpanded ? "Tutup Daftar" : `Lihat Sepeda (${branchBikes.length})`}</span>
+                            <i class="fa-solid fa-chevron-${isExpanded ? "up" : "down"} text-[9px]"></i>
                         </button>
                     </div>
+
+                    <!-- Daftar Unit Sepeda Khusus Gerai Ini -->
+                    <div class="${isExpanded ? "space-y-2 pt-1" : "hide"}">
+                        ${branchBikes.length
+                            ? branchBikes.map(b => _renderSingleBikeAdminRowHtml(b, isMaster, false)).join("")
+                            : `<div class="app-card-soft border border-dashed rounded-2xl p-3.5 text-center space-y-1.5">
+                                <p class="text-[11px] app-muted">Belum ada sepeda khusus di gerai <strong>${escHtml(s.city || s.name)}</strong>.${sharedBikes.length ? ` Saat ini memakai ${sharedBikes.length} unit umum.` : ""}</p>
+                                <button type="button" onclick="openMasterGowesBikeModal(null,'${esc(s.id)}')" class="inline-flex items-center gap-1 px-3 py-1.5 rounded-xl bg-emerald-600/15 text-emerald-700 text-[11px] font-bold">
+                                    <i class="fa-solid fa-bicycle"></i> + Input Sepeda untuk ${escHtml(s.city || "Gerai Ini")}
+                                </button>
+                               </div>`}
+                    </div>
                 </div>
-                <div class="space-y-2.5">
-                    ${renderGowesBikesAdminList()}
+            `;
+        }).join("");
+
+        const sharedSectionHtml = sharedBikes.length ? `
+            <div class="app-card border rounded-3xl p-4 sm:p-5 space-y-3 shadow-sm">
+                <div class="flex flex-wrap items-center justify-between gap-2 border-b gold-border pb-2.5">
+                    <div>
+                        <span class="text-[9px] uppercase font-extrabold px-2 py-0.5 rounded-full bg-blue-500/15 text-blue-600">ARMADA UMUM (SEMUA CABANG)</span>
+                        <h4 class="text-xs sm:text-sm font-extrabold mt-1">Unit yang Tampil di Semua Gerai (${sharedBikes.length} Unit)</h4>
+                        <p class="text-[10.5px] app-muted">Klik <strong>Edit</strong> pada sepeda di bawah jika ingin memindahkannya khusus ke salah satu gerai saja.</p>
+                    </div>
                 </div>
+                <div class="space-y-2">
+                    ${sharedBikes.map(b => _renderSingleBikeAdminRowHtml(b, isMaster, true)).join("")}
+                </div>
+            </div>
+        ` : "";
+
+        paneHtml = `
+            <div class="space-y-4">
+                <div class="app-card border rounded-3xl p-4 flex flex-wrap items-center justify-between gap-3 shadow-sm bg-gradient-to-r from-emerald-500/10 via-transparent to-transparent">
+                    <div>
+                        <h4 class="text-sm font-extrabold text-emerald-600"><i class="fa-solid fa-map-location-dot mr-1.5"></i>Kelola Gerai &amp; Armada per Cabang</h4>
+                        <p class="text-[11px] app-muted">Atur sepeda masing-masing gerai secara terpisah, tambah cabang baru, atau buka/tutup operasional.</p>
+                    </div>
+                    <button type="button" onclick="openGowesShelterOpsModal(null, true)" class="gowes-pill-btn px-4 py-2 rounded-xl text-xs shadow">
+                        <i class="fa-solid fa-plus mr-1"></i>Tambah Gerai Cabang
+                    </button>
+                </div>
+
+                <div class="space-y-3.5">
+                    ${sheltersHtml}
+                </div>
+                ${sharedSectionHtml}
             </div>
         `;
     }
@@ -409,20 +477,27 @@ async function deleteGowesShelterBranch(branchId) {
 }
 
 // ================= 2. KELOLA ARMADA SEPEDA (CABANG GARASI, REM & LABEL TARIF FLEKSIBEL) =================
-function openMasterGowesBikeModal(bikeId = null) {
+function openMasterGowesBikeModal(bikeId = null, prefillBranchId = null) {
     const isEdit = !!bikeId;
     const bikes = Array.isArray(db.gowesBikes) && db.gowesBikes.length ? db.gowesBikes : DEFAULT_GOWES_BIKES;
     const b = isEdit ? bikes.find(x => String(x.id) === String(bikeId)) : null;
 
     mgbTempPhotoUrl = (b && b.image) || "";
 
+    const shelters = _getAdminSheltersList();
+    const prefillBranchObj = prefillBranchId ? shelters.find(s => String(s.id) === String(prefillBranchId)) : null;
     const titleEl = document.getElementById("mgb-title");
-    if (titleEl) titleEl.innerText = isEdit ? `Edit Unit: ${b.name}` : "Tambah Unit Sepeda Baru";
+    if (titleEl) {
+        titleEl.innerText = isEdit
+            ? `Edit Unit: ${b.name}`
+            : prefillBranchObj
+                ? `Tambah Sepeda — Cabang ${prefillBranchObj.city || prefillBranchObj.name}`
+                : "Tambah Unit Sepeda Baru";
+    }
 
     const brSel = document.getElementById("mgb-branch-id");
     if (brSel) {
-        const shelters = _getAdminSheltersList();
-        const curBranchVal = isEdit ? (b.branchId || "all") : "all";
+        const curBranchVal = isEdit ? (b.branchId || "all") : (prefillBranchId || "all");
         brSel.innerHTML = `<option value="all" ${curBranchVal === "all" ? "selected" : ""}>Semua Cabang (Tampil di Semua Lokasi)</option>` +
             shelters.map(s => `<option value="${esc(s.id)}" ${String(curBranchVal) === String(s.id) ? "selected" : ""}>Khusus Cabang ${escHtml(s.city || s.name)}</option>`).join("");
     }
@@ -1019,7 +1094,7 @@ function buildGowesAnalyticsDashboardHtml() {
                     <button type="button" onclick="if(typeof openGowesOfflinePosModal==='function')openGowesOfflinePosModal()" class="gowes-pill-btn px-3.5 py-2 rounded-xl text-xs shadow-sm">
                         <i class="fa-solid fa-cash-register mr-1"></i>Kasir Offline
                     </button>
-                    <button type="button" onclick="openMasterWorkspace('gowes_fleet');switchGowesFleetAdminTab('ops');" class="px-3.5 py-2 rounded-xl app-card-soft border gold-border text-xs font-bold app-accent shadow-sm">
+                    <button type="button" onclick="openMasterWorkspace('gowes_fleet');switchGowesFleetAdminTab('shelters');" class="px-3.5 py-2 rounded-xl app-card-soft border gold-border text-xs font-bold app-accent shadow-sm">
                         <i class="fa-solid fa-sliders mr-1"></i>Gerai
                     </button>
                 </div>

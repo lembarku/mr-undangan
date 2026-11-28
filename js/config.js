@@ -1,6 +1,6 @@
 // =========================================================================
 // LEMBARKU & TITIK GOWES — CORE CONFIG, CATALOGS & SHARED ENGINE (js/config.js)
-// Versi: V14.8 (Banner 16:7 Mentok Logo, Kasir Offline Cash/QRIS, Anti Bentrok 14 Hari & Cabang Unit)
+// Versi: V14.9 (Armada Per Gerai, Konten & Media Beranda, Share Contoh, Auto-Frame Kepala & Anti-Zoom UI)
 // =========================================================================
 const CLOUD_API_URL = "https://script.google.com/macros/s/AKfycbyHsITJ02tiA59p0QIXkOQaO3VnBFQmDBp-7iUHcUkmrYjlOtRVwxhlGZCzL4RLKKNW/exec";
 const FOUNDER_USERNAME = "kausar.af";

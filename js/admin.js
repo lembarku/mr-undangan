@@ -1,6 +1,6 @@
 // =========================================================================
 // LEMBARKU & TITIK GOWES — ADMIN, WORKSPACE & FLEET CONTROLLER (js/admin.js)
-// Versi: V14.3 (Steril, Aman & Modular — Sesi 1 dari 2)
+// Versi: V14.9 (Konten & Media Beranda Terpadu + Selective Zoom Foto)
 // =========================================================================
 let masterThemeCatFilter = "Pernikahan", masterThemeSearch = "", masterOrdersFilter = "all";
 let tbPhotosDraft = { cover: "", pria: "", wanita: "", couple: "", g1: "", g2: "", g3: "" };
@@ -10,6 +10,7 @@ let _soloProjectSearch = "";
 let _soloProjectTypeFilter = "all";
 let _soloProjectDomainFilter = "all"; // 'all' | 'lembarku' | 'gowes'
 let _masterAnalyticsDomain = "lembarku"; // 'lembarku' | 'gowes'
+let _masterContentMediaTab = "banners"; // 'banners' | 'media'
 let _publicProjectsCache = {};
 let _adminStockAudio = null;
 let _adminStockPlayingUrl = "";
@@ -202,16 +203,23 @@ function openMasterWorkspace(name, fromNav = false) {
     if (name === "orders" && curU) return openSoloProjectModal(curU.username);
     if (name === "users_cabang" && curU) return openSoloFollowersModal(curU.username);
 
-    currentMasterWorkspace = name || "overview";
+    let resolvedWs = name || "overview";
+    if (resolvedWs === "home_editor") {
+        resolvedWs = "content_media";
+        _masterContentMediaTab = "banners";
+    } else if (resolvedWs === "media") {
+        resolvedWs = "content_media";
+        _masterContentMediaTab = "media";
+    }
+    currentMasterWorkspace = resolvedWs;
     pbTempUploadedImg = "";
     stopAdminStockSongPreview();
 
     const meta = {
         overview: { title: "Grafik & Analitik Ekosistem", sub: "Omzet berkas Lembarku, rental Titik Gowes & data PWA" },
         themes: { title: "Kelola Tema & Harga", sub: "Foto template, nama contoh & harga CV/Lamaran" },
-        home_editor: { title: "Edit Banner Promosi (12:4.4)", sub: "Atur slide promosi utama di Beranda" },
-        media: { title: "Stok Musik & Testimoni", sub: "Upload lagu dari perangkat & ulasan pelanggan" },
-        gowes_fleet: { title: "Kelola Armada Titik Gowes", sub: "Input unit sepeda, atur tarif & status servis" }
+        content_media: { title: "Konten & Media Beranda", sub: "Banner promosi 12:4.4, stok musik & testimoni pelanggan" },
+        gowes_fleet: { title: "Kelola Gerai & Armada Gowes", sub: "Atur cabang, sepeda tiap gerai & banner promosi 16:7" }
     };
     const info = meta[currentMasterWorkspace] || { title: "Panel Founder", sub: "Pengaturan Mandiri Lembarku" };
     const tEl = document.getElementById("master-active-panel-title");
@@ -242,6 +250,12 @@ function closeMasterWorkspaceFullscreen(fromNav = false) {
 
 function switchMasterAnalyticsDomain(domain) {
     _masterAnalyticsDomain = domain || "lembarku";
+    renderMasterWorkspaceContent();
+}
+
+function switchMasterContentMediaTab(tab) {
+    stopAdminStockSongPreview();
+    _masterContentMediaTab = (tab === "media") ? "media" : "banners";
     renderMasterWorkspaceContent();
 }
 
@@ -596,6 +610,9 @@ function viewOrderProof(kind, id) {
             openLink.classList.toggle("hide", rawUrl.startsWith("data:"));
         }
         modal.classList.remove("hide");
+        if (typeof attachSelectivePinchZoom === "function") {
+            attachSelectivePinchZoom(document.getElementById("proof-zoom-stage"), imgEl);
+        }
         _pushAdminNavStep({ type: "modal", id: "modal-proof-viewer" });
         return;
     }
@@ -795,98 +812,114 @@ function renderMasterWorkspaceContent() {
         return;
     }
 
-    if (currentMasterWorkspace === "home_editor") {
+    if (currentMasterWorkspace === "content_media" || currentMasterWorkspace === "home_editor" || currentMasterWorkspace === "media") {
         const banners = db.promoBanners || [];
-        box.innerHTML = `<div class="grid md:grid-cols-2 gap-6">
-            <form onsubmit="savePromoBannerForm(event)" class="app-card p-4 rounded-3xl border space-y-2.5 shadow-sm">
-                <div class="flex justify-between items-center">
-                    <h4 class="font-bold text-sm app-accent">Edit Banner Promosi (Rasio 12 : 4.4 Full)</h4>
-                    <button type="button" onclick="resetPromoBannerForm()" class="text-[11px] app-muted hover:underline">Reset</button>
-                </div>
-                <input type="hidden" id="pb-id">
-                <div class="w-full rounded-xl overflow-hidden border gold-border bg-black" style="aspect-ratio:12/4.4;">
-                    <img id="pb-preview-img" src="${(banners[0] && banners[0].img) || IMG("1519741497674-611481863552")}" class="w-full h-full object-cover">
-                </div>
-                <label class="block gold-pill-btn py-2 rounded-xl text-center cursor-pointer text-xs"><i class="fa-solid fa-crop-simple mr-1"></i>Pilih &amp; Crop Foto Banner (12 : 4.4)<input type="file" accept="image/*" class="hide" onchange="pickCroppedPromoBanner(this)"></label>
-                <div class="grid grid-cols-2 gap-2">
-                    <input type="text" id="pb-badge" placeholder="Label (PROMO SPESIAL)" class="app-input">
-                    <input type="text" id="pb-cta" placeholder="Teks Tombol (Lihat Promo)" class="app-input">
-                </div>
-                <input type="text" id="pb-title" placeholder="Judul Promosi Menarik" class="app-input" required>
-                <input type="text" id="pb-sub" placeholder="Penjelasan singkat promosi..." class="app-input" required>
-                <select id="pb-target" class="app-input">
-                    <option value="sec-undangan">Arahkan ke Etalase Undangan</option>
-                    <option value="sec-portofolio">Arahkan ke Etalase CV &amp; Lamaran</option>
-                    <option value="sec-sertifikat">Arahkan ke Etalase Sertifikat</option>
-                    <option value="login">Arahkan ke Popup Daftar / Masuk</option>
-                    <option value="chat">Arahkan ke Live Chat Admin</option>
-                </select>
-                <input type="url" id="pb-img-url" oninput="if(this.value.startsWith('http'))document.getElementById('pb-preview-img').src=this.value;" placeholder="Atau tempel URL foto banner (https://...)" class="app-input">
-                <button type="submit" id="btn-save-pb" class="w-full gold-pill-btn py-2.5 rounded-xl text-xs">Simpan Banner Promosi</button>
-            </form>
-            <div class="space-y-2.5">
-                <h4 class="font-bold text-xs app-accent uppercase">Daftar Slide Banner Aktif (${banners.length})</h4>
-                ${banners.map((b, i) => `<div class="app-card border rounded-2xl p-2.5 flex items-center gap-3 shadow-sm">
-                    <img src="${b.img}" class="w-24 h-10 rounded-lg object-cover bg-black shrink-0">
-                    <div class="flex-1 min-w-0"><strong class="text-xs block truncate">${escHtml(b.title)}</strong><span class="text-[10px] app-muted block truncate">${escHtml(b.badge || "Promo")} • ${escHtml(b.subtitle || "")}</span></div>
-                    <button type="button" onclick="editPromoBannerItem(${i})" class="px-2.5 py-1 rounded app-btn-sec text-[10px] font-bold">Edit</button>
-                    <button type="button" onclick="deletePromoBannerItem(${i})" class="px-2.5 py-1 rounded bg-red-600/15 text-[10px] text-red-500"><i class="fa-solid fa-trash"></i></button>
-                </div>`).join("")}
+        const songsCount = (db.musicLibrary || []).length;
+        const testiCount = (db.testimonials || []).length;
+        const isMediaTab = _masterContentMediaTab === "media";
+
+        const subTabsHtml = `
+            <div class="flex gap-2 border-b gold-border pb-3 mb-4 overflow-x-auto no-scrollbar">
+                <button type="button" onclick="switchMasterContentMediaTab('banners')" class="px-4 py-2 rounded-2xl text-xs font-extrabold whitespace-nowrap transition ${!isMediaTab ? "gold-pill-btn shadow" : "app-btn-sec"}">
+                    <i class="fa-solid fa-rectangle-ad mr-1.5"></i>Banner Promosi 12:4.4 (${banners.length})
+                </button>
+                <button type="button" onclick="switchMasterContentMediaTab('media')" class="px-4 py-2 rounded-2xl text-xs font-extrabold whitespace-nowrap transition ${isMediaTab ? "gold-pill-btn shadow" : "app-btn-sec"}">
+                    <i class="fa-solid fa-music mr-1.5"></i>Stok Lagu &amp; Testimoni (${songsCount} Lagu • ${testiCount} Ulasan)
+                </button>
             </div>
-        </div>`;
-        return;
-    }
+        `;
 
-    if (currentMasterWorkspace === "media") {
-        box.innerHTML = `<div class="grid md:grid-cols-2 gap-6">
-            <div class="space-y-4">
-                <div class="app-card p-4 rounded-3xl border space-y-3 shadow-sm">
-                    <div class="flex items-center justify-between">
-                        <h4 class="font-bold text-sm app-accent"><i class="fa-solid fa-music mr-1.5"></i>Stok Lagu Website</h4>
-                        <span class="text-[10px] app-muted font-semibold">${(db.musicLibrary || []).length} Lagu</span>
+        if (!isMediaTab) {
+            box.innerHTML = `${subTabsHtml}<div class="grid md:grid-cols-2 gap-6">
+                <form onsubmit="savePromoBannerForm(event)" class="app-card p-4 rounded-3xl border space-y-2.5 shadow-sm">
+                    <div class="flex justify-between items-center">
+                        <h4 class="font-bold text-sm app-accent">Edit Banner Promosi (Rasio 12 : 4.4 Full)</h4>
+                        <button type="button" onclick="resetPromoBannerForm()" class="text-[11px] app-muted hover:underline">Reset</button>
                     </div>
-                    <label class="block gold-pill-btn py-3 px-4 rounded-2xl text-center cursor-pointer text-xs shadow-md">
-                        <i class="fa-solid fa-upload mr-1.5"></i>Upload File Musik dari Perangkat (MP3/WAV/M4A)
-                        <input type="file" accept="audio/*" class="hide" onchange="openAudioCropperFromInput(this,'library')">
-                    </label>
-                    <p class="text-[10px] app-muted leading-relaxed">Lagu dari perangkat Anda bisa langsung dipotong bagian terbaiknya (30–90 dtk), dikompresi otomatis ke MP3 ringan, dan tersimpan ke Google Drive Stok Lagu.</p>
-
-                    <form onsubmit="addStockSong(event)" class="pt-2.5 border-t gold-border space-y-2">
-                        <span class="text-[10px] font-bold uppercase app-muted block">Atau Tambah Manual via Link MP3:</span>
-                        <div class="grid grid-cols-2 gap-2">
-                            <input type="text" id="song-title" placeholder="Judul Lagu" class="app-input !py-2 text-xs" required>
-                            <input type="text" id="song-cat" placeholder="Kategori (Pernikahan)" class="app-input !py-2 text-xs" required>
-                        </div>
-                        <input type="url" id="song-url" placeholder="Link MP3 (https://.../lagu.mp3)" class="app-input !py-2 text-xs" required>
-                        <button id="btn-add-song" class="w-full app-btn-sec py-2 rounded-xl text-xs font-bold">+ Tambah dari Link</button>
-                    </form>
-                </div>
-
-                <div class="space-y-2 max-h-72 overflow-y-auto">${(db.musicLibrary || []).map((m, i) => `
-                    <div class="app-card border rounded-2xl p-3 flex justify-between items-center gap-2 text-xs shadow-sm">
-                        <button type="button" data-stock-play-btn="${i}" onclick="toggleAdminStockSongPreview(${i},this)" class="w-8 h-8 rounded-full app-accent-bg border gold-border app-accent flex items-center justify-center shrink-0 text-[11px]" title="Putar Preview">
-                            <i class="fa-solid fa-play"></i>
-                        </button>
-                        <div class="flex-1 min-w-0">
-                            <strong class="block truncate">${escHtml(m.title)}</strong>
-                            <span class="block text-[10px] app-accent truncate">${escHtml(m.category)}</span>
-                        </div>
-                        <button type="button" onclick="delStockSong(${i})" class="w-8 h-8 rounded-xl bg-red-600/12 text-red-500 flex items-center justify-center shrink-0" title="Hapus Lagu"><i class="fa-solid fa-trash"></i></button>
+                    <input type="hidden" id="pb-id">
+                    <div class="w-full rounded-xl overflow-hidden border gold-border bg-black" style="aspect-ratio:12/4.4;">
+                        <img id="pb-preview-img" src="${(banners[0] && banners[0].img) || IMG("1519741497674-611481863552")}" class="w-full h-full object-cover">
                     </div>
-                `).join("") || '<p class="text-xs app-muted text-center py-4">Belum ada stok lagu.</p>'}</div>
-            </div>
-
-            <div class="space-y-4">
-                <form onsubmit="addTestimonial(event)" class="app-card p-4 rounded-3xl border space-y-2.5 shadow-sm">
-                    <h4 class="font-bold text-sm app-accent"><i class="fa-solid fa-star mr-1.5"></i>Tambah Testimoni Beranda</h4>
-                    <input type="text" id="t-name" placeholder="Nama Pelanggan" class="app-input" required>
-                    <input type="text" id="t-cat" placeholder="Kategori (Undangan / CV & Lamaran / Titik Gowes)" class="app-input" required>
-                    <textarea id="t-text" placeholder="Isi testimoni..." class="app-input h-20" required></textarea>
-                    <button id="btn-add-testi" class="w-full gold-pill-btn py-2.5 rounded-xl text-xs">+ Tampilkan di Slideshow</button>
+                    <label class="block gold-pill-btn py-2 rounded-xl text-center cursor-pointer text-xs"><i class="fa-solid fa-crop-simple mr-1"></i>Pilih &amp; Crop Foto Banner (12 : 4.4)<input type="file" accept="image/*" class="hide" onchange="pickCroppedPromoBanner(this)"></label>
+                    <div class="grid grid-cols-2 gap-2">
+                        <input type="text" id="pb-badge" placeholder="Label (PROMO SPESIAL)" class="app-input">
+                        <input type="text" id="pb-cta" placeholder="Teks Tombol (Lihat Promo)" class="app-input">
+                    </div>
+                    <input type="text" id="pb-title" placeholder="Judul Promosi Menarik" class="app-input" required>
+                    <input type="text" id="pb-sub" placeholder="Penjelasan singkat promosi..." class="app-input" required>
+                    <select id="pb-target" class="app-input">
+                        <option value="sec-undangan">Arahkan ke Etalase Undangan</option>
+                        <option value="sec-portofolio">Arahkan ke Etalase CV &amp; Lamaran</option>
+                        <option value="sec-sertifikat">Arahkan ke Etalase Sertifikat</option>
+                        <option value="gowes">Arahkan ke Layanan Titik Gowes</option>
+                        <option value="login">Arahkan ke Popup Daftar / Masuk</option>
+                        <option value="chat">Arahkan ke Live Chat Admin</option>
+                    </select>
+                    <input type="url" id="pb-img-url" oninput="if(this.value.startsWith('http'))document.getElementById('pb-preview-img').src=this.value;" placeholder="Atau tempel URL foto banner (https://...)" class="app-input">
+                    <button type="submit" id="btn-save-pb" class="w-full gold-pill-btn py-2.5 rounded-xl text-xs">Simpan Banner Promosi</button>
                 </form>
-                <div class="space-y-2 max-h-72 overflow-y-auto">${(db.testimonials || []).map((t, i) => `<div class="app-card border rounded-2xl p-3 flex justify-between items-center text-xs gap-2 shadow-sm"><div><strong>${escHtml(t.name)}</strong> <span class="text-[10px] app-accent">(${escHtml(t.category)})</span><p class="text-[11px] app-muted mt-0.5">${escHtml(t.text)}</p></div><button onclick="delTestimonial(${i})" class="text-red-500 px-2"><i class="fa-solid fa-trash"></i></button></div>`).join("")}</div>
-            </div>
-        </div>`;
+                <div class="space-y-2.5">
+                    <h4 class="font-bold text-xs app-accent uppercase">Daftar Slide Banner Aktif (${banners.length})</h4>
+                    ${banners.map((b, i) => `<div class="app-card border rounded-2xl p-2.5 flex items-center gap-3 shadow-sm">
+                        <img src="${b.img}" class="w-24 h-10 rounded-lg object-cover bg-black shrink-0">
+                        <div class="flex-1 min-w-0"><strong class="text-xs block truncate">${escHtml(b.title)}</strong><span class="text-[10px] app-muted block truncate">${escHtml(b.badge || "Promo")} • ${escHtml(b.subtitle || "")}</span></div>
+                        <button type="button" onclick="editPromoBannerItem(${i})" class="px-2.5 py-1 rounded app-btn-sec text-[10px] font-bold">Edit</button>
+                        <button type="button" onclick="deletePromoBannerItem(${i})" class="px-2.5 py-1 rounded bg-red-600/15 text-[10px] text-red-500"><i class="fa-solid fa-trash"></i></button>
+                    </div>`).join("")}
+                </div>
+            </div>`;
+        } else {
+            box.innerHTML = `${subTabsHtml}<div class="grid md:grid-cols-2 gap-6">
+                <div class="space-y-4">
+                    <div class="app-card p-4 rounded-3xl border space-y-3 shadow-sm">
+                        <div class="flex items-center justify-between">
+                            <h4 class="font-bold text-sm app-accent"><i class="fa-solid fa-music mr-1.5"></i>Stok Lagu Website</h4>
+                            <span class="text-[10px] app-muted font-semibold">${songsCount} Lagu</span>
+                        </div>
+                        <label class="block gold-pill-btn py-3 px-4 rounded-2xl text-center cursor-pointer text-xs shadow-md">
+                            <i class="fa-solid fa-upload mr-1.5"></i>Upload File Musik dari Perangkat (MP3/WAV/M4A)
+                            <input type="file" accept="audio/*" class="hide" onchange="openAudioCropperFromInput(this,'library')">
+                        </label>
+                        <p class="text-[10px] app-muted leading-relaxed">Lagu dari perangkat Anda bisa langsung dipotong bagian terbaiknya (30–90 dtk), dikompresi otomatis ke MP3 ringan, dan tersimpan ke Google Drive Stok Lagu.</p>
+
+                        <form onsubmit="addStockSong(event)" class="pt-2.5 border-t gold-border space-y-2">
+                            <span class="text-[10px] font-bold uppercase app-muted block">Atau Tambah Manual via Link MP3:</span>
+                            <div class="grid grid-cols-2 gap-2">
+                                <input type="text" id="song-title" placeholder="Judul Lagu" class="app-input !py-2 text-xs" required>
+                                <input type="text" id="song-cat" placeholder="Kategori (Pernikahan)" class="app-input !py-2 text-xs" required>
+                            </div>
+                            <input type="url" id="song-url" placeholder="Link MP3 (https://.../lagu.mp3)" class="app-input !py-2 text-xs" required>
+                            <button id="btn-add-song" class="w-full app-btn-sec py-2 rounded-xl text-xs font-bold">+ Tambah dari Link</button>
+                        </form>
+                    </div>
+
+                    <div class="space-y-2 max-h-72 overflow-y-auto">${(db.musicLibrary || []).map((m, i) => `
+                        <div class="app-card border rounded-2xl p-3 flex justify-between items-center gap-2 text-xs shadow-sm">
+                            <button type="button" data-stock-play-btn="${i}" onclick="toggleAdminStockSongPreview(${i},this)" class="w-8 h-8 rounded-full app-accent-bg border gold-border app-accent flex items-center justify-center shrink-0 text-[11px]" title="Putar Preview">
+                                <i class="fa-solid fa-play"></i>
+                            </button>
+                            <div class="flex-1 min-w-0">
+                                <strong class="block truncate">${escHtml(m.title)}</strong>
+                                <span class="block text-[10px] app-accent truncate">${escHtml(m.category)}</span>
+                            </div>
+                            <button type="button" onclick="delStockSong(${i})" class="w-8 h-8 rounded-xl bg-red-600/12 text-red-500 flex items-center justify-center shrink-0" title="Hapus Lagu"><i class="fa-solid fa-trash"></i></button>
+                        </div>
+                    `).join("") || '<p class="text-xs app-muted text-center py-4">Belum ada stok lagu.</p>'}</div>
+                </div>
+
+                <div class="space-y-4">
+                    <form onsubmit="addTestimonial(event)" class="app-card p-4 rounded-3xl border space-y-2.5 shadow-sm">
+                        <h4 class="font-bold text-sm app-accent"><i class="fa-solid fa-star mr-1.5"></i>Tambah Testimoni Beranda</h4>
+                        <input type="text" id="t-name" placeholder="Nama Pelanggan" class="app-input" required>
+                        <input type="text" id="t-cat" placeholder="Kategori (Undangan / CV & Lamaran / Titik Gowes)" class="app-input" required>
+                        <textarea id="t-text" placeholder="Isi testimoni..." class="app-input h-20" required></textarea>
+                        <button id="btn-add-testi" class="w-full gold-pill-btn py-2.5 rounded-xl text-xs">+ Tampilkan di Slideshow</button>
+                    </form>
+                    <div class="space-y-2 max-h-72 overflow-y-auto">${(db.testimonials || []).map((t, i) => `<div class="app-card border rounded-2xl p-3 flex justify-between items-center text-xs gap-2 shadow-sm"><div><strong>${escHtml(t.name)}</strong> <span class="text-[10px] app-accent">(${escHtml(t.category)})</span><p class="text-[11px] app-muted mt-0.5">${escHtml(t.text)}</p></div><button onclick="delTestimonial(${i})" class="text-red-500 px-2"><i class="fa-solid fa-trash"></i></button></div>`).join("")}</div>
+                </div>
+            </div>`;
+        }
+        return;
     }
 }
 
@@ -902,12 +935,16 @@ function openExpandedAvatarLightbox(imgSrc, labelText = "") {
         document.body.appendChild(box);
     }
     box.innerHTML = `
-        <div onclick="event.stopPropagation();" class="w-full max-w-md flex flex-col items-center gap-3">
-            <img src="${src}" alt="Foto Profil" class="w-full max-h-[75vh] object-contain rounded-3xl border-2 border-white/25 shadow-2xl bg-zinc-900">
-            ${labelText ? `<span class="text-xs text-white/85 font-semibold">${escHtml(labelText)}</span>` : ""}
+        <button type="button" onclick="closeExpandedAvatarLightbox()" class="fixed top-5 right-5 z-20 w-10 h-10 rounded-full bg-white/15 backdrop-blur-md text-white flex items-center justify-center text-base hover:bg-white/25"><i class="fa-solid fa-xmark"></i></button>
+        <div id="avatar-zoom-stage" data-pinch-zoom="1" onclick="event.stopPropagation();" class="selective-zoom-stage w-full max-w-lg flex flex-col items-center justify-center gap-3 overflow-hidden p-2">
+            <img id="avatar-zoom-img" src="${src}" alt="Foto Profil" class="selective-zoom-target w-full max-h-[75vh] object-contain rounded-3xl border-2 border-white/25 shadow-2xl bg-zinc-900">
+            ${labelText ? `<span class="text-xs text-white/85 font-semibold">${escHtml(labelText)} • Cubit / ketuk 2x untuk zoom</span>` : `<span class="text-[10px] text-white/70">Cubit / ketuk 2x untuk zoom</span>`}
         </div>
     `;
     box.classList.remove("hide");
+    if (typeof attachSelectivePinchZoom === "function") {
+        attachSelectivePinchZoom(document.getElementById("avatar-zoom-stage"), document.getElementById("avatar-zoom-img"));
+    }
     _pushAdminNavStep({ type: "avatar_lightbox" });
 }
 
@@ -1742,8 +1779,8 @@ async function savePromoBannerForm(e) {
         ctaText: document.getElementById("pb-cta").value.trim() || "Lihat Promo",
         title: document.getElementById("pb-title").value.trim(),
         subtitle: document.getElementById("pb-sub").value.trim(),
-        targetType: (tgt === "login" || tgt === "chat") ? tgt : "section",
-        targetSection: (tgt === "login" || tgt === "chat") ? "" : tgt,
+        targetType: (tgt === "login" || tgt === "chat" || tgt === "gowes") ? tgt : "section",
+        targetSection: (tgt === "login" || tgt === "chat" || tgt === "gowes") ? "" : tgt,
         img
     };
     const list = [...(db.promoBanners || [])];
@@ -1765,7 +1802,7 @@ function editPromoBannerItem(i) {
     document.getElementById("pb-cta").value = b.ctaText || "";
     document.getElementById("pb-title").value = b.title || "";
     document.getElementById("pb-sub").value = b.subtitle || "";
-    document.getElementById("pb-target").value = (b.targetType === "login" || b.targetType === "chat") ? b.targetType : (b.targetSection || "sec-undangan");
+    document.getElementById("pb-target").value = (b.targetType === "login" || b.targetType === "chat" || b.targetType === "gowes") ? b.targetType : (b.targetSection || "sec-undangan");
     document.getElementById("pb-img-url").value = b.img || "";
     document.getElementById("pb-preview-img").src = b.img || IMG("1519741497674-611481863552");
     showToast(`Mengedit banner "${b.title}"`, "info");

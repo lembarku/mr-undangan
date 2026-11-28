@@ -2,7 +2,7 @@
 <html lang="id" data-app-theme="light">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
     <title>Lembarku &amp; Titik Gowes</title>
     <meta property="og:title" content="Lembarku &amp; Titik Gowes — Undangan Digital &amp; Rental Sepeda">
     <meta property="og:description" content="Buat undangan digital elegan, CV, surat lamaran kerja siap PDF, dan sewa sepeda berkualitas langsung dari HP.">
@@ -1108,7 +1108,7 @@
             </div>
 
             <div class="p-4 border-t gold-border text-center text-[10px] app-muted">
-                Versi V14.8 • Terintegrasi Penuh
+                Versi V14.9 • Terintegrasi Penuh
             </div>
         </div>
     </div>
@@ -1707,9 +1707,14 @@
             <div id="gv-reading-progress" class="h-full w-0 gold-gradient transition-[width] duration-150"></div>
         </div>
 
-        <button id="gv-use-theme-btn" onclick="usePreviewedThemeNow()" class="hide fixed top-4 left-4 z-[60] gold-pill-btn px-3.5 py-2 rounded-full text-[11px] shadow-xl flex items-center gap-1.5">
-            <i class="fa-solid fa-wand-magic-sparkles"></i> Pakai Tema Ini
-        </button>
+        <div id="gv-demo-actions-bar" class="hide fixed top-4 left-3 z-[60] flex items-center gap-1.5 max-w-[60vw]">
+            <button id="gv-use-theme-btn" onclick="usePreviewedThemeNow()" class="gold-pill-btn px-3 py-2 rounded-full text-[10.5px] sm:text-[11px] shadow-xl flex items-center gap-1.5 whitespace-nowrap">
+                <i class="fa-solid fa-wand-magic-sparkles"></i> Pakai Tema
+            </button>
+            <button id="gv-share-demo-btn" onclick="sharePreviewedInvitationDemo()" class="px-3 py-2 rounded-full bg-black/80 hover:bg-black border border-white/30 text-white text-[10.5px] sm:text-[11px] font-bold shadow-xl flex items-center gap-1.5 whitespace-nowrap" title="Bagikan Contoh Undangan ke Sosmed">
+                <i class="fa-solid fa-share-nodes text-amber-300"></i> Bagikan
+            </button>
+        </div>
 
         <div class="fixed top-4 right-4 z-[60] flex items-center gap-2">
             <button id="gv-music-btn" onclick="toggleGuestMusic()" class="w-10 h-10 rounded-full bg-black/80 border border-amber-400/50 text-amber-300 flex items-center justify-center shadow-xl" title="Musik"><i class="fa-solid fa-compact-disc spin-slow text-lg"></i></button>
@@ -1855,7 +1860,7 @@
                             </ul>
                             <div class="pt-3 border-t gold-border flex items-center justify-between text-[11px]">
                                 <span class="app-muted">Versi Aplikasi</span>
-                                <span class="px-2.5 py-0.5 rounded-full app-accent-bg app-accent font-extrabold">V14.8</span>
+                                <span class="px-2.5 py-0.5 rounded-full app-accent-bg app-accent font-extrabold">V14.9</span>
                             </div>
                         </div>
                     </div>
@@ -2203,13 +2208,23 @@
     </div>
 
     <div id="modal-portfolio-preview" class="hide fixed inset-0 z-[95] bg-black/95 flex flex-col overflow-hidden">
-        <div id="pfp-scroll-body" class="flex-1 overflow-y-auto overflow-x-hidden p-2 flex flex-col items-center justify-start">
-            <div id="pfp-a4-mount" class="mx-auto"></div>
+        <div class="px-4 py-2.5 bg-black/80 border-b border-white/10 flex items-center justify-between gap-2 shrink-0">
+            <span class="text-[11px] font-bold text-white/90 truncate"><i class="fa-regular fa-file-lines text-amber-400 mr-1.5"></i>Pratinjau Dokumen A4 (Bisa Cubit Zoom)</span>
+            <div class="flex items-center gap-1.5 shrink-0">
+                <button type="button" id="pfp-zoom-reset-btn" onclick="resetSelectiveZoom('pfp-zoom-stage')" class="hide px-2.5 py-1 rounded-full bg-amber-400 text-black text-[10px] font-extrabold">Reset 1x</button>
+                <button type="button" onclick="closePortfolioPreviewModal()" class="px-3 py-1 rounded-full bg-white/15 hover:bg-white/25 text-white text-xs font-bold"><i class="fa-solid fa-xmark mr-1"></i>Tutup</button>
+            </div>
+        </div>
+        <div id="pfp-scroll-body" class="flex-1 overflow-y-auto overflow-x-hidden p-2 sm:p-4 flex flex-col items-center justify-start">
+            <div id="pfp-zoom-stage" data-pinch-zoom="1" class="selective-zoom-stage flex justify-center items-start">
+                <div id="pfp-a4-mount" class="mx-auto selective-zoom-target"></div>
+            </div>
             <div id="pfp-bottom-actions" class="w-full max-w-md px-3 py-4 flex items-center justify-center gap-2 shrink-0">
                 <button id="pfp-use-btn" onclick="usePreviewedPortfolioTheme()" class="hide flex-1 gold-pill-btn py-3 rounded-2xl text-xs shadow-lg"><i class="fa-solid fa-wand-magic-sparkles mr-1.5"></i>Pakai Desain Ini</button>
+                <button id="pfp-share-demo-btn" onclick="sharePreviewedPortfolioDemo()" class="hide px-4 py-3 rounded-2xl bg-white/15 hover:bg-white/25 border border-white/25 text-white text-xs font-bold shadow-lg whitespace-nowrap"><i class="fa-solid fa-share-nodes text-amber-300 mr-1.5"></i>Bagikan Contoh</button>
                 <button id="pfp-sempurnakan-btn" onclick="openSempurnakanFromPreview()" class="hide flex-1 bg-emerald-600 hover:bg-emerald-500 text-white py-3 rounded-2xl text-xs font-bold shadow-lg"><i class="fa-solid fa-file-pdf mr-1.5"></i>Sempurnakan &amp; PDF</button>
             </div>
-            <p class="text-[10px] text-zinc-400 pb-4 text-center">Cubit layar untuk memperbesar • Tekan tombol <strong>Kembali (Back)</strong> untuk menutup</p>
+            <p class="text-[10px] text-zinc-400 pb-4 text-center">Cubit foto/kertas atau ketuk 2x untuk memperbesar detail • Tekan <strong>Kembali</strong> untuk menutup</p>
         </div>
     </div>
 
@@ -2470,8 +2485,9 @@
                 <h3 id="proof-viewer-title" class="font-bold text-sm truncate"><i class="fa-solid fa-receipt app-accent mr-1.5"></i>Bukti Pembayaran</h3>
                 <button type="button" onclick="document.getElementById('modal-proof-viewer').classList.add('hide')" class="w-8 h-8 rounded-full app-btn-sec flex items-center justify-center text-xs shrink-0"><i class="fa-solid fa-xmark"></i></button>
             </div>
-            <div class="p-4 bg-black/90 flex-1 overflow-auto flex items-center justify-center">
-                <img id="proof-viewer-img" src="" alt="Bukti Pembayaran" class="max-w-full max-h-[68vh] object-contain rounded-xl border border-amber-400/50">
+            <div id="proof-zoom-stage" data-pinch-zoom="1" class="selective-zoom-stage p-4 bg-black/90 flex-1 overflow-hidden flex items-center justify-center relative">
+                <img id="proof-viewer-img" src="" alt="Bukti Pembayaran" class="selective-zoom-target max-w-full max-h-[68vh] object-contain rounded-xl border border-amber-400/50">
+                <span class="pointer-events-none absolute bottom-2 right-3 px-2 py-0.5 rounded-full bg-black/60 text-white/75 text-[9px] font-semibold">Cubit / ketuk 2x untuk zoom</span>
             </div>
             <div class="px-5 py-3 border-t gold-border flex justify-end gap-2 shrink-0">
                 <a id="proof-viewer-open-link" href="#" target="_blank" rel="noopener noreferrer" class="px-4 py-2 rounded-xl app-btn-sec text-xs font-bold"><i class="fa-solid fa-arrow-up-right-from-square mr-1"></i>Buka Ukuran Penuh</a>
@@ -2548,6 +2564,37 @@
                 <button onclick="launchSocialShare('tg')" class="bg-sky-600 text-white py-2.5 rounded-xl text-xs font-bold"><i class="fa-brands fa-telegram mr-1"></i>Telegram</button>
                 <button onclick="launchSocialShare('ig')" class="bg-pink-600 text-white py-2.5 rounded-xl text-xs font-bold"><i class="fa-brands fa-instagram mr-1"></i>Instagram</button>
                 <button onclick="launchSocialShare('fb')" class="bg-blue-600 text-white py-2.5 rounded-xl text-xs font-bold"><i class="fa-brands fa-facebook-messenger mr-1"></i>Messenger</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- MODAL BAGIKAN CONTOH TEMA (UNDANGAN / CV / LAMARAN KE SELURUH SOSMED) -->
+    <div id="modal-share-demo" class="hide fixed inset-0 z-[152] bg-black/82 backdrop-blur-sm flex items-center justify-center p-4" onclick="if(event.target===this)closeShareDemoModal()">
+        <div class="app-card border rounded-3xl max-w-md w-full p-5 space-y-4 shadow-2xl" onclick="event.stopPropagation()">
+            <div class="flex items-center justify-between border-b gold-border pb-2.5">
+                <div>
+                    <h3 class="font-extrabold text-sm sm:text-base"><i class="fa-solid fa-share-nodes app-accent mr-1.5"></i>Bagikan Contoh Desain</h3>
+                    <p id="sd-subtitle" class="text-[10px] app-muted">Bagikan contoh ke WhatsApp, Instagram, Facebook, TikTok &amp; lainnya</p>
+                </div>
+                <button type="button" onclick="closeShareDemoModal()" class="w-8 h-8 rounded-full app-btn-sec flex items-center justify-center text-xs"><i class="fa-solid fa-xmark"></i></button>
+            </div>
+
+            <div class="space-y-2">
+                <label class="app-label">Teks &amp; Tautan Contoh Siap Bagikan</label>
+                <textarea id="sd-preview-text" class="app-input h-24 text-xs" readonly></textarea>
+            </div>
+
+            <button type="button" id="btn-sd-native" onclick="triggerNativeShareDemo()" class="w-full gold-pill-btn py-2.5 rounded-xl text-xs shadow-lg flex items-center justify-center gap-1.5">
+                <i class="fa-solid fa-share-from-square"></i> Bagikan ke Semua Aplikasi / Sosmed
+            </button>
+
+            <div class="grid grid-cols-2 sm:grid-cols-3 gap-2 text-xs font-bold">
+                <button type="button" onclick="launchDemoShareChannel('wa')" class="bg-emerald-600 hover:bg-emerald-500 text-white py-2.5 rounded-xl flex items-center justify-center gap-1.5"><i class="fa-brands fa-whatsapp"></i>WhatsApp</button>
+                <button type="button" onclick="launchDemoShareChannel('tg')" class="bg-sky-600 hover:bg-sky-500 text-white py-2.5 rounded-xl flex items-center justify-center gap-1.5"><i class="fa-brands fa-telegram"></i>Telegram</button>
+                <button type="button" onclick="launchDemoShareChannel('fb')" class="bg-blue-600 hover:bg-blue-500 text-white py-2.5 rounded-xl flex items-center justify-center gap-1.5"><i class="fa-brands fa-facebook"></i>Facebook</button>
+                <button type="button" onclick="launchDemoShareChannel('x')" class="bg-zinc-900 hover:bg-zinc-800 text-white py-2.5 rounded-xl flex items-center justify-center gap-1.5"><i class="fa-brands fa-x-twitter"></i>X / Twitter</button>
+                <button type="button" onclick="launchDemoShareChannel('ig')" class="bg-gradient-to-r from-pink-600 to-purple-600 text-white py-2.5 rounded-xl flex items-center justify-center gap-1.5"><i class="fa-brands fa-instagram"></i>IG / TikTok</button>
+                <button type="button" onclick="launchDemoShareChannel('copy')" class="app-btn-sec py-2.5 rounded-xl flex items-center justify-center gap-1.5"><i class="fa-regular fa-copy"></i>Salin Link</button>
             </div>
         </div>
     </div>

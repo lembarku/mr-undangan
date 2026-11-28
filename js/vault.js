@@ -443,10 +443,21 @@ function openSecretPhotoLightbox(idx) {
         document.body.appendChild(lb);
 
         let sx = 0;
-        lb.addEventListener("touchstart", (e) => { sx = e.touches[0].clientX; }, { passive: true });
+        let swipeBlocked = false;
+        lb.addEventListener("touchstart", (e) => {
+            const st = document.getElementById("vault-zoom-stage");
+            const curSc = Number((st && st.dataset.zoomScale) || 1);
+            if (e.touches.length > 1 || curSc > 1.05) { swipeBlocked = true; return; }
+            swipeBlocked = false;
+            sx = e.touches[0].clientX;
+        }, { passive: true });
         lb.addEventListener("touchend", (e) => {
+            if (swipeBlocked) return;
+            const st = document.getElementById("vault-zoom-stage");
+            const curSc = Number((st && st.dataset.zoomScale) || 1);
+            if (curSc > 1.05) return;
             const dx = e.changedTouches[0].clientX - sx;
-            if (Math.abs(dx) > 42) navSecretPhotoLightbox(dx < 0 ? 1 : -1);
+            if (Math.abs(dx) > 48) navSecretPhotoLightbox(dx < 0 ? 1 : -1);
         }, { passive: true });
     }
 
@@ -468,8 +479,8 @@ function renderSecretPhotoLightbox() {
         <div class="fixed top-6 left-1/2 -translate-x-1/2 z-20 px-3.5 py-1 rounded-full bg-white/12 backdrop-blur-md text-white text-xs font-semibold">
             ${lightboxIndex + 1} / ${lightboxPhotos.length} ${dtStr ? `• ${escHtml(dtStr)}` : ""}
         </div>
-        <div class="w-full h-full flex items-center justify-center p-2">
-            <img src="${ph.url}" class="max-w-full max-h-full object-contain transition-opacity duration-200">
+        <div id="vault-zoom-stage" data-pinch-zoom="1" class="selective-zoom-stage w-full h-full flex items-center justify-center p-2 overflow-hidden">
+            <img id="vault-zoom-img" src="${ph.url}" class="selective-zoom-target max-w-full max-h-full object-contain transition-opacity duration-200">
         </div>
         ${lightboxPhotos.length > 1 ? `
             <button type="button" onclick="navSecretPhotoLightbox(-1)" class="fixed left-3 top-1/2 -translate-y-1/2 z-20 w-10 h-10 rounded-full bg-white/12 backdrop-blur text-white flex items-center justify-center hover:bg-white/25"><i class="fa-solid fa-chevron-left"></i></button>
@@ -481,6 +492,9 @@ function renderSecretPhotoLightbox() {
             </button>
         ` : ""}
     `;
+    if (typeof attachSelectivePinchZoom === "function") {
+        attachSelectivePinchZoom(document.getElementById("vault-zoom-stage"), document.getElementById("vault-zoom-img"));
+    }
 }
 
 function navSecretPhotoLightbox(dir) {

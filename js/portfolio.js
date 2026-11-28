@@ -795,16 +795,60 @@ window.addEventListener("resize", () => {
     }
 });
 
+function _bindPortfolioPreviewZoom() {
+    const stage = document.getElementById("pfp-zoom-stage");
+    const target = document.getElementById("pfp-a4-mount");
+    const resetBtn = document.getElementById("pfp-zoom-reset-btn");
+    if (typeof attachSelectivePinchZoom === "function" && stage && target) {
+        attachSelectivePinchZoom(stage, target, {
+            maxScale: 3.5,
+            onScaleChange: (sc) => {
+                if (resetBtn) resetBtn.classList.toggle("hide", sc <= 1.05);
+            }
+        });
+    }
+}
+
+function closePortfolioPreviewModal() {
+    if (typeof resetSelectiveZoom === "function") resetSelectiveZoom("pfp-zoom-stage");
+    document.getElementById("modal-portfolio-preview")?.classList.add("hide");
+    if (typeof _mrDropTopModalById === "function") _mrDropTopModalById("modal-portfolio-preview");
+}
+
+function sharePreviewedPortfolioDemo() {
+    if (!previewPfDocObj) return;
+    const dt = previewPfDocObj.docType || "cv";
+    const tid = previewPfDocObj.themeId || "cv_emerald";
+    const tName = previewPfDocObj.themeName || getPortfolioThemeObj(dt, tid).name;
+    const labelJenis = dt === "lamaran" ? "Surat Lamaran Kerja" : "Curriculum Vitae (CV)";
+    const url = `${getCleanBaseUrl()}?demo_pf=${encodeURIComponent(dt)}&theme=${encodeURIComponent(tid)}`;
+    const title = `Contoh ${labelJenis} — ${tName}`;
+    const text = `Lihat contoh desain *${labelJenis} — ${tName}* di Lembarku ✨
+Bisa langsung cek tampilannya & unduh PDF rapi di sini:
+${url}`;
+    if (typeof openDemoSocialShare === "function") {
+        openDemoSocialShare({ title, text, url, subtitle: `Contoh ${labelJenis} • ${tName}` });
+    } else {
+        navigator.clipboard?.writeText(url);
+        showToast("Link contoh desain disalin!");
+    }
+}
+
 function openPortfolioDemoPreview(docType, themeId) {
     const demo = buildDemoPortfolioDoc(docType, themeId);
     previewPfDocObj = demo;
     previewPfIsRevision = false;
-    document.getElementById("pfp-use-btn").classList.remove("hide");
-    document.getElementById("pfp-sempurnakan-btn").classList.add("hide");
+    document.getElementById("pfp-use-btn")?.classList.remove("hide");
+    document.getElementById("pfp-share-demo-btn")?.classList.remove("hide");
+    document.getElementById("pfp-sempurnakan-btn")?.classList.add("hide");
     document.getElementById("pfp-a4-mount").innerHTML = renderPortfolioA4Html(demo, true);
     document.getElementById("modal-portfolio-preview").classList.remove("hide");
-    pushBackGuard();
-    requestAnimationFrame(() => requestAnimationFrame(fitPreviewA4Scale));
+    if (typeof mrNavPush === "function") mrNavPush({ type: "modal", id: "modal-portfolio-preview" });
+    else pushBackGuard();
+    requestAnimationFrame(() => requestAnimationFrame(() => {
+        fitPreviewA4Scale();
+        _bindPortfolioPreviewZoom();
+    }));
 }
 
 function openPortfolioDocPreview(pfId, isRevisionView = false) {
@@ -813,23 +857,33 @@ function openPortfolioDocPreview(pfId, isRevisionView = false) {
     previewPfDocObj = target;
     previewPfIsRevision = isRevisionView;
     const isPaidOrActive = target.status === "Aktif";
-    document.getElementById("pfp-use-btn").classList.add("hide");
-    document.getElementById("pfp-sempurnakan-btn").classList.toggle("hide", !isPaidOrActive);
+    document.getElementById("pfp-use-btn")?.classList.add("hide");
+    document.getElementById("pfp-share-demo-btn")?.classList.add("hide");
+    document.getElementById("pfp-sempurnakan-btn")?.classList.toggle("hide", !isPaidOrActive);
     document.getElementById("pfp-a4-mount").innerHTML = renderPortfolioA4Html(target, !isPaidOrActive);
     document.getElementById("modal-portfolio-preview").classList.remove("hide");
-    pushBackGuard();
-    requestAnimationFrame(() => requestAnimationFrame(fitPreviewA4Scale));
+    if (typeof mrNavPush === "function") mrNavPush({ type: "modal", id: "modal-portfolio-preview" });
+    else pushBackGuard();
+    requestAnimationFrame(() => requestAnimationFrame(() => {
+        fitPreviewA4Scale();
+        _bindPortfolioPreviewZoom();
+    }));
 }
 
 function previewPortfolioDraft() {
     const draftDoc = collectPortfolioFormPayload(true);
     previewPfDocObj = draftDoc;
-    document.getElementById("pfp-use-btn").classList.add("hide");
-    document.getElementById("pfp-sempurnakan-btn").classList.add("hide");
+    document.getElementById("pfp-use-btn")?.classList.add("hide");
+    document.getElementById("pfp-share-demo-btn")?.classList.add("hide");
+    document.getElementById("pfp-sempurnakan-btn")?.classList.add("hide");
     document.getElementById("pfp-a4-mount").innerHTML = renderPortfolioA4Html(draftDoc, true);
     document.getElementById("modal-portfolio-preview").classList.remove("hide");
-    pushBackGuard();
-    requestAnimationFrame(() => requestAnimationFrame(fitPreviewA4Scale));
+    if (typeof mrNavPush === "function") mrNavPush({ type: "modal", id: "modal-portfolio-preview" });
+    else pushBackGuard();
+    requestAnimationFrame(() => requestAnimationFrame(() => {
+        fitPreviewA4Scale();
+        _bindPortfolioPreviewZoom();
+    }));
 }
 
 function usePreviewedPortfolioTheme() {

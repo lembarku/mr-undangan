@@ -1,5 +1,5 @@
 /* =========================================================================
-   LEMBARKU & TITIK GOWES — STYLESHEET RESMI (V14.8)
+   LEMBARKU & TITIK GOWES — STYLESHEET RESMI (V14.9)
    File: css/styles.css
    ========================================================================= */
 
@@ -132,6 +132,9 @@ html[data-app-theme="orange"] {
 html, body {
     overflow-x: hidden;
     max-width: 100%;
+    touch-action: pan-x pan-y;
+    -webkit-text-size-adjust: 100%;
+    overscroll-behavior-y: none;
 }
 
 body {
@@ -515,7 +518,7 @@ body {
 .polaroid-stack { position: relative; width: 100%; max-width: 310px; height: 375px; margin: 0.5rem auto; perspective: 1200px; touch-action: pan-y; }
 .polaroid-card { position: absolute; inset: 0; background: #ffffff; padding: 12px 12px 42px 12px; border-radius: 6px; box-shadow: 0 18px 40px rgba(0, 0, 0, 0.55); transform-origin: 50% 90%; transition: transform 0.55s cubic-bezier(0.22, 1, 0.36, 1), opacity 0.45s ease; cursor: grab; user-select: none; }
 .polaroid-card:active { cursor: grabbing; }
-.polaroid-card img { width: 100%; height: 100%; object-fit: cover; border-radius: 3px; pointer-events: none; }
+.polaroid-card img { width: 100%; height: 100%; object-fit: cover; object-position: 50% 18%; border-radius: 3px; pointer-events: none; transition: object-position 0.25s ease; }
 .polaroid-cap { position: absolute; bottom: 10px; left: 12px; right: 12px; text-align: center; font-family: 'Playfair Display', serif; font-style: italic; font-size: 12px; color: #3f3f46; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .paper-flip-next { transform: translate3d(135%, -14%, 0) rotate(24deg) scale(0.92) !important; opacity: 0 !important; }
 .paper-flip-prev { transform: translate3d(-135%, -14%, 0) rotate(-24deg) scale(0.92) !important; opacity: 0 !important; }
@@ -556,7 +559,7 @@ body {
 .hide { display: none !important; }
 
 /* =========================================================================
-   TITIK GOWES — MODULAR EXTENSION STYLES (SAFE APPEND V14.8)
+   TITIK GOWES — MODULAR EXTENSION STYLES (SAFE APPEND V14.9)
    ========================================================================= */
 
 /* 1. Tombol Garis 2 Threads di Sisi Kiri Header (Hanya di Beranda) */
@@ -858,7 +861,7 @@ body.in-home.mode-gowes main {
     box-shadow: 0 4px 12px rgba(5, 150, 105, 0.28);
 }
 
-/* 8. V14.8 — Kartu Peta Google Maps Elegan & Banner Tipografi Promosi */
+/* 8. V14.9 — Kartu Peta Google Maps Elegan & Banner Tipografi Promosi */
 .gowes-map-card-frame {
     position: relative;
     width: 100%;
@@ -898,7 +901,7 @@ body.in-home.mode-gowes main {
     text-shadow: 0 2px 12px rgba(0, 0, 0, 0.72);
 }
 
-/* 9. V14.8 — Dropdown Pemilih Cabang Memanjang & Pemilih Sepeda Bergambar */
+/* 9. V14.9 — Dropdown Pemilih Cabang Memanjang & Pemilih Sepeda Bergambar */
 .gowes-branch-select-btn {
     width: 100%;
     display: flex;
@@ -959,7 +962,7 @@ body.in-home.mode-gowes main {
     -webkit-overflow-scrolling: touch;
 }
 
-/* 10. V14.8 — Peringatan Bentrok Booking, Indikator Overdue & Kasir Offline */
+/* 10. V14.9 — Peringatan Bentrok Booking, Indikator Overdue & Kasir Offline */
 .gowes-conflict-alert {
     border-radius: 1rem;
     background: rgba(239, 68, 68, 0.12);
@@ -992,4 +995,103 @@ html[data-app-theme="black"] .gowes-conflict-alert {
     border-radius: 9999px;
     text-transform: uppercase;
     letter-spacing: 0.03em;
+}
+
+/* =========================================================================
+   V14.9 — SMART PORTRAIT FRAMING, SELECTIVE PINCH ZOOM & RESPONSIVE PC/TABLET/MOBILE
+   ========================================================================= */
+
+/* 1. Smart Framing Kepala Otomatis (Default Atas Wajah 50% 18%) */
+.inv-portrait-smart {
+    object-fit: cover !important;
+    object-position: 50% 18%;
+    transition: object-position 0.25s ease;
+}
+
+/* 2. Area Zoom Selektif (Hanya Foto Dibuka & Preview A4) */
+.selective-zoom-stage {
+    touch-action: none !important;
+    user-select: none;
+    -webkit-user-select: none;
+}
+.selective-zoom-target {
+    transform-origin: center center;
+    will-change: transform;
+    transition: transform 0.08s ease-out;
+}
+.selective-zoom-target.is-dragging {
+    transition: none;
+}
+.cropper-container,
+#modal-image-cropper * {
+    touch-action: none;
+}
+
+/* 3. Adaptasi Layout Mobile, Tablet (768px-1023px) & PC (>=1024px) */
+@media (min-width: 768px) {
+    .h-shelf-card {
+        flex: 0 0 198px;
+        width: 198px;
+    }
+    .h-doc-poster-card {
+        flex: 0 0 335px;
+        width: 335px;
+    }
+    .slide-drawer-panel {
+        max-width: 48rem;
+    }
+    .gowes-map-card-frame {
+        height: 230px;
+    }
+}
+
+@media (min-width: 1024px) {
+    main {
+        padding-left: 2rem !important;
+        padding-right: 2rem !important;
+    }
+    .h-shelf-card {
+        flex: 0 0 208px;
+        width: 208px;
+    }
+    .promo-banner-fullbleed {
+        height: 270px;
+        border-radius: 1.75rem;
+    }
+    .gowes-banner-16-5 {
+        height: 265px;
+        max-height: 280px;
+        border-radius: 1.5rem;
+    }
+    /* Titik Gowes Showcase di Layar PC: 2 Kolom Elegan (Foto Kiri 4:3 + Detail Kanan) */
+    .gowes-showcase-slide {
+        flex-direction: row;
+        align-items: stretch;
+        min-height: 360px;
+    }
+    .gowes-showcase-photo-box {
+        flex: 0 0 54%;
+        width: 54%;
+        aspect-ratio: auto;
+        min-height: 360px;
+        max-height: 430px;
+    }
+    .gowes-showcase-photo-fade {
+        top: 0;
+        bottom: 0;
+        left: auto;
+        right: 0;
+        width: 3.5rem;
+        height: 100%;
+        background: linear-gradient(to left, #09090b 0%, rgba(9, 9, 11, 0.4) 55%, transparent 100%);
+    }
+    .gowes-showcase-info {
+        flex: 1 1 46%;
+        padding: 1.75rem 2rem;
+        justify-content: center;
+        gap: 1rem;
+    }
+    .gowes-map-card-frame {
+        height: 270px;
+    }
 }
