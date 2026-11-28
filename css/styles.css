@@ -129,12 +129,13 @@ html[data-app-theme="orange"] {
     --app-chat-replied: #ea580c;
 }
 
-html, body {
-    overflow-x: hidden;
-    max-width: 100%;
-    touch-action: pan-x pan-y;
-    -webkit-text-size-adjust: 100%;
-    overscroll-behavior-y: none;
+.selective-zoom-stage {
+    touch-action: pan-y;
+    user-select: none;
+    -webkit-user-select: none;
+}
+.selective-zoom-stage[data-zooming="1"] {
+    touch-action: none !important;
 }
 
 body {
